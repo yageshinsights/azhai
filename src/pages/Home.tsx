@@ -31,50 +31,51 @@ const HERO_SLIDES = [
     desc: 'Featherlight organza, fitted corset kurtas & heirloom maroon silks crafted by Preethi for your soft, unforgettable moments.',
     image: 'https://images.unsplash.com/photo-1610030469983-98e550d6193c?auto=format&fit=crop&w=1400&q=90',
     polaroidCaption: 'The Maroon Corset Set · Handloom Kanjivaram',
-    productName: 'Maroon Corset Kurta Set',
+    productName: 'Maroon Corset Handloom Kurti Set',
     price: '₹8,499',
-    productSlug: 'maroon-kanjivaram-kurta-set',
+    productSlug: 'maroon-corset-kurti-set',
     productId: 101,
   },
   {
     id: 2,
-    badge: 'PINTEREST DREAM · SIGNATURE EDIT',
-    headline: 'Soft as a Cloud,',
-    scriptHeadline: 'Pure as a Lotus.',
-    desc: 'Parchment-cream organza adorned with hand-painted crimson blooms. Effortless drapes that float with every step.',
-    image: 'https://images.unsplash.com/photo-1583391733956-3750e0ff4e8b?auto=format&fit=crop&w=1400&q=90',
-    polaroidCaption: 'Ivory Lotus Organza · 100% Pure Mulberry Silk',
-    productName: 'Ivory Lotus Organza Saree',
-    price: '₹12,800',
-    productSlug: 'ivory-lotus-organza-saree',
-    productId: 102,
-  },
-  {
-    id: 3,
     badge: 'SANGEET COUTURE · 32-KALI FLAIR',
     headline: 'Dance in 32 Kalis,',
     scriptHeadline: 'Own the Moment.',
     desc: 'Sweeping raw silk volume with continuous maroon cord-work. Pure drama designed for effortless 360° slow-mo twirls.',
     image: 'https://images.unsplash.com/photo-1617627143750-d86bc21e42bb?auto=format&fit=crop&w=1400&q=90',
-    polaroidCaption: '32-Kali Raw Silk Anarkali · Heirloom Cordwork',
-    productName: '32-Kali Raw Silk Anarkali',
+    polaroidCaption: '32-Kali Raw Silk Shalwar Suit · Heirloom Cordwork',
+    productName: '32-Kali Twirl Raw Silk Shalwar Suit',
     price: '₹15,500',
-    productSlug: 'raw-silk-anarkali',
-    productId: 103,
+    productSlug: 'raw-silk-shalwar-suit',
+    productId: 201,
+  },
+  {
+    id: 3,
+    badge: 'MODERN MUSE · CORSET SEPARATES',
+    headline: 'Structured Silk,',
+    scriptHeadline: 'Endless Versatility.',
+    desc: 'Handloom silk bustiers with gold zari piping and flattering boning. Pair with trousers, sarees or flowing palazzos.',
+    image: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=1400&q=90',
+    polaroidCaption: 'Handloom Silk Bustier Crop Top',
+    productName: 'Handloom Silk Bustier Crop Top',
+    price: '₹4,499',
+    productSlug: 'handloom-silk-bustier-top',
+    productId: 301,
   }
 ];
 
-const MOOD_FILTERS = [
-  { label: '✨ All Curations', value: 'all' },
-  { label: '🌸 Golden Hour Organza', value: 'organza' },
-  { label: '💃 Twirl Sangeet Moments', value: 'twirl' },
-  { label: '🪷 Sacred Pooja & Temple', value: 'pooja' },
-  { label: '🎓 College & Casual Chic', value: 'casual' },
+const CATEGORY_FILTERS = [
+  { label: '✨ All Pieces', value: 'all' },
+  { label: '👗 Kurtis', value: 'kurtis' },
+  { label: '💃 Shalwars', value: 'shalwars' },
+  { label: '🌸 Tops', value: 'tops' },
+  { label: '✨ Bottoms', value: 'bottoms' },
+  { label: '🪷 Accessories', value: 'accessories' },
 ];
 
 export default function Home() {
   const [activeSlide, setActiveSlide] = useState(0);
-  const [selectedMood, setSelectedMood] = useState('all');
+  const [selectedCategory, setSelectedCategory] = useState('all');
   const [quickAdded, setQuickAdded] = useState(false);
   const { addItem } = useCartStore();
 
@@ -101,12 +102,8 @@ export default function Home() {
   };
 
   const filteredProducts = PRODUCTS.filter(p => {
-    if (selectedMood === 'all') return true;
-    if (selectedMood === 'organza') return p.categories.some(c => c.slug === 'lotus-in-bloom');
-    if (selectedMood === 'twirl') return p.name.includes('Anarkali') || p.occasion?.includes('Sangeet');
-    if (selectedMood === 'pooja') return p.categories.some(c => c.slug === 'sacred-thread');
-    if (selectedMood === 'casual') return p.name.includes('Chanderi') || p.occasion?.includes('College');
-    return true;
+    if (selectedCategory === 'all') return true;
+    return p.categories.some(c => c.slug === selectedCategory);
   });
 
   return (
@@ -117,7 +114,7 @@ export default function Home() {
         <div className="flex items-center justify-center gap-4 sm:gap-8 whitespace-nowrap">
           <span className="flex items-center gap-2"><Crown className="w-3.5 h-3.5 text-[#DFBF77]" /> HAUTE COUTURE FESTIVE '26 DROP</span>
           <span className="hidden md:inline text-[#C5A059]/60">✦</span>
-          <span className="hidden md:inline">COMPLIMENTARY WHITE-GLOVE SHIPPING OVER ₹5,000</span>
+          <span className="hidden md:inline">FREE ISLAND-WIDE DELIVERY OVER LKR 15,000</span>
           <span className="hidden sm:inline text-[#C5A059]/60">✦</span>
           <span className="hidden sm:inline">USE CODE <strong>AZHAI10</strong> FOR 10% PRIVILEGE DISCOUNT</span>
         </div>
@@ -168,19 +165,19 @@ export default function Home() {
                 to="/collections"
                 className="px-9 py-4 bg-[#701626] hover:bg-[#8E1E34] text-white text-xs uppercase tracking-[0.25em] font-bold flex items-center gap-3 rounded-full shadow-xl shadow-[#701626]/20 transition-all hover:scale-[1.02] border border-[#C5A059]/30"
               >
-                <span>Explore The New Drop</span>
+                <span>Explore All 5 Collections</span>
                 <ArrowRight className="w-4 h-4" />
               </Link>
 
               <Link
-                to="/collections/lotus-in-bloom"
+                to="/collections/kurtis"
                 className="px-8 py-4 bg-white/90 hover:bg-[#F7F4EE] text-[#110B0E] text-xs uppercase tracking-[0.25em] font-bold border border-[#C5A059]/50 rounded-full transition-all shadow-sm"
               >
-                🌸 Dreamy Organza
+                👗 Kurtis Edit
               </Link>
             </div>
 
-            {/* Founder Handwritten Quote with Emblem */}
+            {/* Founder Handwritten Quote */}
             <div className="pt-5 border-t border-[#C5A059]/30 flex items-center justify-between gap-3">
               <div className="flex items-center gap-3">
                 <img
@@ -317,10 +314,10 @@ export default function Home() {
       <div className="border-y border-[#C5A059]/30 bg-white/85 backdrop-blur-md py-7 px-5 sm:px-8 relative z-10">
         <div className="max-w-7xl mx-auto grid grid-cols-2 md:grid-cols-4 gap-6 text-center sm:text-left">
           {[
-            { icon: Sparkles, title: 'Complimentary Express Delivery', desc: 'On all orders over ₹5,000 across India' },
+            { icon: Sparkles, title: 'Island-wide Express Delivery', desc: 'Free on all orders over LKR 15,000 across Sri Lanka' },
             { icon: Feather, title: 'Cloud-Light Mulberry Silks', desc: 'Zero synthetic blends · Pure handloom drape' },
             { icon: Sun, title: 'Made for Aesthetic Memories', desc: 'Flattering cuts designed for golden hour radiance' },
-            { icon: Crown, title: 'Bespoke Craft by Preethi', desc: 'Limited edition runs · Handcrafted in Tamil Nadu' },
+            { icon: Crown, title: 'Bespoke Craft by Preethi', desc: 'Limited edition runs · Handcrafted with love' },
           ].map((f, i) => (
             <div key={i} className="flex items-center gap-3.5 justify-center sm:justify-start">
               <div className="w-11 h-11 rounded-2xl bg-[#701626]/8 flex items-center justify-center shrink-0 border border-[#C5A059]/35 shadow-sm">
@@ -335,33 +332,34 @@ export default function Home() {
         </div>
       </div>
 
-      {/* ── SHOP BY MOOD / OCCASION ── */}
+      {/* ── SHOP BY CATEGORY ── */}
       <section className="py-24 px-5 sm:px-8 max-w-7xl mx-auto relative z-10">
+        
         <div className="text-center space-y-2.5 mb-10">
           <span className="text-[10px] uppercase tracking-[0.3em] text-[#701626] font-bold">
-            Curated by Occasion
+            Curated Categories
           </span>
           <h2 className="font-display text-4xl sm:text-5xl font-bold text-[#110B0E]">
-            Find your festive aesthetic
+            Shop By Collection
           </h2>
           <p className="text-sm text-[#6D6268] max-w-md mx-auto font-light leading-relaxed">
             Every piece is thoughtfully designed to make you feel effortless, graceful, and radiant.
           </p>
         </div>
 
-        {/* Filter Pills */}
+        {/* Category Filter Pills */}
         <div className="flex flex-wrap items-center justify-center gap-2.5 pb-12">
-          {MOOD_FILTERS.map((mood) => (
+          {CATEGORY_FILTERS.map((cat) => (
             <button
-              key={mood.value}
-              onClick={() => setSelectedMood(mood.value)}
+              key={cat.value}
+              onClick={() => setSelectedCategory(cat.value)}
               className={`px-6 py-2.5 rounded-full text-xs font-semibold tracking-wide transition-all ${
-                selectedMood === mood.value
+                selectedCategory === cat.value
                   ? 'bg-[#701626] text-white shadow-lg shadow-[#701626]/20 border border-[#C5A059]/50 scale-105'
                   : 'bg-white text-[#6D6268] hover:text-[#110B0E] border border-[#C5A059]/30 hover:border-[#701626]/40 shadow-sm'
               }`}
             >
-              {mood.label}
+              {cat.label}
             </button>
           ))}
         </div>
@@ -379,33 +377,25 @@ export default function Home() {
         <LiyawelDivider />
       </div>
 
-      {/* ── INTERACTIVE FABRIC & CRAFT SWATCH EXPLORER ── */}
-      <FabricExplorer />
-
-      {/* Liyawel Cultural Vine Divider */}
-      <div className="max-w-4xl mx-auto px-5">
-        <LiyawelDivider />
-      </div>
-
-      {/* ── CURATED CHAPTERS (COLLECTIONS) ── */}
+      {/* ── THE 5 SIGNATURE COLLECTIONS ── */}
       <section className="py-24 px-5 sm:px-8 max-w-7xl mx-auto relative z-10">
         <div className="flex items-end justify-between mb-12">
           <div className="space-y-1">
-            <span className="text-[10px] uppercase tracking-[0.3em] text-[#701626] font-bold">Signature Edits</span>
+            <span className="text-[10px] uppercase tracking-[0.3em] text-[#701626] font-bold">Signature Silhouettes</span>
             <h2 className="font-display text-4xl sm:text-5xl font-bold text-[#110B0E]">The Collections</h2>
           </div>
           <Link to="/collections" className="text-xs uppercase tracking-[0.2em] text-[#701626] font-bold hover:underline flex items-center gap-1.5">
-            <span>View All Chapters</span>
+            <span>View All 5 Collections</span>
             <ArrowRight className="w-3.5 h-3.5" />
           </Link>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-7">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-5">
           {COLLECTIONS.map((col) => (
             <Link
               key={col.id}
               to={`/collections/${col.slug}`}
-              className="group block relative rounded-[2rem] overflow-hidden h-[480px] bg-white border border-[#C5A059]/30 shadow-md hover:shadow-2xl transition-all duration-500"
+              className="group block relative rounded-[2rem] overflow-hidden aspect-[3/4] bg-white border border-[#C5A059]/30 shadow-md hover:shadow-2xl transition-all duration-500"
             >
               <img
                 src={col.heroImage}
@@ -414,24 +404,32 @@ export default function Home() {
               />
               <div className="absolute inset-0 bg-gradient-to-t from-[#110B0E]/90 via-[#110B0E]/20 to-transparent" />
               
-              <div className="absolute top-4 right-4 bg-white/95 backdrop-blur-md px-4 py-1.5 rounded-full text-[9px] text-[#701626] font-bold uppercase tracking-[0.2em] shadow-md border border-[#C5A059]/40">
+              <div className="absolute top-3.5 right-3.5 bg-white/95 backdrop-blur-md px-3 py-1 rounded-full text-[8px] text-[#701626] font-bold uppercase tracking-[0.2em] shadow-md border border-[#C5A059]/40">
                 {col.season}
               </div>
 
-              <div className="absolute bottom-0 left-0 right-0 p-7 space-y-1.5 text-white">
-                <p className="text-[10px] uppercase tracking-[0.25em] text-[#DFBF77] font-semibold">{col.tagline}</p>
-                <h3 className="font-display text-2xl sm:text-3xl font-bold group-hover:text-[#DFBF77] transition-colors">
+              <div className="absolute bottom-0 left-0 right-0 p-5 space-y-1 text-white">
+                <p className="text-[9px] uppercase tracking-[0.2em] text-[#DFBF77] font-semibold">{col.count} Pieces</p>
+                <h3 className="font-display text-xl sm:text-2xl font-bold group-hover:text-[#DFBF77] transition-colors leading-tight">
                   {col.name}
                 </h3>
-                <p className="text-xs text-white/75 font-light line-clamp-2 leading-relaxed">{col.description}</p>
-                <span className="inline-flex items-center gap-1.5 text-xs text-[#DFBF77] font-bold pt-2 uppercase tracking-wider">
-                  Discover Chapter →
+                <p className="text-[11px] text-white/75 font-light line-clamp-2 leading-relaxed">{col.description}</p>
+                <span className="inline-flex items-center gap-1 text-[11px] text-[#DFBF77] font-bold pt-1 uppercase tracking-wider">
+                  Explore →
                 </span>
               </div>
             </Link>
           ))}
         </div>
       </section>
+
+      {/* Liyawel Cultural Vine Divider */}
+      <div className="max-w-4xl mx-auto px-5">
+        <LiyawelDivider />
+      </div>
+
+      {/* ── INTERACTIVE FABRIC & CRAFT SWATCH EXPLORER ── */}
+      <FabricExplorer />
 
       {/* Liyawel Cultural Vine Divider */}
       <div className="max-w-4xl mx-auto px-5">

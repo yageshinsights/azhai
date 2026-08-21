@@ -8,6 +8,8 @@ import Collections from '@/pages/Collections';
 import CollectionDetail from '@/pages/CollectionDetail';
 import ProductDetail from '@/pages/ProductDetail';
 import Story from '@/pages/Story';
+import Checkout from '@/pages/Checkout';
+import OrderSuccess from '@/pages/OrderSuccess';
 
 const pageVariants: Variants = {
   initial: { opacity: 0, y: 16 },
@@ -32,6 +34,8 @@ function AnimatedRoutes() {
           <Route path="/collections/:slug" element={<CollectionDetail />} />
           <Route path="/products/:slug" element={<ProductDetail />} />
           <Route path="/story" element={<Story />} />
+          <Route path="/checkout" element={<Checkout />} />
+          <Route path="/order-success/:orderId" element={<OrderSuccess />} />
         </Routes>
       </motion.div>
     </AnimatePresence>

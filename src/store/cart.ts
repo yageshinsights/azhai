@@ -9,14 +9,40 @@ export interface CartItem {
   size?: string;
 }
 
+export interface PlacedOrder {
+  orderId: string;
+  items: CartItem[];
+  subtotal: number;
+  discount: number;
+  shipping: number;
+  total: number;
+  coupon?: string;
+  giftNote?: string;
+  customer: {
+    fullName: string;
+    email: string;
+    phone: string;
+    address: string;
+    city: string;
+    district: string;
+    postalCode: string;
+  };
+  deliveryMethod: string;
+  paymentMethod: string;
+  placedAt: string;
+}
+
 interface CartStore {
   items: CartItem[];
   isOpen: boolean;
+  lastOrder: PlacedOrder | null;
   addItem: (item: CartItem) => void;
   removeItem: (id: number, size?: string) => void;
   updateQuantity: (id: number, size: string | undefined, qty: number) => void;
   toggleCart: () => void;
   setCartOpen: (open: boolean) => void;
+  clearCart: () => void;
+  setLastOrder: (order: PlacedOrder) => void;
   totalItems: () => number;
   totalPrice: () => number;
 }
@@ -24,6 +50,7 @@ interface CartStore {
 export const useCartStore = create<CartStore>((set, get) => ({
   items: [],
   isOpen: false,
+  lastOrder: null,
   addItem: (item) => {
     const existing = get().items.find(i => i.id === item.id && i.size === item.size);
     if (existing) {
@@ -49,6 +76,8 @@ export const useCartStore = create<CartStore>((set, get) => ({
     })),
   toggleCart: () => set(state => ({ isOpen: !state.isOpen })),
   setCartOpen: (open) => set({ isOpen: open }),
+  clearCart: () => set({ items: [] }),
+  setLastOrder: (order) => set({ lastOrder: order }),
   totalItems: () => get().items.reduce((sum, i) => sum + i.quantity, 0),
   totalPrice: () =>
     get().items.reduce((sum, i) => {
