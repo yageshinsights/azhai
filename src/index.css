@@ -1,0 +1,117 @@
+@import "tailwindcss";
+
+@import "@fontsource/cormorant-garamond/400.css";
+@import "@fontsource/cormorant-garamond/500.css";
+@import "@fontsource/cormorant-garamond/600.css";
+@import "@fontsource/cormorant-garamond/700.css";
+@import "@fontsource/montserrat/300.css";
+@import "@fontsource/montserrat/400.css";
+@import "@fontsource/montserrat/500.css";
+@import "@fontsource/montserrat/600.css";
+@import "@fontsource/montserrat/700.css";
+@import "@fontsource/dancing-script/400.css";
+@import "@fontsource/dancing-script/700.css";
+
+@layer base {
+  :root {
+    --maroon:         #701626;
+    --maroon-deep:    #3F0C15;
+    --maroon-royal:   #8E1E34;
+    --gold:           #C5A059;
+    --gold-bright:    #DFBF77;
+    --gold-light:     #F3E8CE;
+    --alabaster-bg:   #FCFBF8;
+    --linen-surface:  #F7F4EE;
+    --card-surface:   #FFFFFF;
+    --text-obsidian:  #110B0E;
+    --text-muted:     #6D6268;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    font-family: 'Montserrat', system-ui, sans-serif;
+    background: #FCFBF8;
+    color: #110B0E;
+    overflow-x: hidden;
+    letter-spacing: -0.01em;
+  }
+
+  ::-webkit-scrollbar { width: 5px; }
+  ::-webkit-scrollbar-track { background: #FCFBF8; }
+  ::-webkit-scrollbar-thumb { background: #C5A059; border-radius: 4px; }
+
+  ::selection {
+    background: #701626;
+    color: #FFFFFF;
+  }
+}
+
+/* Haute Couture Luxury Glass & Cards */
+.glass {
+  background: rgba(255, 255, 255, 0.75);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(223, 191, 119, 0.25);
+}
+
+.glass-milk {
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(223, 191, 119, 0.35);
+  box-shadow: 0 16px 40px -10px rgba(112, 22, 38, 0.06), 0 4px 16px rgba(0, 0, 0, 0.02);
+}
+
+.glass-maroon {
+  background: rgba(112, 22, 38, 0.06);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(112, 22, 38, 0.18);
+}
+
+.card-couture {
+  background: #FFFFFF;
+  border: 1px solid rgba(197, 160, 89, 0.22);
+  box-shadow: 0 12px 36px -8px rgba(35, 15, 22, 0.05), 0 2px 8px rgba(0, 0, 0, 0.02);
+  transition: all 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+.card-couture:hover {
+  border-color: rgba(112, 22, 38, 0.35);
+  box-shadow: 0 24px 55px -12px rgba(112, 22, 38, 0.12), 0 6px 20px rgba(197, 160, 89, 0.08);
+  transform: translateY(-4px);
+}
+
+/* Brushed Gold Foil & Shimmer */
+.text-gold-foil {
+  background: linear-gradient(135deg, #B8860B 0%, #D4AF37 40%, #FFF3C4 60%, #AA771C 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.text-shimmer {
+  background: linear-gradient(90deg, #701626 0%, #C5A059 35%, #9E2238 65%, #701626 100%);
+  background-size: 250% auto;
+  color: transparent;
+  -webkit-background-clip: text;
+  background-clip: text;
+  animation: shimmer 5s ease-in-out infinite;
+}
+
+@keyframes shimmer {
+  0% { background-position: -250% 0; }
+  100% { background-position: 250% 0; }
+}
+
+.gold-border-glow {
+  box-shadow: 0 0 0 1px rgba(197, 160, 89, 0.3), 0 8px 30px -4px rgba(112, 22, 38, 0.08);
+}
+
+.font-display { font-family: 'Cormorant Garamond', Georgia, serif; }
+.font-script { font-family: 'Dancing Script', cursive; }
