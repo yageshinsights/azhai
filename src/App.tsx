@@ -3,6 +3,7 @@ import { AnimatePresence, motion, type Variants } from 'framer-motion';
 import Navbar from '@/components/Navbar';
 import CartDrawer from '@/components/CartDrawer';
 import Footer from '@/components/Footer';
+import AuthGuard from '@/components/AuthGuard';
 import Home from '@/pages/Home';
 import Collections from '@/pages/Collections';
 import CollectionDetail from '@/pages/CollectionDetail';
@@ -10,6 +11,11 @@ import ProductDetail from '@/pages/ProductDetail';
 import Story from '@/pages/Story';
 import Checkout from '@/pages/Checkout';
 import OrderSuccess from '@/pages/OrderSuccess';
+import Login from '@/pages/Login';
+import Signup from '@/pages/Signup';
+import ForgotPassword from '@/pages/ForgotPassword';
+import ResetPassword from '@/pages/ResetPassword';
+import Account from '@/pages/Account';
 
 const pageVariants: Variants = {
   initial: { opacity: 0, y: 16 },
@@ -36,6 +42,20 @@ function AnimatedRoutes() {
           <Route path="/story" element={<Story />} />
           <Route path="/checkout" element={<Checkout />} />
           <Route path="/order-success/:orderId" element={<OrderSuccess />} />
+          
+          {/* Auth & Account Routes */}
+          <Route path="/login" element={<Login />} />
+          <Route path="/signup" element={<Signup />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
+          <Route
+            path="/account"
+            element={
+              <AuthGuard>
+                <Account />
+              </AuthGuard>
+            }
+          />
         </Routes>
       </motion.div>
     </AnimatePresence>

@@ -16,7 +16,7 @@ export default function CollectionDetail() {
   );
 
   return (
-    <div className="min-h-screen bg-[#FCFBF8] pt-20 text-[#110B0E]">
+    <div className="min-h-screen bg-[#FCFBF8] pt-24 text-[#110B0E]">
       
       {/* Hero Banner */}
       <section className="relative h-[45vh] min-h-[340px] overflow-hidden">

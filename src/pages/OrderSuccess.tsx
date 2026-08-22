@@ -1,11 +1,13 @@
 import { useParams, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { CheckCircle2, Package, Truck, MessageCircle, ArrowRight, Sparkles, Crown } from 'lucide-react';
+import { CheckCircle2, Package, Truck, MessageCircle, ArrowRight, Sparkles, Crown, UserPlus, FileText } from 'lucide-react';
 import { useCartStore } from '@/store/cart';
+import { useAuthStore } from '@/store/auth';
 
 export default function OrderSuccess() {
   const { orderId } = useParams<{ orderId: string }>();
   const { lastOrder } = useCartStore();
+  const { isAuthenticated } = useAuthStore();
 
   const order = lastOrder || {
     orderId: orderId || 'AZH-84291',
@@ -131,24 +133,44 @@ export default function OrderSuccess() {
           </div>
 
           {/* Action Buttons */}
-          <div className="pt-6 border-t border-[#C5A059]/30 flex flex-col sm:flex-row gap-3 justify-center">
-            <a
-              href={`https://wa.me/?text=${whatsappMessage}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="px-8 py-4 bg-emerald-700 hover:bg-emerald-800 text-white text-xs uppercase tracking-[0.2em] font-bold rounded-2xl flex items-center justify-center gap-2 shadow-lg transition-colors"
-            >
-              <MessageCircle className="w-4 h-4" />
-              <span>Confirm on WhatsApp</span>
-            </a>
+          <div className="pt-6 border-t border-[#C5A059]/30 space-y-3">
+            <div className="flex flex-col sm:flex-row gap-3 justify-center">
+              <a
+                href={`https://wa.me/?text=${whatsappMessage}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="px-6 py-3.5 bg-emerald-700 hover:bg-emerald-800 text-white text-xs uppercase tracking-[0.2em] font-bold rounded-2xl flex items-center justify-center gap-2 shadow-md transition-colors"
+              >
+                <MessageCircle className="w-4 h-4" />
+                <span>Confirm on WhatsApp</span>
+              </a>
 
-            <Link
-              to="/collections"
-              className="px-8 py-4 bg-[#701626] hover:bg-[#8E1E34] text-white text-xs uppercase tracking-[0.2em] font-bold rounded-2xl flex items-center justify-center gap-2 shadow-lg transition-colors border border-[#C5A059]/30"
-            >
-              <span>Continue Shopping</span>
-              <ArrowRight className="w-4 h-4" />
-            </Link>
+              {isAuthenticated ? (
+                <Link
+                  to={`/account?tab=orders&order=${order.orderId}`}
+                  className="px-6 py-3.5 bg-[#701626] hover:bg-[#8E1E34] text-white text-xs uppercase tracking-[0.2em] font-bold rounded-2xl flex items-center justify-center gap-2 shadow-md transition-colors"
+                >
+                  <FileText className="w-4 h-4" />
+                  <span>View in My Orders</span>
+                </Link>
+              ) : (
+                <Link
+                  to="/signup"
+                  className="px-6 py-3.5 bg-[#F7F4EE] hover:bg-[#C5A059]/20 text-[#110B0E] hover:text-[#701626] text-xs uppercase tracking-[0.2em] font-bold rounded-2xl flex items-center justify-center gap-2 border border-[#C5A059]/40 transition-colors"
+                >
+                  <UserPlus className="w-4 h-4" />
+                  <span>Create Account to Track</span>
+                </Link>
+              )}
+
+              <Link
+                to="/collections"
+                className="px-6 py-3.5 bg-white hover:bg-gray-50 text-[#110B0E] text-xs uppercase tracking-[0.2em] font-bold rounded-2xl flex items-center justify-center gap-2 border border-[#C5A059]/30 transition-colors"
+              >
+                <span>Continue Shopping</span>
+                <ArrowRight className="w-4 h-4" />
+              </Link>
+            </div>
           </div>
 
         </motion.div>

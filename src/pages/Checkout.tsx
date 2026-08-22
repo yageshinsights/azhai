@@ -17,6 +17,7 @@ import {
   Calendar
 } from 'lucide-react';
 import { useCartStore } from '@/store/cart';
+import { useAuthStore } from '@/store/auth';
 
 const SRI_LANKA_DISTRICTS = [
   'Colombo',
@@ -48,21 +49,36 @@ const SRI_LANKA_DISTRICTS = [
 
 export default function Checkout() {
   const { items, totalPrice, clearCart, setLastOrder } = useCartStore();
+  const { user, isAuthenticated, addresses, addOrder, addAddress } = useAuthStore();
   const location = useLocation();
   const navigate = useNavigate();
 
   const state = (location.state as { appliedCoupon?: string; discountAmount?: number; giftNote?: string } | null) || {};
   const rawTotal = totalPrice();
 
-  // Form State
-  const [email, setEmail] = useState('');
-  const [phone, setPhone] = useState('');
-  const [fullName, setFullName] = useState('');
-  const [address, setAddress] = useState('');
-  const [city, setCity] = useState('');
-  const [district, setDistrict] = useState('Colombo');
-  const [postalCode, setPostalCode] = useState('');
+  const defaultAddr = addresses.find((a) => a.isDefault) || addresses[0];
+
+  // Form State initialized with user profile or default address if available
+  const [email, setEmail] = useState(user?.email || '');
+  const [phone, setPhone] = useState(user?.phone || defaultAddr?.phone || '');
+  const [fullName, setFullName] = useState(user?.fullName || defaultAddr?.fullName || '');
+  const [address, setAddress] = useState(defaultAddr?.address || '');
+  const [city, setCity] = useState(defaultAddr?.city || '');
+  const [district, setDistrict] = useState(defaultAddr?.district || 'Colombo');
+  const [postalCode, setPostalCode] = useState(defaultAddr?.postalCode || '');
   const [deliveryNotes, setDeliveryNotes] = useState('');
+  const [saveAddressToAccount, setSaveAddressToAccount] = useState(false);
+  const [selectedAddrId, setSelectedAddrId] = useState<string | null>(defaultAddr?.id || null);
+
+  const handleSelectSavedAddress = (addr: typeof addresses[0]) => {
+    setSelectedAddrId(addr.id);
+    setFullName(addr.fullName);
+    setPhone(addr.phone);
+    setAddress(addr.address);
+    setCity(addr.city);
+    setDistrict(addr.district);
+    setPostalCode(addr.postalCode || '');
+  };
 
   // Shipping & Payment Method
   const [deliveryMethod, setDeliveryMethod] = useState<'standard' | 'express'>('standard');
@@ -128,8 +144,25 @@ export default function Checkout() {
         paymentMethod === 'cod' ? 'Cash on Delivery (COD)' :
         paymentMethod === 'card' ? 'Credit / Debit Card (Visa/Mastercard)' :
         paymentMethod === 'koko' ? 'Koko / Mintpay (3x Installments)' : 'Direct Bank Deposit',
-      placedAt: new Date().toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' })
+      placedAt: new Date().toISOString()
     };
+
+    // Optionally save new address to account if checked
+    if (isAuthenticated && saveAddressToAccount && !selectedAddrId) {
+      addAddress({
+        label: 'Home',
+        fullName,
+        phone,
+        address,
+        city,
+        district,
+        postalCode,
+        isDefault: addresses.length === 0
+      });
+    }
+
+    // Save order to both cart store and user's auth order history
+    addOrder(orderData);
 
     setTimeout(() => {
       setLastOrder(orderData);
@@ -200,10 +233,56 @@ export default function Checkout() {
 
               {/* 2. Sri Lanka Delivery Address */}
               <div className="p-6 sm:p-7 rounded-[2rem] bg-white border border-[#C5A059]/35 shadow-sm space-y-5">
-                <div className="flex items-center gap-3">
-                  <span className="w-7 h-7 rounded-full bg-[#701626] text-white text-xs font-bold flex items-center justify-center">2</span>
-                  <h2 className="font-display text-2xl font-bold text-[#110B0E]">Sri Lanka Delivery Address</h2>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <span className="w-7 h-7 rounded-full bg-[#701626] text-white text-xs font-bold flex items-center justify-center">2</span>
+                    <h2 className="font-display text-2xl font-bold text-[#110B0E]">Sri Lanka Delivery Address</h2>
+                  </div>
+                  {isAuthenticated && addresses.length > 0 && (
+                    <span className="text-[10.5px] text-[#701626] font-bold">
+                      {addresses.length} Saved Addresses
+                    </span>
+                  )}
                 </div>
+
+                {/* Saved Address Quick Selector Pills */}
+                {isAuthenticated && addresses.length > 0 && (
+                  <div className="space-y-2 pb-2">
+                    <p className="text-[11px] font-bold text-[#110B0E] uppercase tracking-wider">
+                      Select Delivery Address:
+                    </p>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                      {addresses.map((addr) => {
+                        const isSelected = selectedAddrId === addr.id;
+                        return (
+                          <button
+                            key={addr.id}
+                            type="button"
+                            onClick={() => handleSelectSavedAddress(addr)}
+                            className={`p-3 rounded-2xl border text-left transition-all ${
+                              isSelected
+                                ? 'bg-[#701626]/5 border-[#701626] shadow-sm'
+                                : 'bg-[#FCFBF8] border-[#C5A059]/30 hover:border-[#701626]/50'
+                            }`}
+                          >
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs font-bold text-[#110B0E] font-display">
+                                {addr.label}
+                              </span>
+                              {addr.isDefault && (
+                                <span className="text-[9px] bg-[#701626] text-[#F3E8CE] font-bold px-2 py-0.5 rounded-full">
+                                  Default
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-[11px] text-[#6D6268] truncate pt-0.5">{addr.address}</p>
+                            <p className="text-[10px] text-[#6D6268]">{addr.city}, {addr.district}</p>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
 
                 <div className="space-y-4">
                   <div>
@@ -215,7 +294,10 @@ export default function Checkout() {
                       required
                       placeholder="e.g. Ananya Senanayake"
                       value={fullName}
-                      onChange={(e) => setFullName(e.target.value)}
+                      onChange={(e) => {
+                        setSelectedAddrId(null);
+                        setFullName(e.target.value);
+                      }}
                       className="w-full px-4 py-3 text-xs bg-[#FCFBF8] border border-[#C5A059]/50 rounded-xl text-[#110B0E] focus:outline-none focus:border-[#701626]"
                     />
                   </div>
@@ -229,7 +311,10 @@ export default function Checkout() {
                       required
                       placeholder="No. 42, Flower Road, Colombo 07"
                       value={address}
-                      onChange={(e) => setAddress(e.target.value)}
+                      onChange={(e) => {
+                        setSelectedAddrId(null);
+                        setAddress(e.target.value);
+                      }}
                       className="w-full px-4 py-3 text-xs bg-[#FCFBF8] border border-[#C5A059]/50 rounded-xl text-[#110B0E] focus:outline-none focus:border-[#701626]"
                     />
                   </div>
@@ -244,7 +329,10 @@ export default function Checkout() {
                         required
                         placeholder="Colombo 07"
                         value={city}
-                        onChange={(e) => setCity(e.target.value)}
+                        onChange={(e) => {
+                          setSelectedAddrId(null);
+                          setCity(e.target.value);
+                        }}
                         className="w-full px-4 py-3 text-xs bg-[#FCFBF8] border border-[#C5A059]/50 rounded-xl text-[#110B0E] focus:outline-none focus:border-[#701626]"
                       />
                     </div>
@@ -255,7 +343,10 @@ export default function Checkout() {
                       </label>
                       <select
                         value={district}
-                        onChange={(e) => setDistrict(e.target.value)}
+                        onChange={(e) => {
+                          setSelectedAddrId(null);
+                          setDistrict(e.target.value);
+                        }}
                         className="w-full px-4 py-3 text-xs bg-[#FCFBF8] border border-[#C5A059]/50 rounded-xl text-[#110B0E] focus:outline-none focus:border-[#701626]"
                       >
                         {SRI_LANKA_DISTRICTS.map(d => (
@@ -272,7 +363,10 @@ export default function Checkout() {
                         type="text"
                         placeholder="00700"
                         value={postalCode}
-                        onChange={(e) => setPostalCode(e.target.value)}
+                        onChange={(e) => {
+                          setSelectedAddrId(null);
+                          setPostalCode(e.target.value);
+                        }}
                         className="w-full px-4 py-3 text-xs bg-[#FCFBF8] border border-[#C5A059]/50 rounded-xl text-[#110B0E] focus:outline-none focus:border-[#701626]"
                       />
                     </div>
@@ -290,6 +384,21 @@ export default function Checkout() {
                       className="w-full px-4 py-3 text-xs bg-[#FCFBF8] border border-[#C5A059]/50 rounded-xl text-[#110B0E] focus:outline-none focus:border-[#701626]"
                     />
                   </div>
+
+                  {/* Save address to account checkbox */}
+                  {isAuthenticated && !selectedAddrId && (
+                    <label className="flex items-center gap-2.5 pt-1 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={saveAddressToAccount}
+                        onChange={(e) => setSaveAddressToAccount(e.target.checked)}
+                        className="rounded border-[#C5A059]/40 text-[#701626] focus:ring-[#701626]"
+                      />
+                      <span className="text-xs text-[#110B0E] font-medium">
+                        Save this address to my Azhai account for future orders
+                      </span>
+                    </label>
+                  )}
                 </div>
               </div>
 

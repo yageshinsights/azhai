@@ -62,11 +62,10 @@ export default function Footer() {
             <p className="text-[10px] uppercase tracking-[0.25em] text-[#701626] font-bold">The Collections</p>
             <ul className="space-y-2">
               {[
-                ['/collections/kurtis', 'Kurtis & Sets'],
-                ['/collections/shalwars', 'Shalwar Kameez Suits'],
+                ['/collections/kurties', 'Kurties & Sets'],
+                ['/collections/sarees', 'Sarees'],
+                ['/collections/shawls', 'Shawls & Wraps'],
                 ['/collections/tops', 'Tops & Bustiers'],
-                ['/collections/bottoms', 'Bottoms & Palazzos'],
-                ['/collections/accessories', 'Heirloom Accessories'],
                 ['/story', 'Our Brand Story']
               ].map(([to, label]) => (
                 <li key={to}>

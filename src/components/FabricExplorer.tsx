@@ -19,20 +19,6 @@ const FABRICS = [
     samplePrice: 'LKR 14,500'
   },
   {
-    id: 'rawsilk',
-    name: '32-Kali Raw Silk',
-    tamil: 'மூல பட்டு அனார்கலி',
-    tag: 'Twirl Approved',
-    weight: '110 GSM · High Volume',
-    feel: 'Rich tactile slub texture, maximum slow-mo flare',
-    craft: 'Hand-dyed in small batches with unbroken maroon cord embellishment.',
-    image: 'https://images.unsplash.com/photo-1617627143750-d86bc21e42bb?auto=format&fit=crop&w=800&q=90',
-    swatchColor: '#8E1E34',
-    samplePiece: '32-Kali Twirl Raw Silk Shalwar Suit',
-    sampleSlug: 'raw-silk-shalwar-suit',
-    samplePrice: 'LKR 28,500'
-  },
-  {
     id: 'organza',
     name: 'Featherlight Sheer Organza',
     tamil: 'மெல்லிய தாமரை பட்டு',
@@ -42,9 +28,23 @@ const FABRICS = [
     craft: 'Hand-painted with botanical crimson lotus motifs using fine camel-hair brushes.',
     image: 'https://images.unsplash.com/photo-1583391733956-3750e0ff4e8b?auto=format&fit=crop&w=800&q=90',
     swatchColor: '#FAF7F2',
-    samplePiece: 'Sheer Organza Peplum Blouse Top',
-    sampleSlug: 'sheer-organza-peplum-top',
-    samplePrice: 'LKR 9,800'
+    samplePiece: 'Ivory Hand-Painted Lotus Organza Saree',
+    sampleSlug: 'ivory-lotus-organza-saree',
+    samplePrice: 'LKR 18,500'
+  },
+  {
+    id: 'silkshawl',
+    name: 'Zari-Embroidered Pure Silk',
+    tamil: 'பட்டு சால்வை',
+    tag: 'Atelier Wrap',
+    weight: '75 GSM · Fluid Wrap',
+    feel: 'Rich crimson silk with hand-twisted metallic gold bullion tassels',
+    craft: 'Hand-woven borders with intricate geometric floral and temple jaali threadwork.',
+    image: 'https://images.unsplash.com/photo-1617627143750-d86bc21e42bb?auto=format&fit=crop&w=800&q=90',
+    swatchColor: '#8E1E34',
+    samplePiece: 'Heirloom Zari Embroidered Silk Shawl',
+    sampleSlug: 'heirloom-zari-silk-shawl',
+    samplePrice: 'LKR 8,900'
   },
   {
     id: 'chanderi',
@@ -53,7 +53,7 @@ const FABRICS = [
     tag: 'Everyday Luxe',
     weight: '45 GSM · Breathable',
     feel: 'Featherlight, crisp yet soft against the skin',
-    craft: 'Woven with gold zari motifs inspired by traditional Tamil temple architecture.',
+    craft: 'Woven with gold zari motifs inspired by traditional South Asian temple architecture.',
     image: 'https://images.unsplash.com/photo-1567401893414-76b7b1e5a7a5?auto=format&fit=crop&w=800&q=90',
     swatchColor: '#DFBF77',
     samplePiece: 'Temple Border Chanderi Kurti',
@@ -69,25 +69,25 @@ export default function FabricExplorer() {
   return (
     <section id="craft" className="py-20 px-4 sm:px-8 max-w-7xl mx-auto relative z-10 scroll-mt-24">
       
-      <div className="text-center space-y-2.5 mb-12">
+      <div className="text-center space-y-2.5 mb-10">
         <span className="text-[10px] uppercase tracking-[0.3em] text-[#701626] font-bold">
           Tactile Craft & Weaves
         </span>
         <h2 className="font-display text-3xl sm:text-5xl font-bold text-[#110B0E]">
           Feel the Weave
         </h2>
-        <p className="text-sm text-[#6D6268] max-w-lg mx-auto font-light leading-relaxed">
-          Every thread is sourced from certified handloom clusters, dyed in sacred crimson and woven with 24K gold zari.
+        <p className="text-xs sm:text-sm text-[#6D6268] max-w-lg mx-auto font-light leading-relaxed">
+          Every thread is sourced from certified handloom clusters, dyed in sacred crimson and woven with fine gold zari.
         </p>
       </div>
 
       {/* Fabric Switcher Tabs */}
-      <div className="flex flex-wrap items-center justify-center gap-2.5 sm:gap-3 mb-10">
+      <div className="flex flex-wrap items-center justify-center gap-2 sm:gap-3 mb-10">
         {FABRICS.map((f, i) => (
           <button
             key={f.id}
             onClick={() => setActiveTab(i)}
-            className={`px-5 sm:px-7 py-3 rounded-full text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-2.5 ${
+            className={`px-5 sm:px-6 py-2.5 rounded-full text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-2 ${
               activeTab === i
                 ? 'bg-[#701626] text-white shadow-xl shadow-[#701626]/20 border border-[#C5A059]/50 scale-105'
                 : 'bg-white text-[#110B0E]/80 hover:text-[#701626] border border-[#C5A059]/30 shadow-sm'

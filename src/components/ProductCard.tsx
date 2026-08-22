@@ -1,16 +1,20 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Link } from 'react-router-dom';
-import { ShoppingBag, Heart, Star, Check, Sparkles } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
+import { ShoppingBag, Heart, Star, Check, Sparkles, Eye } from 'lucide-react';
 import { useCartStore } from '@/store/cart';
+import { useAuthStore } from '@/store/auth';
 import type { Product } from '@/lib/data';
 
 export default function ProductCard({ product, index = 0 }: { product: Product; index?: number }) {
   const [hovered, setHovered] = useState(false);
-  const [isWishlisted, setIsWishlisted] = useState(false);
   const [selectedSize, setSelectedSize] = useState(product.attributes[0]?.options[0] || 'M');
   const [justAdded, setJustAdded] = useState(false);
   const { addItem } = useCartStore();
+  const { isInWishlist, toggleWishlist } = useAuthStore();
+  const navigate = useNavigate();
+
+  const isWishlisted = isInWishlist(product.slug);
 
   const handleAddToCart = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -30,7 +34,11 @@ export default function ProductCard({ product, index = 0 }: { product: Product; 
   const handleToggleWishlist = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    setIsWishlisted(!isWishlisted);
+    toggleWishlist(product.slug);
+  };
+
+  const handleCardClick = () => {
+    navigate(`/products/${product.slug}`);
   };
 
   return (
@@ -40,7 +48,10 @@ export default function ProductCard({ product, index = 0 }: { product: Product; 
       viewport={{ once: true, margin: '-30px' }}
       transition={{ duration: 0.5, delay: index * 0.07 }}
     >
-      <Link to={`/products/${product.slug}`} className="block group">
+      <div 
+        onClick={handleCardClick}
+        className="block group cursor-pointer"
+      >
         <div 
           className="relative rounded-3xl overflow-hidden card-couture"
           onMouseEnter={() => setHovered(true)}
@@ -114,25 +125,37 @@ export default function ProductCard({ product, index = 0 }: { product: Product; 
                 ))}
               </div>
 
-              {/* Quick Add Button */}
-              <button
-                onClick={handleAddToCart}
-                className={`w-full py-2.5 text-[10px] uppercase tracking-[0.2em] font-bold rounded-xl flex items-center justify-center gap-2 transition-all shadow-sm ${
-                  justAdded 
-                    ? 'bg-emerald-700 text-white' 
-                    : 'bg-[#701626] hover:bg-[#8E1E34] text-white'
-                }`}
-              >
-                {justAdded ? (
-                  <>
-                    <Check className="w-3.5 h-3.5" /> Added to Shopping Bag
-                  </>
-                ) : (
-                  <>
-                    <ShoppingBag className="w-3.5 h-3.5" /> Quick Add ({selectedSize})
-                  </>
-                )}
-              </button>
+              {/* Action Row: Quick Add + View Piece Button */}
+              <div className="flex items-center gap-1.5 w-full">
+                <button
+                  onClick={handleAddToCart}
+                  className={`flex-1 py-2.5 text-[10px] uppercase tracking-[0.16em] font-bold rounded-xl flex items-center justify-center gap-1.5 transition-all shadow-sm ${
+                    justAdded 
+                      ? 'bg-emerald-700 text-white' 
+                      : 'bg-[#701626] hover:bg-[#8E1E34] text-white'
+                  }`}
+                >
+                  {justAdded ? (
+                    <>
+                      <Check className="w-3.5 h-3.5" /> Added!
+                    </>
+                  ) : (
+                    <>
+                      <ShoppingBag className="w-3.5 h-3.5" /> Quick Add ({selectedSize})
+                    </>
+                  )}
+                </button>
+
+                {/* View Details Button */}
+                <Link
+                  to={`/products/${product.slug}`}
+                  onClick={(e) => e.stopPropagation()}
+                  className="px-3 py-2.5 bg-[#F7F4EE] hover:bg-[#C5A059]/20 text-[#110B0E] hover:text-[#701626] rounded-xl text-[10px] uppercase tracking-wider font-bold border border-[#C5A059]/35 flex items-center justify-center transition-colors shrink-0 shadow-sm"
+                  title="View Piece Details"
+                >
+                  <Eye className="w-4 h-4" />
+                </Link>
+              </div>
             </motion.div>
           </div>
 
@@ -162,7 +185,7 @@ export default function ProductCard({ product, index = 0 }: { product: Product; 
             </div>
           </div>
         </div>
-      </Link>
+      </div>
     </motion.div>
   );
 }

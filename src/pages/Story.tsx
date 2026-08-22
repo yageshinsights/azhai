@@ -32,7 +32,7 @@ export default function Story() {
   const lineHeight = useTransform(scrollYProgress, [0, 1], ['0%', '100%']);
 
   return (
-    <div className="min-h-screen bg-[#FCFBF8] pt-20 text-[#110B0E]">
+    <div className="min-h-screen bg-[#FCFBF8] pt-24 text-[#110B0E]">
       
       {/* Hero */}
       <section className="relative py-20 px-5 sm:px-8 text-center overflow-hidden">

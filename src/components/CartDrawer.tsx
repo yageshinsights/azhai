@@ -1,11 +1,13 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
-import { X, Trash2, ShoppingBag, ArrowRight, Plus, Minus, Sparkles, Tag, Gift } from 'lucide-react';
+import { X, Trash2, ShoppingBag, ArrowRight, Plus, Minus, Sparkles, Tag, Gift, Heart, User } from 'lucide-react';
 import { useCartStore } from '@/store/cart';
+import { useAuthStore } from '@/store/auth';
 
 export default function CartDrawer() {
   const { items, isOpen, setCartOpen, removeItem, updateQuantity, totalPrice } = useCartStore();
+  const { user, isAuthenticated, wishlist } = useAuthStore();
   const navigate = useNavigate();
   const rawTotal = totalPrice();
 
@@ -73,13 +75,22 @@ export default function CartDrawer() {
             transition={{ type: 'spring', damping: 28, stiffness: 260 }}
           >
             {/* Header */}
-            <div className="flex items-center justify-between px-5 sm:px-6 py-5 border-b border-[#C5A059]/30 bg-white/80 backdrop-blur-md">
+            <div className="flex items-center justify-between px-5 sm:px-6 py-4 border-b border-[#C5A059]/30 bg-white/80 backdrop-blur-md">
               <div className="flex items-center gap-3">
                 <ShoppingBag className="w-4 h-4 text-[#701626]" />
-                <span className="font-display text-2xl font-bold text-[#110B0E]">Your Shopping Bag</span>
-                <span className="text-xs text-[#701626] bg-[#701626]/10 font-bold px-2.5 py-0.5 rounded-full">
-                  {items.reduce((a, b) => a + b.quantity, 0)}
-                </span>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="font-display text-xl font-bold text-[#110B0E]">Your Shopping Bag</span>
+                    <span className="text-xs text-[#701626] bg-[#701626]/10 font-bold px-2 py-0.2 rounded-full">
+                      {items.reduce((a, b) => a + b.quantity, 0)}
+                    </span>
+                  </div>
+                  {isAuthenticated && user && (
+                    <p className="text-[10px] text-[#6D6268]">
+                      Patron: <strong className="text-[#701626]">{user.fullName.split(' ')[0]}</strong>
+                    </p>
+                  )}
+                </div>
               </div>
               <motion.button
                 onClick={() => setCartOpen(false)}
@@ -91,13 +102,24 @@ export default function CartDrawer() {
             </div>
 
             {/* Free shipping progress (Sri Lanka LKR 15,000 threshold) */}
-            <div className="px-5 sm:px-6 py-3 bg-[#F7F4EE] border-b border-[#C5A059]/30 flex items-center justify-between text-[11px] text-[#6D6268]">
+            <div className="px-5 sm:px-6 py-2.5 bg-[#F7F4EE] border-b border-[#C5A059]/30 flex items-center justify-between text-[11px] text-[#6D6268]">
               <span className="flex items-center gap-1.5 font-medium text-[#701626]">
                 <Sparkles className="w-3.5 h-3.5 text-[#C5A059]" />
                 {rawTotal >= FREE_SHIPPING_THRESHOLD 
                   ? "You've unlocked Free Island-wide Delivery!" 
                   : `Add LKR ${(FREE_SHIPPING_THRESHOLD - rawTotal).toLocaleString('en-US')} more for Free Delivery`}
               </span>
+              {wishlist.length > 0 && (
+                <button
+                  onClick={() => {
+                    setCartOpen(false);
+                    navigate('/account?tab=wishlist');
+                  }}
+                  className="text-[10px] text-[#701626] font-bold hover:underline flex items-center gap-1 shrink-0"
+                >
+                  <Heart className="w-3 h-3 fill-[#701626]" /> {wishlist.length} Saved
+                </button>
+              )}
             </div>
 
             {/* Items List */}
