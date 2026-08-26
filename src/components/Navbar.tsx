@@ -11,7 +11,8 @@ import {
   Package,
   Heart,
   LogOut,
-  Sparkles
+  Sparkles,
+  Scissors
 } from 'lucide-react';
 import { useCartStore } from '@/store/cart';
 import { useAuthStore } from '@/store/auth';
@@ -128,7 +129,20 @@ export default function Navbar() {
                 Tops
               </Link>
 
-              {/* 5. Our Story */}
+              {/* 5. Custom Tailoring */}
+              <Link
+                to="/tailoring"
+                className={`text-xs font-semibold uppercase tracking-[0.22em] transition-all py-1.5 flex items-center gap-1.5 ${
+                  location.pathname === '/tailoring' 
+                    ? 'text-[#701626] font-bold border-b-2 border-[#701626]' 
+                    : 'text-[#701626] hover:text-[#8E1E34]'
+                }`}
+              >
+                <Scissors className="w-3.5 h-3.5 text-[#C5A059]" />
+                <span>Custom Tailoring</span>
+              </Link>
+
+              {/* 6. Our Story */}
               <Link
                 to="/story"
                 className={`text-xs font-semibold uppercase tracking-[0.22em] transition-all py-1.5 ${
@@ -362,6 +376,26 @@ export default function Navbar() {
                     </Link>
                     <Link to="/collections/tops" className="block text-lg font-display font-bold text-[#110B0E] hover:text-[#701626]">
                       🌸 Tops
+                    </Link>
+                  </div>
+
+                  {/* Bespoke Custom Tailoring */}
+                  <div className="pt-4">
+                    <Link
+                      to="/tailoring"
+                      onClick={() => setMobileOpen(false)}
+                      className="p-3.5 rounded-2xl bg-gradient-to-r from-[#701626] to-[#8E1E34] text-white flex items-center justify-between shadow-md"
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <Scissors className="w-4 h-4 text-[#DFBF77]" />
+                        <div>
+                          <p className="font-display text-sm font-bold">Custom Tailoring</p>
+                          <p className="text-[10px] text-white/80">Made-to-Measure Studio</p>
+                        </div>
+                      </div>
+                      <span className="text-[9px] bg-white/20 text-[#DFBF77] font-bold px-2 py-0.5 rounded-full uppercase">
+                        Bespoke
+                      </span>
                     </Link>
                   </div>
 

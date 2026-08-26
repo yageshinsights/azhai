@@ -297,7 +297,7 @@ export default function Addresses() {
                       type="text"
                       value={fullName}
                       onChange={(e) => setFullName(e.target.value)}
-                      placeholder="e.g. Preethi Kumaran"
+                      placeholder="e.g. Preethi"
                       required
                       className="w-full px-4 py-2.5 rounded-2xl bg-[#F7F4EE]/70 border border-[#C5A059]/30 focus:border-[#701626] focus:bg-white focus:outline-none text-xs text-[#110B0E]"
                     />

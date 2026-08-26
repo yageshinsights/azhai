@@ -66,10 +66,11 @@ export default function Footer() {
                 ['/collections/sarees', 'Sarees'],
                 ['/collections/shawls', 'Shawls & Wraps'],
                 ['/collections/tops', 'Tops & Bustiers'],
-                ['/story', 'Our Brand Story']
+                ['/story', 'Our Brand Story'],
+                ['/contact', 'Contact & Showroom']
               ].map(([to, label]) => (
                 <li key={to}>
-                  <Link to={to} className="text-xs text-[#6D6268] hover:text-[#701626] transition-colors">
+                  <Link to={to} className="text-xs text-[#6D6268] hover:text-[#701626] transition-colors font-medium">
                     {label}
                   </Link>
                 </li>
@@ -77,15 +78,33 @@ export default function Footer() {
             </ul>
           </div>
 
-          {/* Customer Care */}
+          {/* Customer Care & Policies */}
           <div className="space-y-3">
             <p className="text-[10px] uppercase tracking-[0.25em] text-[#701626] font-bold">Customer Privileges</p>
-            <ul className="space-y-2 text-xs text-[#6D6268]">
-              <li>Island-wide Delivery (PromptX / Koombiyo)</li>
-              <li>Free Shipping Over LKR 15,000</li>
-              <li>14-Day Doorstep Exchanges</li>
-              <li>Cash on Delivery (COD) Available</li>
-              <li>Bespoke Sizing Consultation</li>
+            <ul className="space-y-2 text-xs">
+              <li>
+                <Link to="/shipping-policy" className="text-[#6D6268] hover:text-[#701626] transition-colors">
+                  Island-wide Shipping Policy
+                </Link>
+              </li>
+              <li>
+                <Link to="/returns-exchanges" className="text-[#6D6268] hover:text-[#701626] transition-colors">
+                  14-Day Doorstep Exchanges
+                </Link>
+              </li>
+              <li>
+                <Link to="/contact" className="text-[#6D6268] hover:text-[#701626] transition-colors">
+                  Bespoke Sizing Consultation
+                </Link>
+              </li>
+              <li>
+                <Link to="/privacy-policy" className="text-[#6D6268] hover:text-[#701626] transition-colors">
+                  Privacy & Payment Security
+                </Link>
+              </li>
+              <li className="text-[#701626] font-semibold pt-1">
+                Free Shipping Over LKR 15,000
+              </li>
             </ul>
           </div>
 

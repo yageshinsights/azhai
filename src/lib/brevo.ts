@@ -1,0 +1,707 @@
+/**
+ * Brevo (formerly Sendinblue) Transactional Email & Marketing Automation Engine
+ * for Azhai Clothing by Preethi
+ * Official Boutique Domain: azhaiclothing.lk
+ * Official Inquiries & Orders: orders@azhaiclothing.lk
+ */
+
+const BREVO_API_KEY = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_BREVO_API_KEY) || '';
+const SENDER_EMAIL = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_SENDER_EMAIL) || 'orders@azhaiclothing.lk';
+const SENDER_NAME = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_SENDER_NAME) || 'Azhai Clothing by Preethi';
+const STORE_URL = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_STORE_URL) || 'https://azhaiclothing.lk';
+
+// Supabase Public Storage Brand Asset URL or Local / CDN Fallback
+export const LOGO_URL = 
+  (typeof import.meta !== 'undefined' && import.meta.env?.VITE_BRAND_LOGO_URL) ||
+  ((typeof import.meta !== 'undefined' && import.meta.env?.VITE_SUPABASE_URL && !import.meta.env.VITE_SUPABASE_URL.includes('placeholder'))
+    ? `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/brand-assets/logo-gold.png`
+    : '/logo-gold.png');
+
+export interface EmailRecipient {
+  email: string;
+  name?: string;
+}
+
+export interface SendEmailPayload {
+  to: EmailRecipient[];
+  subject: string;
+  htmlContent: string;
+  replyTo?: EmailRecipient;
+}
+
+export async function sendBrevoEmail(payload: SendEmailPayload): Promise<{ success: boolean; error?: string }> {
+  if (!BREVO_API_KEY) {
+    console.info(`[Brevo Email Simulated] To: ${payload.to.map(t => t.email).join(', ')} | Subject: "${payload.subject}"`);
+    return { success: true };
+  }
+
+  try {
+    const response = await fetch('https://api.brevo.com/v3/smtp/email', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'api-key': BREVO_API_KEY,
+      },
+      body: JSON.stringify({
+        sender: { name: SENDER_NAME, email: SENDER_EMAIL },
+        to: payload.to,
+        subject: payload.subject,
+        htmlContent: payload.htmlContent,
+        replyTo: payload.replyTo || { name: SENDER_NAME, email: SENDER_EMAIL },
+      }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      console.error('[Brevo Email Error]:', errorData);
+      return { success: false, error: errorData.message || 'Failed to send email' };
+    }
+
+    return { success: true };
+  } catch (err: any) {
+    console.error('[Brevo Fetch Exception]:', err);
+    return { success: false, error: err?.message || 'Network error' };
+  }
+}
+
+// ── SHARED LUXURY EMAIL WRAPPER WITH EXACT BRAND LOGO & GOLD TRIM ──
+function wrapEmailLayout(title: string, bodyContent: string): string {
+  return `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${title}</title>
+</head>
+<body style="margin: 0; padding: 0; background-color: #FCFBF8; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #110B0E;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background-color: #FCFBF8; padding: 30px 10px;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="100%" max-width="600" cellspacing="0" cellpadding="0" border="0" style="max-width: 600px; background-color: #ffffff; border-radius: 24px; border: 1px solid #DFBF77; overflow: hidden; box-shadow: 0 12px 36px rgba(112, 22, 38, 0.07);">
+          
+          <!-- Top Atelier Header with Exact Brand Logo -->
+          <tr>
+            <td align="center" style="background: linear-gradient(135deg, #701626 0%, #8E1E34 100%); padding: 26px 20px 22px 20px; border-bottom: 3px solid #C5A059;">
+              <a href="${STORE_URL}" target="_blank" style="text-decoration: none; display: inline-block;">
+                <img 
+                  src="${LOGO_URL}" 
+                  alt="Azhai Clothing by Preethi" 
+                  style="max-height: 52px; width: auto; max-width: 220px; display: block; margin: 0 auto; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.2));"
+                />
+              </a>
+              <p style="margin: 8px 0 0 0; font-size: 9.5px; text-transform: uppercase; letter-spacing: 3.5px; color: #DFBF77; font-weight: bold;">
+                Boutique Couture & Handlooms
+              </p>
+            </td>
+          </tr>
+
+          <!-- Main Content Area -->
+          <tr>
+            <td style="padding: 32px 28px;">
+              ${bodyContent}
+            </td>
+          </tr>
+
+          <!-- Dynamic Editorial Lookbook Footer Banner -->
+          <tr>
+            <td style="padding: 0 28px 24px 28px;">
+              <div style="background: linear-gradient(135deg, #FCFBF8 0%, #F7F4EE 100%); border-radius: 18px; border: 1px solid #DFBF77; padding: 18px; text-align: center;">
+                <p style="margin: 0 0 4px 0; font-size: 10px; font-weight: bold; text-transform: uppercase; letter-spacing: 2px; color: #701626;">Festive Atelier Releases</p>
+                <p style="margin: 0 0 12px 0; font-size: 12px; color: #6D6268;">Featherlight hand-painted organzas & pure temple silks</p>
+                <div style="display: flex; gap: 8px; justify-content: center; margin-bottom: 12px;">
+                  <img src="https://images.unsplash.com/photo-1610030469983-98e550d6193c?auto=format&fit=crop&w=300&q=80" style="width: 80px; height: 95px; object-fit: cover; border-radius: 10px; border: 1px solid #DFBF77; display: inline-block;" />
+                  <img src="https://images.unsplash.com/photo-1583391733956-3750e0ff4e8b?auto=format&fit=crop&w=300&q=80" style="width: 80px; height: 95px; object-fit: cover; border-radius: 10px; border: 1px solid #DFBF77; display: inline-block;" />
+                  <img src="https://images.unsplash.com/photo-1617627143750-d86bc21e42bb?auto=format&fit=crop&w=300&q=80" style="width: 80px; height: 95px; object-fit: cover; border-radius: 10px; border: 1px solid #DFBF77; display: inline-block;" />
+                </div>
+                <a href="${STORE_URL}/collections" style="display: inline-block; font-size: 11px; font-weight: bold; color: #701626; text-transform: uppercase; letter-spacing: 1.5px; text-decoration: none; border-bottom: 1px solid #701626; padding-bottom: 2px;">
+                  Explore Lookbook ↗
+                </a>
+              </div>
+            </td>
+          </tr>
+
+          <!-- Boutique Contact Footer -->
+          <tr>
+            <td align="center" style="background-color: #F7F4EE; padding: 24px 20px; border-top: 1px solid #DFBF77; font-size: 11px; color: #6D6268; line-height: 1.6;">
+              <p style="margin: 0 0 6px 0; font-weight: bold; color: #701626; text-transform: uppercase; letter-spacing: 1.5px;">Azhai Clothing Colombo</p>
+              <p style="margin: 0 0 8px 0;">Handloom, Mulberry Silk & Bespoke Tailoring · Colombo, Sri Lanka</p>
+              <p style="margin: 0; font-size: 10.5px; color: #9B9197;">
+                Inquiries & Sizing Concierge: <a href="mailto:orders@azhaiclothing.lk" style="color: #701626; font-weight: bold; text-decoration: none;">orders@azhaiclothing.lk</a>
+              </p>
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+  `;
+}
+
+// ─────────────────────────────────────────────────────────────
+// 1. 🌟 WELCOME TO AZHAI ATELIER EMAIL (WITH DYNAMIC HERO BANNER)
+// ─────────────────────────────────────────────────────────────
+export function buildWelcomeEmailHtml(params: { customerName: string; email: string }): string {
+  const firstName = params.customerName ? params.customerName.split(' ')[0] : 'Patron';
+  const body = `
+    <!-- Editorial Welcome Hero Banner Image -->
+    <div style="margin-bottom: 24px; border-radius: 18px; overflow: hidden; border: 1px solid #DFBF77; position: relative;">
+      <img 
+        src="https://images.unsplash.com/photo-1583391733956-3750e0ff4e8b?auto=format&fit=crop&w=1200&q=85" 
+        alt="Azhai Couture" 
+        style="width: 100%; height: 210px; object-fit: cover; display: block;" 
+      />
+    </div>
+
+    <div style="text-align: center; margin-bottom: 24px;">
+      <span style="background-color: rgba(112, 22, 38, 0.08); color: #701626; font-size: 10px; font-weight: bold; text-transform: uppercase; letter-spacing: 2.5px; padding: 4px 14px; border-radius: 20px; border: 1px solid rgba(197, 160, 89, 0.4);">
+        Atelier Welcome
+      </span>
+      <h2 style="font-family: Georgia, serif; color: #110B0E; font-size: 25px; margin: 14px 0 8px 0; font-weight: bold;">
+        Welcome to the Inner Circle, ${firstName}
+      </h2>
+      <p style="color: #6D6268; font-size: 13.5px; margin: 0; line-height: 1.6;">
+        You have entered the home of artisanal handlooms, featherlight mulberry silks, and bespoke tailoring designed by Preethi.
+      </p>
+    </div>
+
+    <div style="background-color: #FCFBF8; border-radius: 18px; border: 1px solid #DFBF77; padding: 22px; margin-bottom: 24px;">
+      <h3 style="font-family: Georgia, serif; font-size: 14px; color: #701626; margin: 0 0 10px 0;">Your Patron Privileges:</h3>
+      <ul style="margin: 0; padding-left: 18px; font-size: 12px; color: #110B0E; line-height: 1.8;">
+        <li><strong>Bespoke Silhouette Studio:</strong> Save your custom waist, bust & sleeve measurements for 1-tap tailoring.</li>
+        <li><strong>VIP Live Order Tracking:</strong> Real-time updates from our cutting table to your doorstep.</li>
+        <li><strong>Complimentary Alteration Support:</strong> 1.5-inch inner seam margin on all tailored garments.</li>
+      </ul>
+    </div>
+
+    <div style="text-align: center; margin-top: 28px;">
+      <a href="${STORE_URL}/collections" style="display: inline-block; background: linear-gradient(135deg, #701626 0%, #8E1E34 100%); color: #ffffff; font-size: 12px; font-weight: bold; text-transform: uppercase; letter-spacing: 2px; padding: 14px 30px; border-radius: 14px; text-decoration: none; box-shadow: 0 6px 20px rgba(112, 22, 38, 0.25);">
+        Explore Signature Collections →
+      </a>
+    </div>
+  `;
+  return wrapEmailLayout('Welcome to Azhai Atelier', body);
+}
+
+// ─────────────────────────────────────────────────────────────
+// 2. 🛍️ CUSTOMER ORDER CONFIRMATION (WITH PRODUCT IMAGES & TAILORING)
+// ─────────────────────────────────────────────────────────────
+export function buildOrderConfirmationHtml(order: {
+  orderId: string;
+  customerName: string;
+  total: number;
+  items: { name: string; size?: string; quantity: number; price: string; image?: string; tailoring?: any }[];
+  deliveryMethod: string;
+  paymentMethod: string;
+}): string {
+  const firstName = order.customerName ? order.customerName.split(' ')[0] : 'Valued Patron';
+  
+  const itemsHtml = order.items
+    .map(
+      (item) => `
+      <tr>
+        <td style="padding: 14px 0; border-bottom: 1px solid #E5E0D8; vertical-align: top; width: 75px;">
+          <img 
+            src="${item.image || 'https://images.unsplash.com/photo-1610030469983-98e550d6193c?auto=format&fit=crop&w=300&q=80'}" 
+            alt="${item.name}" 
+            style="width: 68px; height: 86px; object-fit: cover; border-radius: 12px; border: 1px solid #DFBF77; display: block;" 
+          />
+        </td>
+        <td style="padding: 14px 12px; border-bottom: 1px solid #E5E0D8; vertical-align: top;">
+          <strong style="color: #110B0E; font-size: 13.5px; font-family: Georgia, serif;">${item.name}</strong><br>
+          <span style="font-size: 11px; color: #6D6268;">Size: <strong style="color: #701626;">${item.size || 'M'}</strong> | Qty: ${item.quantity}</span>
+          ${
+            item.tailoring
+              ? `<div style="margin-top: 6px; font-size: 10px; color: #701626; font-weight: bold; background: #F7F4EE; padding: 4px 8px; border-radius: 6px; border: 1px solid #DFBF77; display: inline-block;">
+                  ✂️ Bespoke Custom Fitting (${item.tailoring.leadTime || '4-7 days'})
+                 </div>`
+              : ''
+          }
+        </td>
+        <td style="padding: 14px 0; border-bottom: 1px solid #E5E0D8; vertical-align: top; text-align: right; color: #701626; font-weight: bold; font-size: 13.5px; white-space: nowrap;">
+          ${item.price}
+        </td>
+      </tr>
+    `
+    )
+    .join('');
+
+  const body = `
+    <div style="text-align: center; margin-bottom: 24px;">
+      <span style="background-color: #E8F5E9; color: #2E7D32; font-size: 10px; font-weight: bold; text-transform: uppercase; letter-spacing: 2px; padding: 4px 14px; border-radius: 20px;">
+        Order Placed #${order.orderId}
+      </span>
+      <h2 style="font-family: Georgia, serif; color: #110B0E; font-size: 25px; margin: 12px 0 6px 0;">Thank you, ${firstName}</h2>
+      <p style="color: #6D6268; font-size: 13px; margin: 0; line-height: 1.6;">
+        Your handcrafted order has been received by our Colombo atelier and is being carefully tailored for dispatch.
+      </p>
+    </div>
+
+    <!-- Itemized Products Table with Images -->
+    <div style="background-color: #FCFBF8; border-radius: 18px; border: 1px solid #DFBF77; padding: 20px; margin-bottom: 24px;">
+      <h3 style="font-size: 11px; text-transform: uppercase; letter-spacing: 2px; color: #701626; margin: 0 0 14px 0; font-weight: bold;">
+        Itemized Receipt
+      </h3>
+      <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
+        ${itemsHtml}
+      </table>
+
+      <div style="margin-top: 18px; padding-top: 14px; border-top: 2px solid #701626; text-align: right;">
+        <p style="font-size: 18px; font-weight: bold; color: #701626; margin: 0; font-family: Georgia, serif;">
+          Total Amount: LKR ${order.total.toLocaleString()}
+        </p>
+        <p style="font-size: 11px; color: #6D6268; margin: 6px 0 0 0;">
+          Payment Method: <strong>${order.paymentMethod}</strong><br>
+          Delivery: <strong>${order.deliveryMethod}</strong>
+        </p>
+      </div>
+    </div>
+
+    <div style="text-align: center;">
+      <a href="${STORE_URL}/account?tab=orders" style="display: inline-block; background: linear-gradient(135deg, #701626 0%, #8E1E34 100%); color: #ffffff; font-size: 11.5px; font-weight: bold; text-transform: uppercase; letter-spacing: 2px; padding: 13px 26px; border-radius: 12px; text-decoration: none; box-shadow: 0 4px 15px rgba(112, 22, 38, 0.2);">
+        Track Live in My Orders →
+      </a>
+    </div>
+  `;
+  return wrapEmailLayout(`Order Confirmed #${order.orderId}`, body);
+}
+
+// ─────────────────────────────────────────────────────────────
+// 3. 🚨 ADMIN NEW ORDER NOTIFICATION
+// ─────────────────────────────────────────────────────────────
+export function buildAdminOrderAlertHtml(order: {
+  orderId: string;
+  customerName: string;
+  customerEmail: string;
+  customerPhone: string;
+  customerAddress: string;
+  city: string;
+  district: string;
+  total: number;
+  items: { name: string; size?: string; quantity: number; price: string; image?: string; tailoring?: any }[];
+  deliveryMethod: string;
+  paymentMethod: string;
+}): string {
+  const itemsHtml = order.items
+    .map(
+      (item) => `
+      <tr>
+        <td style="padding: 10px 0; border-bottom: 1px solid #ddd; width: 60px;">
+          <img src="${item.image || 'https://images.unsplash.com/photo-1610030469983-98e550d6193c?auto=format&fit=crop&w=200&q=80'}" style="width: 50px; height: 60px; object-fit: cover; border-radius: 8px;" />
+        </td>
+        <td style="padding: 10px 10px; border-bottom: 1px solid #ddd;">
+          <strong>${item.name}</strong> (${item.size || 'M'} x ${item.quantity})
+          ${item.tailoring ? `<br><small style="color: #701626; font-weight: bold;">✂️ Bespoke Fitting: ${JSON.stringify(item.tailoring.measurements || {})}</small>` : ''}
+        </td>
+        <td style="padding: 10px 0; border-bottom: 1px solid #ddd; text-align: right; font-weight: bold; color: #701626;">
+          ${item.price}
+        </td>
+      </tr>
+    `
+    )
+    .join('');
+
+  const body = `
+    <h2 style="font-family: Georgia, serif; color: #701626; margin-top: 0;">🛍️ New Order Received: #${order.orderId}</h2>
+    <div style="background-color: #F7F4EE; padding: 18px; border-radius: 14px; margin-bottom: 18px; font-size: 13px; line-height: 1.6;">
+      <p style="margin: 0;"><strong>Patron:</strong> ${order.customerName}</p>
+      <p style="margin: 0;"><strong>Phone:</strong> <a href="tel:${order.customerPhone}" style="color: #701626; font-weight: bold;">${order.customerPhone}</a></p>
+      <p style="margin: 0;"><strong>Email:</strong> ${order.customerEmail}</p>
+      <p style="margin: 0;"><strong>Destination:</strong> ${order.customerAddress}, ${order.city}, ${order.district}</p>
+      <p style="margin: 0;"><strong>Payment:</strong> ${order.paymentMethod}</p>
+      <p style="margin: 0;"><strong>Delivery:</strong> ${order.deliveryMethod}</p>
+    </div>
+
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="font-size: 12px;">
+      ${itemsHtml}
+    </table>
+
+    <div style="text-align: right; padding-top: 14px; font-size: 17px; font-weight: bold; color: #701626;">
+      Total Collected: LKR ${order.total.toLocaleString()}
+    </div>
+
+    <div style="text-align: center; margin-top: 24px;">
+      <a href="${STORE_URL}/admin/orders" style="display: inline-block; background-color: #701626; color: #ffffff; font-size: 11px; font-weight: bold; text-transform: uppercase; letter-spacing: 2px; padding: 12px 24px; border-radius: 12px; text-decoration: none;">
+        Open Order in Master Admin →
+      </a>
+    </div>
+  `;
+  return wrapEmailLayout(`New Order Alert #${order.orderId}`, body);
+}
+
+// ─────────────────────────────────────────────────────────────
+// 4. ✂️ IN ATELIER TAILORING & CUTTING PROGRESS
+// ─────────────────────────────────────────────────────────────
+export function buildOrderProcessingHtml(params: {
+  orderId: string;
+  customerName: string;
+  items: { name: string; size?: string; quantity: number; image?: string }[];
+}): string {
+  const firstName = params.customerName ? params.customerName.split(' ')[0] : 'Patron';
+  const body = `
+    <!-- Atelier Workshop Banner Image -->
+    <div style="margin-bottom: 22px; border-radius: 16px; overflow: hidden; border: 1px solid #DFBF77;">
+      <img 
+        src="https://images.unsplash.com/photo-1567401893414-76b7b1e5a7a5?auto=format&fit=crop&w=1200&q=80" 
+        alt="Atelier Crafting" 
+        style="width: 100%; height: 180px; object-fit: cover; display: block;" 
+      />
+    </div>
+
+    <div style="text-align: center; margin-bottom: 24px;">
+      <span style="background-color: rgba(197, 160, 89, 0.15); color: #701626; font-size: 10px; font-weight: bold; text-transform: uppercase; letter-spacing: 2px; padding: 4px 14px; border-radius: 20px; border: 1px solid #DFBF77;">
+        ✂️ Atelier Crafting in Progress
+      </span>
+      <h2 style="font-family: Georgia, serif; color: #110B0E; font-size: 24px; margin: 12px 0 6px 0;">On the Cutting Table, ${firstName}</h2>
+      <p style="color: #6D6268; font-size: 13px; margin: 0; line-height: 1.6;">
+        Your order <strong>#${params.orderId}</strong> is in the skilled hands of our master tailors.
+      </p>
+    </div>
+
+    <div style="background-color: #FCFBF8; border-radius: 16px; border: 1px solid #DFBF77; padding: 20px; margin-bottom: 24px;">
+      <h3 style="font-size: 12px; text-transform: uppercase; letter-spacing: 2px; color: #701626; margin: 0 0 10px 0;">Crafting Timeline</h3>
+      <p style="font-size: 12px; color: #110B0E; line-height: 1.8; margin: 0;">
+        • <strong>Fabric Inspection & Hand-Cutting:</strong> Completed<br>
+        • <strong>Precision Seaming & Lining:</strong> In Progress<br>
+        • <strong>Quality Assurance & Packaging:</strong> Next (estimated dispatch in 1–2 days)
+      </p>
+    </div>
+
+    <div style="text-align: center;">
+      <a href="${STORE_URL}/account?tab=orders" style="display: inline-block; background-color: #701626; color: #ffffff; font-size: 11px; font-weight: bold; text-transform: uppercase; letter-spacing: 2px; padding: 12px 24px; border-radius: 12px; text-decoration: none;">
+        View Atelier Progress →
+      </a>
+    </div>
+  `;
+  return wrapEmailLayout(`Atelier Progress #${params.orderId}`, body);
+}
+
+// ─────────────────────────────────────────────────────────────
+// 5. 🚚 ORDER SHIPPED & IN TRANSIT (WITH EXPRESS COURIER BANNER)
+// ─────────────────────────────────────────────────────────────
+export function buildOrderShippedHtml(params: {
+  orderId: string;
+  customerName: string;
+  courierName: string;
+  trackingNumber: string;
+  trackingUrl?: string;
+  destinationCity: string;
+}): string {
+  const firstName = params.customerName ? params.customerName.split(' ')[0] : 'Patron';
+  const trackLink = params.trackingUrl || `${STORE_URL}/account?tab=orders`;
+
+  const body = `
+    <!-- Transit Visual Header -->
+    <div style="margin-bottom: 22px; border-radius: 16px; overflow: hidden; border: 1px solid #DFBF77;">
+      <img 
+        src="https://images.unsplash.com/photo-1617627143750-d86bc21e42bb?auto=format&fit=crop&w=1200&q=80" 
+        alt="In Transit" 
+        style="width: 100%; height: 180px; object-fit: cover; display: block;" 
+      />
+    </div>
+
+    <div style="text-align: center; margin-bottom: 24px;">
+      <span style="background-color: #E3F2FD; color: #1565C0; font-size: 10px; font-weight: bold; text-transform: uppercase; letter-spacing: 2px; padding: 4px 14px; border-radius: 20px;">
+        🚚 Dispatched & In Transit
+      </span>
+      <h2 style="font-family: Georgia, serif; color: #110B0E; font-size: 24px; margin: 12px 0 6px 0;">Your Package is on the Way, ${firstName}</h2>
+      <p style="color: #6D6268; font-size: 13px; margin: 0; line-height: 1.6;">
+        Your Azhai parcel <strong>#${params.orderId}</strong> has been dispatched for express delivery to ${params.destinationCity}.
+      </p>
+    </div>
+
+    <div style="background-color: #FCFBF8; border-radius: 18px; border: 1px solid #DFBF77; padding: 22px; margin-bottom: 24px; text-align: center;">
+      <p style="font-size: 11px; text-transform: uppercase; letter-spacing: 1.5px; color: #6D6268; margin: 0;">Courier Partner</p>
+      <p style="font-size: 17px; font-weight: bold; color: #701626; margin: 4px 0 14px 0;">${params.courierName}</p>
+      
+      <p style="font-size: 11px; text-transform: uppercase; letter-spacing: 1.5px; color: #6D6268; margin: 0;">Waybill / Tracking Number</p>
+      <p style="font-family: monospace; font-size: 19px; font-weight: bold; color: #110B0E; margin: 4px 0 18px 0; letter-spacing: 2.5px;">
+        ${params.trackingNumber}
+      </p>
+
+      <a href="${trackLink}" style="display: inline-block; background: linear-gradient(135deg, #701626 0%, #8E1E34 100%); color: #ffffff; font-size: 11.5px; font-weight: bold; text-transform: uppercase; letter-spacing: 2px; padding: 13px 26px; border-radius: 12px; text-decoration: none; box-shadow: 0 4px 15px rgba(112, 22, 38, 0.2);">
+        Track Live Parcel →
+      </a>
+    </div>
+
+    <p style="font-size: 11px; color: #6D6268; text-align: center; margin: 0;">
+      Please ensure someone is available at the delivery destination to receive your boutique parcel.
+    </p>
+  `;
+  return wrapEmailLayout(`Dispatched: Order #${params.orderId}`, body);
+}
+
+// ─────────────────────────────────────────────────────────────
+// 6. 📦 DELIVERED TO YOUR DOOR EMAIL
+// ─────────────────────────────────────────────────────────────
+export function buildOrderDeliveredHtml(params: {
+  orderId: string;
+  customerName: string;
+}): string {
+  const firstName = params.customerName ? params.customerName.split(' ')[0] : 'Patron';
+  const body = `
+    <div style="text-align: center; margin-bottom: 24px;">
+      <span style="background-color: #E8F5E9; color: #2E7D32; font-size: 10px; font-weight: bold; text-transform: uppercase; letter-spacing: 2px; padding: 4px 14px; border-radius: 20px;">
+        ✨ Delivered with Grace
+      </span>
+      <h2 style="font-family: Georgia, serif; color: #110B0E; font-size: 24px; margin: 12px 0 6px 0;">Enjoy Your Masterpiece, ${firstName}</h2>
+      <p style="color: #6D6268; font-size: 13px; margin: 0; line-height: 1.6;">
+        Your order <strong>#${params.orderId}</strong> has been successfully delivered. We hope you cherish every handwoven detail.
+      </p>
+    </div>
+
+    <div style="background-color: #FCFBF8; border-radius: 18px; border: 1px solid #DFBF77; padding: 22px; margin-bottom: 24px;">
+      <h3 style="font-family: Georgia, serif; font-size: 13.5px; color: #701626; margin: 0 0 10px 0;">Handloom & Silk Care Instructions</h3>
+      <ul style="margin: 0; padding-left: 18px; font-size: 11.5px; color: #110B0E; line-height: 1.8;">
+        <li>Dry clean recommended for hand-painted organza & pure zari silks.</li>
+        <li>Gentle handwash in cold water with mild detergent for pure cotton handlooms.</li>
+        <li>Warm iron on reverse side using a protective cloth.</li>
+        <li>All bespoke garments include a 1.5" inner margin for any future fit adjustments.</li>
+      </ul>
+    </div>
+
+    <div style="text-align: center;">
+      <a href="${STORE_URL}/account?tab=orders" style="display: inline-block; background-color: #701626; color: #ffffff; font-size: 11px; font-weight: bold; text-transform: uppercase; letter-spacing: 2px; padding: 12px 24px; border-radius: 12px; text-decoration: none;">
+        View Order & Receipt →
+      </a>
+    </div>
+  `;
+  return wrapEmailLayout(`Delivered: Order #${params.orderId}`, body);
+}
+
+// ─────────────────────────────────────────────────────────────
+// 7. ❌ ORDER CANCELLED & REFUND EMAIL
+// ─────────────────────────────────────────────────────────────
+export function buildOrderCancelledHtml(params: {
+  orderId: string;
+  customerName: string;
+  reason?: string;
+  refundNote?: string;
+}): string {
+  const firstName = params.customerName ? params.customerName.split(' ')[0] : 'Patron';
+  const body = `
+    <div style="text-align: center; margin-bottom: 24px;">
+      <span style="background-color: #FFEBEE; color: #C62828; font-size: 10px; font-weight: bold; text-transform: uppercase; letter-spacing: 2px; padding: 4px 14px; border-radius: 20px;">
+        Order Cancelled
+      </span>
+      <h2 style="font-family: Georgia, serif; color: #110B0E; font-size: 24px; margin: 12px 0 6px 0;">Notice of Cancellation, ${firstName}</h2>
+      <p style="color: #6D6268; font-size: 13px; margin: 0; line-height: 1.6;">
+        Your order <strong>#${params.orderId}</strong> has been cancelled.
+      </p>
+    </div>
+
+    <div style="background-color: #FCFBF8; border-radius: 16px; border: 1px solid #DFBF77; padding: 20px; margin-bottom: 24px; font-size: 12.5px; line-height: 1.7;">
+      <p style="margin: 0 0 8px 0;"><strong>Reason:</strong> ${params.reason || 'Customer request / Inventory adjustment'}</p>
+      ${
+        params.refundNote
+          ? `<p style="margin: 0; color: #701626;"><strong>Refund Note:</strong> ${params.refundNote}</p>`
+          : '<p style="margin: 0;">If you completed an online card payment, your refund will be credited back to your original payment method within 3–5 business days.</p>'
+      }
+    </div>
+
+    <div style="text-align: center;">
+      <a href="${STORE_URL}/collections" style="display: inline-block; background-color: #701626; color: #ffffff; font-size: 11px; font-weight: bold; text-transform: uppercase; letter-spacing: 2px; padding: 12px 24px; border-radius: 12px; text-decoration: none;">
+        Continue Shopping →
+      </a>
+    </div>
+  `;
+  return wrapEmailLayout(`Order Cancelled #${params.orderId}`, body);
+}
+
+// ─────────────────────────────────────────────────────────────
+// 8. ⭐ POST-DELIVERY FIT & CRAFTSMANSHIP REVIEW EMAIL
+// ─────────────────────────────────────────────────────────────
+export function buildPostDeliveryFeedbackEmailHtml(params: {
+  orderId: string;
+  customerName: string;
+}): string {
+  const firstName = params.customerName ? params.customerName.split(' ')[0] : 'Patron';
+  const body = `
+    <!-- Lookbook Review Banner -->
+    <div style="margin-bottom: 22px; border-radius: 16px; overflow: hidden; border: 1px solid #DFBF77;">
+      <img 
+        src="https://images.unsplash.com/photo-1610030469983-98e550d6193c?auto=format&fit=crop&w=1200&q=80" 
+        alt="Azhai Patron Review" 
+        style="width: 100%; height: 180px; object-fit: cover; display: block;" 
+      />
+    </div>
+
+    <div style="text-align: center; margin-bottom: 24px;">
+      <span style="background-color: rgba(112, 22, 38, 0.08); color: #701626; font-size: 10px; font-weight: bold; text-transform: uppercase; letter-spacing: 2px; padding: 4px 14px; border-radius: 20px;">
+        ⭐ Craftsmanship & Fit Feedback
+      </span>
+      <h2 style="font-family: Georgia, serif; color: #110B0E; font-size: 24px; margin: 12px 0 6px 0;">How was your fit, ${firstName}?</h2>
+      <p style="color: #6D6268; font-size: 13px; margin: 0; line-height: 1.6;">
+        Every stitch in order <strong>#${params.orderId}</strong> was crafted with dedication. We would be honored to hear your thoughts.
+      </p>
+    </div>
+
+    <div style="text-align: center; margin: 28px 0;">
+      <p style="font-size: 13px; font-weight: bold; margin-bottom: 12px; color: #701626;">Rate Your Experience:</p>
+      <div style="font-size: 28px; letter-spacing: 8px;">
+        <a href="${STORE_URL}/contact?order=${params.orderId}&rating=5" style="text-decoration: none; color: #DFBF77;">⭐</a>
+        <a href="${STORE_URL}/contact?order=${params.orderId}&rating=4" style="text-decoration: none; color: #DFBF77;">⭐</a>
+        <a href="${STORE_URL}/contact?order=${params.orderId}&rating=3" style="text-decoration: none; color: #DFBF77;">⭐</a>
+        <a href="${STORE_URL}/contact?order=${params.orderId}&rating=2" style="text-decoration: none; color: #DFBF77;">⭐</a>
+        <a href="${STORE_URL}/contact?order=${params.orderId}&rating=1" style="text-decoration: none; color: #DFBF77;">⭐</a>
+      </div>
+    </div>
+
+    <div style="text-align: center;">
+      <a href="${STORE_URL}/contact?order=${params.orderId}" style="display: inline-block; background: linear-gradient(135deg, #701626 0%, #8E1E34 100%); color: #ffffff; font-size: 11.5px; font-weight: bold; text-transform: uppercase; letter-spacing: 2px; padding: 13px 26px; border-radius: 12px; text-decoration: none; box-shadow: 0 4px 15px rgba(112, 22, 38, 0.2);">
+        Share Your Fit Review →
+      </a>
+    </div>
+  `;
+  return wrapEmailLayout(`How was your Azhai fit?`, body);
+}
+
+// ─────────────────────────────────────────────────────────────
+// 9. 🛒 ABANDONED BAG RECOVERY EMAIL (WITH PRODUCT IMAGES & 5% PRIVILEGE)
+// ─────────────────────────────────────────────────────────────
+export function buildAbandonedCartEmailHtml(params: {
+  customerName?: string;
+  items: { name: string; price: string; size?: string; image?: string }[];
+  couponCode?: string;
+}): string {
+  const firstName = params.customerName ? params.customerName.split(' ')[0] : 'Patron';
+  const coupon = params.couponCode || 'ATELIER5';
+
+  const itemsHtml = params.items
+    .map(
+      (item) => `
+      <tr>
+        <td style="padding: 12px 0; border-bottom: 1px solid #E5E0D8; width: 75px; vertical-align: middle;">
+          <img 
+            src="${item.image || 'https://images.unsplash.com/photo-1583391733956-3750e0ff4e8b?auto=format&fit=crop&w=300&q=80'}" 
+            alt="${item.name}" 
+            style="width: 68px; height: 86px; object-fit: cover; border-radius: 12px; border: 1px solid #DFBF77; display: block;" 
+          />
+        </td>
+        <td style="padding: 12px 12px; border-bottom: 1px solid #E5E0D8; vertical-align: middle;">
+          <strong style="color: #110B0E; font-size: 13.5px; font-family: Georgia, serif;">${item.name}</strong><br>
+          <span style="font-size: 11px; color: #6D6268;">Size: <strong style="color: #701626;">${item.size || 'M'}</strong></span>
+        </td>
+        <td style="padding: 12px 0; border-bottom: 1px solid #E5E0D8; text-align: right; color: #701626; font-weight: bold; font-size: 13.5px; vertical-align: middle; white-space: nowrap;">
+          ${item.price}
+        </td>
+      </tr>
+    `
+    )
+    .join('');
+
+  const body = `
+    <!-- Reserved Bag Editorial Banner -->
+    <div style="margin-bottom: 22px; border-radius: 16px; overflow: hidden; border: 1px solid #DFBF77;">
+      <img 
+        src="https://images.unsplash.com/photo-1610030469983-98e550d6193c?auto=format&fit=crop&w=1200&q=80" 
+        alt="Reserved Bag" 
+        style="width: 100%; height: 180px; object-fit: cover; display: block;" 
+      />
+    </div>
+
+    <div style="text-align: center; margin-bottom: 24px;">
+      <span style="background-color: rgba(112, 22, 38, 0.08); color: #701626; font-size: 10px; font-weight: bold; text-transform: uppercase; letter-spacing: 2.5px; padding: 4px 14px; border-radius: 20px;">
+        Atelier Reserved
+      </span>
+      <h2 style="font-family: Georgia, serif; color: #110B0E; font-size: 24px; margin: 12px 0 6px 0;">You left something exquisite behind</h2>
+      <p style="color: #6D6268; font-size: 13px; margin: 0; line-height: 1.6;">
+        Dear ${firstName}, your handcrafted selections are reserved in your bag.
+      </p>
+    </div>
+
+    <div style="background-color: #FCFBF8; border-radius: 18px; border: 1px solid #DFBF77; padding: 20px; margin-bottom: 24px;">
+      <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
+        ${itemsHtml}
+      </table>
+
+      <div style="margin-top: 16px; padding: 14px; background-color: #F7F4EE; border-radius: 12px; text-align: center; border: 1px dashed #C5A059;">
+        <p style="font-size: 11.5px; color: #701626; font-weight: bold; margin: 0;">
+          Enjoy 5% Courtesy Privilege: Use code <span style="font-family: monospace; font-size: 13.5px; letter-spacing: 2px; background: #fff; padding: 3px 8px; border-radius: 6px; border: 1px solid #701626; color: #701626;">${coupon}</span> at checkout.
+        </p>
+      </div>
+    </div>
+
+    <div style="text-align: center;">
+      <a href="${STORE_URL}/checkout" style="display: inline-block; background: linear-gradient(135deg, #701626 0%, #8E1E34 100%); color: #ffffff; font-size: 12px; font-weight: bold; text-transform: uppercase; letter-spacing: 2px; padding: 14px 30px; border-radius: 14px; text-decoration: none; box-shadow: 0 6px 20px rgba(112, 22, 38, 0.25);">
+        Complete Your Order →
+      </a>
+    </div>
+  `;
+  return wrapEmailLayout('Your Azhai bag is waiting for you', body);
+}
+
+// ─────────────────────────────────────────────────────────────
+// 10. 💖 WISHLIST LOW STOCK ALERT EMAIL
+// ─────────────────────────────────────────────────────────────
+export function buildWishlistLowStockEmailHtml(params: {
+  customerName?: string;
+  productName: string;
+  productPrice: string;
+  productImage?: string;
+  productUrl: string;
+}): string {
+  const firstName = params.customerName ? params.customerName.split(' ')[0] : 'Patron';
+  const imgUrl = params.productImage || 'https://images.unsplash.com/photo-1583391733956-3750e0ff4e8b?auto=format&fit=crop&w=600&q=80';
+
+  const body = `
+    <div style="text-align: center; margin-bottom: 24px;">
+      <span style="background-color: #FFF3E0; color: #E65100; font-size: 10px; font-weight: bold; text-transform: uppercase; letter-spacing: 2px; padding: 4px 14px; border-radius: 20px;">
+        Almost Sold Out
+      </span>
+      <h2 style="font-family: Georgia, serif; color: #110B0E; font-size: 24px; margin: 12px 0 6px 0;">Only a few pieces remain</h2>
+      <p style="color: #6D6268; font-size: 13px; margin: 0; line-height: 1.6;">
+        Dear ${firstName}, an item from your boutique wishlist is almost out of stock.
+      </p>
+    </div>
+
+    <div style="background-color: #FCFBF8; border-radius: 18px; border: 1px solid #DFBF77; padding: 22px; margin-bottom: 24px; text-align: center;">
+      <img src="${imgUrl}" alt="${params.productName}" style="width: 140px; height: 180px; object-fit: cover; border-radius: 14px; border: 1px solid #DFBF77; margin-bottom: 12px;" />
+      <h3 style="font-family: Georgia, serif; font-size: 18px; color: #701626; margin: 0 0 6px 0;">${params.productName}</h3>
+      <p style="font-size: 16px; font-weight: bold; color: #110B0E; margin: 0 0 16px 0;">${params.productPrice}</p>
+      
+      <a href="${params.productUrl}" style="display: inline-block; background: linear-gradient(135deg, #701626 0%, #8E1E34 100%); color: #ffffff; font-size: 11px; font-weight: bold; text-transform: uppercase; letter-spacing: 2px; padding: 12px 24px; border-radius: 12px; text-decoration: none;">
+        Secure Yours Before It's Gone →
+      </a>
+    </div>
+  `;
+  return wrapEmailLayout('Your Wishlist Piece is Almost Gone', body);
+}
+
+// ─────────────────────────────────────────────────────────────
+// 11. 🔐 SECURE PASSWORD RESET EMAIL
+// ─────────────────────────────────────────────────────────────
+export function buildPasswordResetEmailHtml(params: {
+  customerName?: string;
+  resetUrl: string;
+}): string {
+  const firstName = params.customerName ? params.customerName.split(' ')[0] : 'Patron';
+  const body = `
+    <div style="text-align: center; margin-bottom: 24px;">
+      <span style="background-color: rgba(112, 22, 38, 0.08); color: #701626; font-size: 10px; font-weight: bold; text-transform: uppercase; letter-spacing: 2px; padding: 4px 14px; border-radius: 20px;">
+        Security Notice
+      </span>
+      <h2 style="font-family: Georgia, serif; color: #110B0E; font-size: 24px; margin: 12px 0 6px 0;">Password Reset Request</h2>
+      <p style="color: #6D6268; font-size: 13px; margin: 0; line-height: 1.6;">
+        Dear ${firstName}, we received a request to reset your Azhai Atelier account password.
+      </p>
+    </div>
+
+    <div style="background-color: #FCFBF8; border-radius: 18px; border: 1px solid #DFBF77; padding: 24px; margin-bottom: 24px; text-align: center;">
+      <p style="font-size: 12.5px; color: #110B0E; margin: 0 0 18px 0; line-height: 1.6;">
+        Click the button below to set a new secure password. This secure link is valid for 1 hour.
+      </p>
+      <a href="${params.resetUrl}" style="display: inline-block; background: linear-gradient(135deg, #701626 0%, #8E1E34 100%); color: #ffffff; font-size: 11.5px; font-weight: bold; text-transform: uppercase; letter-spacing: 2px; padding: 13px 28px; border-radius: 12px; text-decoration: none; box-shadow: 0 4px 15px rgba(112, 22, 38, 0.2);">
+        Reset My Password →
+      </a>
+    </div>
+
+    <p style="font-size: 11px; color: #6D6268; text-align: center; margin: 0;">
+      If you did not request this change, you can safely disregard this email.
+    </p>
+  `;
+  return wrapEmailLayout('Reset Your Azhai Password', body);
+}

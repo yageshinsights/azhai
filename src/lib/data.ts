@@ -7,6 +7,12 @@ export interface Product {
   salePrice?: string;
   description: string;
   shortDescription: string;
+  stylingTip?: string;
+  fabricYarn?: string;
+  craftedFor?: string;
+  careGuide?: string;
+  shippingNote?: string;
+  pairingProductIds?: number[];
   images: { src: string; alt: string }[];
   categories: { id: number; name: string; slug: string }[];
   attributes: { name: string; options: string[] }[];
@@ -26,6 +32,7 @@ export interface Collection {
   count: number;
   season?: string;
   tagline?: string;
+  isFeatured?: boolean;
 }
 
 export const COLLECTIONS: Collection[] = [
@@ -37,7 +44,8 @@ export const COLLECTIONS: Collection[] = [
     heroImage: "https://images.unsplash.com/photo-1610030469983-98e550d6193c?auto=format&fit=crop&w=1400&q=90",
     count: 6,
     season: "Core Edit",
-    tagline: "Tailored everyday & festive elegance."
+    tagline: "Tailored everyday & festive elegance.",
+    isFeatured: true,
   },
   {
     id: 2,
@@ -47,7 +55,8 @@ export const COLLECTIONS: Collection[] = [
     heroImage: "https://images.unsplash.com/photo-1583391733956-3750e0ff4e8b?auto=format&fit=crop&w=1400&q=90",
     count: 8,
     season: "Signature Drapes",
-    tagline: "Cloud-light drapes & heirloom weaves."
+    tagline: "Cloud-light drapes & heirloom weaves.",
+    isFeatured: true,
   },
   {
     id: 3,
@@ -57,7 +66,8 @@ export const COLLECTIONS: Collection[] = [
     heroImage: "https://images.unsplash.com/photo-1617627143750-d86bc21e42bb?auto=format&fit=crop&w=1400&q=90",
     count: 4,
     season: "Atelier Wraps",
-    tagline: "The finishing touch of warmth & grace."
+    tagline: "The finishing touch of warmth & grace.",
+    isFeatured: false,
   },
   {
     id: 4,
@@ -67,7 +77,8 @@ export const COLLECTIONS: Collection[] = [
     heroImage: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=1400&q=90",
     count: 5,
     season: "Modern Muse",
-    tagline: "Versatile structured & sheer silhouettes."
+    tagline: "Versatile structured & sheer silhouettes.",
+    isFeatured: false,
   }
 ];
 

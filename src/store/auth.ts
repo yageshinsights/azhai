@@ -99,7 +99,7 @@ export const useAuthStore = create<AuthState>()(
           passwordHash: 'e6c2789f2cf05d52cfc236f0ff64b63e9f45efd9ef4f1c97a5a8f4c2c5c67c51', // hashed 'Azhai@2026'
           user: {
             id: 'usr_demo_01',
-            fullName: 'Preethi Kumaran',
+            fullName: 'Preethi',
             email: 'preethi@azhai.lk',
             phone: '+94 77 123 4567',
             dob: '1995-10-18',
@@ -114,7 +114,7 @@ export const useAuthStore = create<AuthState>()(
             {
               id: 'addr_01',
               label: 'Home',
-              fullName: 'Preethi Kumaran',
+              fullName: 'Preethi',
               phone: '+94 77 123 4567',
               address: '42/A Temple Road, Kollupitiya',
               city: 'Colombo 03',
@@ -125,7 +125,7 @@ export const useAuthStore = create<AuthState>()(
             {
               id: 'addr_02',
               label: 'Atelier Studio',
-              fullName: 'Preethi Kumaran',
+              fullName: 'Preethi',
               phone: '+94 77 987 6543',
               address: '15 Ward Place, Cinnamon Gardens',
               city: 'Colombo 07',
@@ -161,7 +161,7 @@ export const useAuthStore = create<AuthState>()(
               total: 29700,
               coupon: 'AZHAI10',
               customer: {
-                fullName: 'Preethi Kumaran',
+                fullName: 'Preethi',
                 email: 'preethi@azhai.lk',
                 phone: '+94 77 123 4567',
                 address: '42/A Temple Road, Kollupitiya',

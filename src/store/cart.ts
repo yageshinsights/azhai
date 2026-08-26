@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import type { TailoringCartData } from '@/lib/tailoring';
 
 export interface CartItem {
   id: number;
@@ -7,6 +8,7 @@ export interface CartItem {
   image: string;
   quantity: number;
   size?: string;
+  tailoring?: TailoringCartData; // Present only for custom tailored items
 }
 
 export interface PlacedOrder {
@@ -52,14 +54,32 @@ export const useCartStore = create<CartStore>((set, get) => ({
   isOpen: false,
   lastOrder: null,
   addItem: (item) => {
-    const existing = get().items.find(i => i.id === item.id && i.size === item.size);
+    const existing = get().items.find(i => {
+      // For tailored items, match by dress type + fabric + size label
+      if (item.tailoring && i.tailoring) {
+        return (
+          i.tailoring.dressTypeSlug === item.tailoring.dressTypeSlug &&
+          i.tailoring.fabricName === item.tailoring.fabricName &&
+          i.tailoring.sizeLabel === item.tailoring.sizeLabel
+        );
+      }
+      // For regular items, match by id + size
+      return i.id === item.id && i.size === item.size && !i.tailoring;
+    });
     if (existing) {
       set(state => ({
-        items: state.items.map(i =>
-          i.id === item.id && i.size === item.size
+        items: state.items.map(i => {
+          if (item.tailoring && i.tailoring) {
+            return (
+              i.tailoring.dressTypeSlug === item.tailoring.dressTypeSlug &&
+              i.tailoring.fabricName === item.tailoring.fabricName &&
+              i.tailoring.sizeLabel === item.tailoring.sizeLabel
+            ) ? { ...i, quantity: i.quantity + item.quantity } : i;
+          }
+          return (i.id === item.id && i.size === item.size && !i.tailoring)
             ? { ...i, quantity: i.quantity + item.quantity }
-            : i
-        ),
+            : i;
+        }),
         isOpen: true,
       }));
     } else {
@@ -81,7 +101,13 @@ export const useCartStore = create<CartStore>((set, get) => ({
   totalItems: () => get().items.reduce((sum, i) => sum + i.quantity, 0),
   totalPrice: () =>
     get().items.reduce((sum, i) => {
+      // For tailored items, use fabricPrice + stitchingFee
+      if (i.tailoring) {
+        return sum + (i.tailoring.fabricPrice + i.tailoring.stitchingFee) * i.quantity;
+      }
+      // For regular items, parse from price string
       const num = parseInt(i.price.replace(/[^0-9]/g, '')) || 0;
       return sum + num * i.quantity;
     }, 0),
 }));
+

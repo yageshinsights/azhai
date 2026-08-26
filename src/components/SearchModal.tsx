@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Search, X, ArrowRight, Sparkles } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { PRODUCTS } from '@/lib/data';
+import { useAdminStore } from '@/store/admin';
 
 interface SearchModalProps {
   isOpen: boolean;
@@ -21,6 +22,8 @@ const POPULAR_SEARCHES = [
 export default function SearchModal({ isOpen, onClose }: SearchModalProps) {
   const [query, setQuery] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
+  const storeProducts = useAdminStore((state) => state.products);
+  const allProducts = storeProducts.length > 0 ? storeProducts : PRODUCTS;
 
   useEffect(() => {
     if (isOpen) {
@@ -31,7 +34,7 @@ export default function SearchModal({ isOpen, onClose }: SearchModalProps) {
   }, [isOpen]);
 
   const results = query.trim()
-    ? PRODUCTS.filter(p => 
+    ? allProducts.filter(p => 
         p.name.toLowerCase().includes(query.toLowerCase()) ||
         p.shortDescription.toLowerCase().includes(query.toLowerCase()) ||
         p.categories.some(c => c.name.toLowerCase().includes(query.toLowerCase())) ||

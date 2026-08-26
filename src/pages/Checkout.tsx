@@ -18,6 +18,10 @@ import {
 } from 'lucide-react';
 import { useCartStore } from '@/store/cart';
 import { useAuthStore } from '@/store/auth';
+import { useAdminStore } from '@/store/admin';
+import { supabase, isSupabaseConfigured } from '@/lib/supabase';
+import { sendBrevoEmail, buildOrderConfirmationHtml, buildAdminOrderAlertHtml } from '@/lib/brevo';
+import { startPayHerePayment } from '@/lib/payhere';
 
 const SRI_LANKA_DISTRICTS = [
   'Colombo',
@@ -48,66 +52,186 @@ const SRI_LANKA_DISTRICTS = [
 ];
 
 export default function Checkout() {
-  const { items, totalPrice, clearCart, setLastOrder } = useCartStore();
-  const { user, isAuthenticated, addresses, addOrder, addAddress } = useAuthStore();
-  const location = useLocation();
   const navigate = useNavigate();
+  const location = useLocation();
+  const state = (location.state as { appliedCoupon?: string; discountAmount?: number; giftNote?: string }) || {};
 
-  const state = (location.state as { appliedCoupon?: string; discountAmount?: number; giftNote?: string } | null) || {};
-  const rawTotal = totalPrice();
+  const { items, clearCart, setLastOrder, totalPrice } = useCartStore();
+  const { user, isAuthenticated, addresses, addAddress, addOrder } = useAuthStore();
+  const settings = useAdminStore((s) => s.settings);
 
+  // Default address pre-fill
   const defaultAddr = addresses.find((a) => a.isDefault) || addresses[0];
 
-  // Form State initialized with user profile or default address if available
+  // Form State
   const [email, setEmail] = useState(user?.email || '');
-  const [phone, setPhone] = useState(user?.phone || defaultAddr?.phone || '');
-  const [fullName, setFullName] = useState(user?.fullName || defaultAddr?.fullName || '');
+  const [fullName, setFullName] = useState(defaultAddr?.fullName || user?.fullName || '');
+  const [phone, setPhone] = useState(defaultAddr?.phone || user?.phone || '');
   const [address, setAddress] = useState(defaultAddr?.address || '');
   const [city, setCity] = useState(defaultAddr?.city || '');
   const [district, setDistrict] = useState(defaultAddr?.district || 'Colombo');
   const [postalCode, setPostalCode] = useState(defaultAddr?.postalCode || '');
+  const [deliveryMethod, setDeliveryMethod] = useState<'standard' | 'express'>('standard');
+  const [paymentMethod, setPaymentMethod] = useState<'cod' | 'card' | 'koko' | 'bank'>(
+    settings.enableCOD ? 'cod' : 'card'
+  );
   const [deliveryNotes, setDeliveryNotes] = useState('');
   const [saveAddressToAccount, setSaveAddressToAccount] = useState(false);
-  const [selectedAddrId, setSelectedAddrId] = useState<string | null>(defaultAddr?.id || null);
-
-  const handleSelectSavedAddress = (addr: typeof addresses[0]) => {
-    setSelectedAddrId(addr.id);
-    setFullName(addr.fullName);
-    setPhone(addr.phone);
-    setAddress(addr.address);
-    setCity(addr.city);
-    setDistrict(addr.district);
-    setPostalCode(addr.postalCode || '');
-  };
-
-  // Shipping & Payment Method
-  const [deliveryMethod, setDeliveryMethod] = useState<'standard' | 'express'>('standard');
-  const [paymentMethod, setPaymentMethod] = useState<'cod' | 'card' | 'koko' | 'bank'>('cod');
+  const [selectedAddrId, setSelectedAddrId] = useState<string>(defaultAddr?.id || '');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Pricing calculations
+  const rawTotal = totalPrice();
   const discount = state.discountAmount || 0;
-  const isFreeStandard = rawTotal >= 15000;
-  const shippingFee = deliveryMethod === 'express' ? 850 : (isFreeStandard ? 0 : 450);
+
+  // Dynamic Shipping Fee
+  const isFreeStandard = rawTotal >= settings.freeShippingThreshold;
+  const isFreeShipping = isFreeStandard;
+  const shippingFee = deliveryMethod === 'express' 
+    ? settings.expressShippingFee 
+    : (isFreeShipping ? 0 : settings.standardShippingFee);
+
   const finalTotal = Math.max(0, rawTotal - discount + shippingFee);
+
+  const handleSelectSavedAddress = (id: string) => {
+    setSelectedAddrId(id);
+    const found = addresses.find((a) => a.id === id);
+    if (found) {
+      setFullName(found.fullName);
+      setPhone(found.phone);
+      setAddress(found.address);
+      setCity(found.city);
+      setDistrict(found.district);
+      setPostalCode(found.postalCode || '');
+    }
+  };
 
   if (items.length === 0) {
     return (
-      <div className="min-h-screen bg-[#FCFBF8] pt-28 pb-20 px-5 flex flex-col items-center justify-center text-center">
-        <div className="w-16 h-16 rounded-full bg-[#F7F4EE] flex items-center justify-center border border-[#C5A059]/40 mb-4">
-          <ShoppingBag className="w-8 h-8 text-[#701626]/50" />
+      <div className="min-h-screen bg-[#FCFBF8] pt-32 pb-20 px-4 text-center font-display">
+        <div className="max-w-md mx-auto space-y-4">
+          <ShoppingBag className="w-12 h-12 text-[#701626] mx-auto opacity-50" />
+          <h1 className="text-2xl font-bold text-[#110B0E]">Your shopping bag is empty</h1>
+          <p className="text-xs text-[#6D6268]">Add handcrafted creations to your bag before checking out.</p>
+          <Link
+            to="/collections"
+            className="inline-block px-8 py-3 bg-[#701626] text-white text-xs uppercase tracking-widest font-bold rounded-full shadow-md"
+          >
+            Explore Collections
+          </Link>
         </div>
-        <h1 className="font-display text-3xl font-bold text-[#110B0E] mb-2">Your Shopping Bag is Empty</h1>
-        <p className="text-sm text-[#6D6268] max-w-sm mb-6 font-light">Add our handcrafted heirloom silks to proceed with checkout.</p>
-        <Link
-          to="/collections"
-          className="px-8 py-3.5 bg-[#701626] text-white text-xs uppercase tracking-[0.2em] font-bold rounded-full shadow-lg"
-        >
-          Explore Collections →
-        </Link>
       </div>
     );
   }
+
+  const finalizeOrderPlacement = async (orderData: any) => {
+    // 1. Save order to Zustand local stores
+    if (isAuthenticated && saveAddressToAccount && !selectedAddrId) {
+      addAddress({
+        label: 'Home',
+        fullName,
+        phone,
+        address,
+        city,
+        district,
+        postalCode,
+        isDefault: addresses.length === 0,
+      });
+    }
+
+    addOrder(orderData);
+    useAdminStore.getState().syncNewOrder(orderData);
+
+    // 2. Sync Order to Supabase Postgres (If Configured)
+    if (isSupabaseConfigured()) {
+      try {
+        const { data: insertedOrder, error: orderErr } = await supabase
+          .from('orders')
+          .insert({
+            order_code: orderData.orderId,
+            user_id: user?.id || null,
+            customer_details: orderData.customer,
+            delivery_notes: state.giftNote || null,
+            gift_note: state.giftNote || null,
+            coupon_code: state.appliedCoupon || null,
+            subtotal: orderData.subtotal,
+            discount: orderData.discount,
+            shipping: orderData.shipping,
+            total: orderData.total,
+            cost_price: Math.round(orderData.subtotal * 0.45),
+            delivery_method: orderData.deliveryMethod,
+            payment_method: orderData.paymentMethod,
+            payment_status: paymentMethod === 'card' ? 'paid' : 'pending_cod',
+            status: 'confirmed',
+          })
+          .select()
+          .single();
+
+        if (insertedOrder && !orderErr) {
+          const orderItemsPayload = items.map((item) => ({
+            order_id: insertedOrder.id,
+            product_id: item.id,
+            product_name: item.name,
+            price: item.price,
+            image_url: item.image,
+            size: item.tailoring ? `Tailored: ${item.tailoring.sizeLabel}` : (item.size || 'M'),
+            custom_measurements: item.tailoring || null,
+            quantity: item.quantity,
+          }));
+
+          await supabase.from('order_items').insert(orderItemsPayload);
+        }
+      } catch (err) {
+        console.error('[Supabase Order Insert Error]:', err);
+      }
+    }
+
+    // 3. Send Brevo Transactional Confirmation Email (Customer Receipt)
+    try {
+      const emailHtml = buildOrderConfirmationHtml({
+        orderId: orderData.orderId,
+        customerName: fullName,
+        total: finalTotal,
+        items: items.map((i) => ({ name: i.name, size: i.size, quantity: i.quantity, price: i.price, tailoring: i.tailoring })),
+        deliveryMethod: orderData.deliveryMethod,
+        paymentMethod: orderData.paymentMethod,
+      });
+
+      await sendBrevoEmail({
+        to: [{ email, name: fullName }],
+        subject: `✨ Order Confirmed #${orderData.orderId} — Azhai Boutique by Preethi`,
+        htmlContent: emailHtml,
+      });
+
+      // Also send Admin Notification to Store Owner
+      const adminEmail = import.meta.env.VITE_ADMIN_NOTIFICATION_EMAIL || 'orders@azhai.lk';
+      const adminHtml = buildAdminOrderAlertHtml({
+        orderId: orderData.orderId,
+        customerName: fullName,
+        customerEmail: email,
+        customerPhone: phone,
+        customerAddress: address,
+        city,
+        district,
+        total: finalTotal,
+        items: items.map((i) => ({ name: i.name, size: i.size, quantity: i.quantity, price: i.price, tailoring: i.tailoring })),
+        deliveryMethod: orderData.deliveryMethod,
+        paymentMethod: orderData.paymentMethod,
+      });
+
+      await sendBrevoEmail({
+        to: [{ email: adminEmail, name: 'Azhai Store Owner' }],
+        subject: `🛍️ New Order Received #${orderData.orderId} (LKR ${finalTotal.toLocaleString()})`,
+        htmlContent: adminHtml,
+      });
+    } catch (emailErr) {
+      console.error('[Brevo Confirmation Email Error]:', emailErr);
+    }
+
+    setLastOrder(orderData);
+    clearCart();
+    setIsSubmitting(false);
+    navigate(`/order-success/${orderData.orderId}`);
+  };
 
   const handlePlaceOrder = (e: React.FormEvent) => {
     e.preventDefault();
@@ -137,39 +261,54 @@ export default function Checkout() {
         address,
         city,
         district,
-        postalCode
+        postalCode,
       },
       deliveryMethod: deliveryMethod === 'express' ? 'Express Colombo Same-Day' : 'Island-wide Standard Courier (1-3 Days)',
-      paymentMethod: 
-        paymentMethod === 'cod' ? 'Cash on Delivery (COD)' :
-        paymentMethod === 'card' ? 'Credit / Debit Card (Visa/Mastercard)' :
-        paymentMethod === 'koko' ? 'Koko / Mintpay (3x Installments)' : 'Direct Bank Deposit',
-      placedAt: new Date().toISOString()
+      paymentMethod:
+        paymentMethod === 'cod'
+          ? 'Cash on Delivery (COD)'
+          : paymentMethod === 'card'
+          ? 'Credit / Debit Card (Visa/Mastercard)'
+          : paymentMethod === 'koko'
+          ? 'Koko / Mintpay (3x Installments)'
+          : 'Direct Bank Deposit',
+      placedAt: new Date().toISOString(),
     };
 
-    // Optionally save new address to account if checked
-    if (isAuthenticated && saveAddressToAccount && !selectedAddrId) {
-      addAddress({
-        label: 'Home',
-        fullName,
-        phone,
-        address,
-        city,
-        district,
-        postalCode,
-        isDefault: addresses.length === 0
-      });
+    // If PayHere Card Payment selected, trigger PayHere Gateway modal
+    if (paymentMethod === 'card') {
+      const nameParts = fullName.trim().split(' ');
+      startPayHerePayment(
+        {
+          orderId: generatedOrderId,
+          itemsName: items.map((i) => `${i.name} (${i.size || 'M'})`).join(', '),
+          amount: finalTotal,
+          firstName: nameParts[0] || fullName,
+          lastName: nameParts.slice(1).join(' ') || 'Patron',
+          email,
+          phone,
+          address,
+          city,
+          country: 'Sri Lanka',
+        },
+        // PayHere Success Handler
+        () => {
+          finalizeOrderPlacement(orderData);
+        },
+        // PayHere Dismissed
+        () => {
+          setIsSubmitting(false);
+        },
+        // PayHere Error Handler
+        (err) => {
+          alert(`Payment Error: ${err}. Placing order with pending verification.`);
+          finalizeOrderPlacement(orderData);
+        }
+      );
+    } else {
+      // COD, Bank Deposit, Koko
+      finalizeOrderPlacement(orderData);
     }
-
-    // Save order to both cart store and user's auth order history
-    addOrder(orderData);
-
-    setTimeout(() => {
-      setLastOrder(orderData);
-      clearCart();
-      setIsSubmitting(false);
-      navigate(`/order-success/${generatedOrderId}`);
-    }, 1200);
   };
 
   return (
@@ -258,7 +397,7 @@ export default function Checkout() {
                           <button
                             key={addr.id}
                             type="button"
-                            onClick={() => handleSelectSavedAddress(addr)}
+                            onClick={() => handleSelectSavedAddress(addr.id)}
                             className={`p-3 rounded-2xl border text-left transition-all ${
                               isSelected
                                 ? 'bg-[#701626]/5 border-[#701626] shadow-sm'
@@ -295,7 +434,7 @@ export default function Checkout() {
                       placeholder="e.g. Ananya Senanayake"
                       value={fullName}
                       onChange={(e) => {
-                        setSelectedAddrId(null);
+                        setSelectedAddrId('');
                         setFullName(e.target.value);
                       }}
                       className="w-full px-4 py-3 text-xs bg-[#FCFBF8] border border-[#C5A059]/50 rounded-xl text-[#110B0E] focus:outline-none focus:border-[#701626]"
@@ -312,7 +451,7 @@ export default function Checkout() {
                       placeholder="No. 42, Flower Road, Colombo 07"
                       value={address}
                       onChange={(e) => {
-                        setSelectedAddrId(null);
+                        setSelectedAddrId('');
                         setAddress(e.target.value);
                       }}
                       className="w-full px-4 py-3 text-xs bg-[#FCFBF8] border border-[#C5A059]/50 rounded-xl text-[#110B0E] focus:outline-none focus:border-[#701626]"
@@ -330,7 +469,7 @@ export default function Checkout() {
                         placeholder="Colombo 07"
                         value={city}
                         onChange={(e) => {
-                          setSelectedAddrId(null);
+                          setSelectedAddrId('');
                           setCity(e.target.value);
                         }}
                         className="w-full px-4 py-3 text-xs bg-[#FCFBF8] border border-[#C5A059]/50 rounded-xl text-[#110B0E] focus:outline-none focus:border-[#701626]"
@@ -344,7 +483,7 @@ export default function Checkout() {
                       <select
                         value={district}
                         onChange={(e) => {
-                          setSelectedAddrId(null);
+                          setSelectedAddrId('');
                           setDistrict(e.target.value);
                         }}
                         className="w-full px-4 py-3 text-xs bg-[#FCFBF8] border border-[#C5A059]/50 rounded-xl text-[#110B0E] focus:outline-none focus:border-[#701626]"
@@ -364,7 +503,7 @@ export default function Checkout() {
                         placeholder="00700"
                         value={postalCode}
                         onChange={(e) => {
-                          setSelectedAddrId(null);
+                          setSelectedAddrId('');
                           setPostalCode(e.target.value);
                         }}
                         className="w-full px-4 py-3 text-xs bg-[#FCFBF8] border border-[#C5A059]/50 rounded-xl text-[#110B0E] focus:outline-none focus:border-[#701626]"
@@ -465,27 +604,46 @@ export default function Checkout() {
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                   
-                  {/* COD */}
-                  <label className={`p-4 rounded-2xl border cursor-pointer transition-all flex flex-col justify-between space-y-2 ${
-                    paymentMethod === 'cod'
-                      ? 'border-[#701626] bg-[#701626]/5 ring-1 ring-[#701626]'
-                      : 'border-[#C5A059]/30 bg-[#FCFBF8] hover:border-[#C5A059]'
-                  }`}>
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <Banknote className="w-4 h-4 text-[#701626]" />
-                        <span className="text-xs font-bold text-[#110B0E]">Cash on Delivery</span>
+                  {/* COD (with live admin settings toggle & ceiling limit) */}
+                  {settings.enableCOD ? (
+                    <label className={`p-4 rounded-2xl border cursor-pointer transition-all flex flex-col justify-between space-y-2 ${
+                      finalTotal > settings.maxCODAmount
+                        ? 'opacity-50 cursor-not-allowed bg-gray-50 border-gray-200'
+                        : paymentMethod === 'cod'
+                        ? 'border-[#701626] bg-[#701626]/5 ring-1 ring-[#701626]'
+                        : 'border-[#C5A059]/30 bg-[#FCFBF8] hover:border-[#C5A059]'
+                    }`}>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <Banknote className="w-4 h-4 text-[#701626]" />
+                          <span className="text-xs font-bold text-[#110B0E]">Cash on Delivery (COD)</span>
+                        </div>
+                        <input
+                          type="radio"
+                          name="payment"
+                          disabled={finalTotal > settings.maxCODAmount}
+                          checked={paymentMethod === 'cod' && finalTotal <= settings.maxCODAmount}
+                          onChange={() => setPaymentMethod('cod')}
+                          className="text-[#701626]"
+                        />
                       </div>
-                      <input
-                        type="radio"
-                        name="payment"
-                        checked={paymentMethod === 'cod'}
-                        onChange={() => setPaymentMethod('cod')}
-                        className="text-[#701626]"
-                      />
+                      <p className="text-[11px] text-[#6D6268]">
+                        {finalTotal > settings.maxCODAmount
+                          ? `COD limited to orders up to LKR ${settings.maxCODAmount.toLocaleString()}. Please use Card/Bank.`
+                          : 'Pay with cash to courier upon doorstep parcel handover across Sri Lanka.'}
+                      </p>
+                    </label>
+                  ) : (
+                    <div className="p-4 rounded-2xl border border-dashed border-gray-300 bg-gray-50 opacity-60 flex flex-col justify-between space-y-1 text-xs">
+                      <div className="flex items-center gap-2">
+                        <Banknote className="w-4 h-4 text-gray-400" />
+                        <span className="font-bold text-gray-500">Cash on Delivery (Disabled)</span>
+                      </div>
+                      <p className="text-[10.5px] text-gray-400">
+                        COD is currently paused by the atelier. Please pay via Online Card or Bank Transfer.
+                      </p>
                     </div>
-                    <p className="text-[11px] text-[#6D6268]">Pay with cash to courier upon doorstep parcel handover.</p>
-                  </label>
+                  )}
 
                   {/* Online Card */}
                   <label className={`p-4 rounded-2xl border cursor-pointer transition-all flex flex-col justify-between space-y-2 ${
@@ -593,15 +751,26 @@ export default function Checkout() {
               {/* Item List */}
               <div className="space-y-4 max-h-72 overflow-y-auto pr-1">
                 {items.map(item => (
-                  <div key={`${item.id}-${item.size}`} className="flex gap-4 items-center">
+                  <div key={`${item.id}-${item.size}`} className="flex gap-4 items-start">
                     <div className="w-16 h-20 rounded-xl overflow-hidden bg-[#F7F4EE] shrink-0 border border-[#C5A059]/30">
                       <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
                     </div>
                     <div className="flex-1 min-w-0 space-y-0.5">
+                      {item.tailoring && (
+                        <span className="inline-block text-[9px] font-bold uppercase tracking-wider text-[#701626] bg-[#701626]/10 px-2 py-0.2 rounded-full">
+                          ✂️ Custom Tailored
+                        </span>
+                      )}
                       <h4 className="font-display text-base font-bold text-[#110B0E] leading-tight line-clamp-1">{item.name}</h4>
-                      <p className="text-[10px] text-[#6D6268] uppercase tracking-wider">
-                        Size: {item.size} · Qty: {item.quantity}
-                      </p>
+                      {item.tailoring ? (
+                        <p className="text-[10px] text-[#6D6268]">
+                          Fabric: {item.tailoring.fabricName} · Size: {item.tailoring.sizeLabel}
+                        </p>
+                      ) : (
+                        <p className="text-[10px] text-[#6D6268] uppercase tracking-wider">
+                          Size: {item.size} · Qty: {item.quantity}
+                        </p>
+                      )}
                       <p className="font-display text-sm font-bold text-[#701626]">{item.price}</p>
                     </div>
                   </div>

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import { 
@@ -7,64 +7,75 @@ import {
   Camera, 
   Feather, 
   Sun, 
-  Crown,
-  ChevronLeft,
-  ChevronRight,
-  Layers
+  Crown, 
+  ChevronLeft, 
+  ChevronRight, 
+  Layers 
 } from 'lucide-react';
 import ProductCard from '@/components/ProductCard';
-import FabricExplorer from '@/components/FabricExplorer';
+import TailoringStudio from '@/components/TailoringStudio';
 import StyleQuiz from '@/components/StyleQuiz';
-import { 
-  LiyawelDivider 
-} from '@/components/CulturalPatterns';
-import { PRODUCTS, COLLECTIONS } from '@/lib/data';
-
-const CATEGORY_FILTERS = [
-  { label: '✨ All Pieces', value: 'all' },
-  { label: '👗 Kurties', value: 'kurties' },
-  { label: '🥻 Sarees', value: 'sarees' },
-  { label: '🧣 Shawls', value: 'shawls' },
-  { label: '🌸 Tops', value: 'tops' },
-];
+import AnimatedLogo from '@/components/AnimatedLogo';
+import { LiyawelDivider } from '@/components/CulturalPatterns';
+import { PRODUCTS, COLLECTIONS, type Collection } from '@/lib/data';
+import { useAdminStore } from '@/store/admin';
 
 export default function Home() {
+  const storeProducts = useAdminStore((s) => s.products);
+  const storeCategories = useAdminStore((s) => s.categories);
+
+  const allProducts = storeProducts && storeProducts.length > 0 ? storeProducts : PRODUCTS;
+  const allCategories = storeCategories && storeCategories.length > 0 ? storeCategories : COLLECTIONS;
+
+  // Filter collections featured in the Hero Carousel (fallback to first if none are featured)
+  const heroCategories = useMemo(() => {
+    const featured = allCategories.filter((c) => Boolean(c.isFeatured));
+    return featured.length > 0 ? featured : allCategories.slice(0, 1);
+  }, [allCategories]);
+
   const [activeSlide, setActiveSlide] = useState(0);
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [direction, setDirection] = useState(1);
   const isHovered = useRef(false);
 
+  // Reset activeSlide if heroCategories length changes
+  useEffect(() => {
+    if (activeSlide >= heroCategories.length) {
+      setActiveSlide(0);
+    }
+  }, [heroCategories.length, activeSlide]);
+
   // Auto-advance slider every 5.5 seconds (paused on hover)
   useEffect(() => {
     const timer = setInterval(() => {
-      if (!isHovered.current) {
+      if (!isHovered.current && heroCategories.length > 0) {
         setDirection(1);
-        setActiveSlide(prev => (prev + 1) % COLLECTIONS.length);
+        setActiveSlide((prev) => (prev + 1) % heroCategories.length);
       }
     }, 5500);
     return () => clearInterval(timer);
-  }, []);
+  }, [heroCategories.length]);
 
   const handleNext = () => {
     setDirection(1);
-    setActiveSlide(prev => (prev + 1) % COLLECTIONS.length);
+    setActiveSlide((prev) => (prev + 1) % heroCategories.length);
   };
 
   const handlePrev = () => {
     setDirection(-1);
-    setActiveSlide(prev => (prev - 1 + COLLECTIONS.length) % COLLECTIONS.length);
+    setActiveSlide((prev) => (prev - 1 + heroCategories.length) % heroCategories.length);
   };
 
-  const currentCategory = COLLECTIONS[activeSlide];
+  const currentCategory = heroCategories[activeSlide] || heroCategories[0];
 
-  const filteredProducts = PRODUCTS.filter(p => {
+  const filteredProducts = allProducts.filter((p) => {
     if (selectedCategory === 'all') return true;
-    return p.categories.some(c => c.slug === selectedCategory);
+    return p.categories.some((c) => c.slug === selectedCategory);
   });
 
   return (
     <div className="min-h-screen bg-[#FCFBF8] text-[#110B0E]">
-
+      
       {/* ── FIT-TO-SCREEN EDITORIAL CATEGORY HERO ── */}
       <section 
         className="relative w-full h-[100svh] min-h-[580px] sm:min-h-[640px] pt-18 sm:pt-24 flex flex-col justify-between overflow-hidden bg-[#110B0E]"
@@ -74,120 +85,124 @@ export default function Home() {
         
         {/* Background Category Sliding Imagery */}
         <AnimatePresence initial={false} custom={direction}>
-          <motion.div
-            key={currentCategory.id}
-            custom={direction}
-            initial={{ opacity: 0, scale: 1.06 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.98 }}
-            transition={{ duration: 0.8, ease: [0.25, 0.46, 0.45, 0.94] }}
-            className="absolute inset-0 z-0"
-          >
-            <img
-              src={currentCategory.heroImage}
-              alt={currentCategory.name}
-              className="w-full h-full object-cover object-center"
-            />
-            {/* Cinematic Luxury Vignette Gradients */}
-            <div className="absolute inset-0 bg-gradient-to-t from-[#110B0E] via-[#110B0E]/60 to-[#110B0E]/25" />
-            <div className="absolute inset-0 bg-gradient-to-r from-[#110B0E]/85 via-[#110B0E]/30 to-transparent hidden md:block" />
-          </motion.div>
+          {currentCategory && (
+            <motion.div
+              key={currentCategory.id || currentCategory.slug}
+              custom={direction}
+              initial={{ opacity: 0, scale: 1.06 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.98 }}
+              transition={{ duration: 0.8, ease: [0.25, 0.46, 0.45, 0.94] }}
+              className="absolute inset-0 z-0"
+            >
+              <img
+                src={currentCategory.heroImage}
+                alt={currentCategory.name}
+                className="w-full h-full object-cover object-center"
+              />
+              {/* Vignette Gradients */}
+              <div className="absolute inset-0 bg-gradient-to-t from-[#110B0E] via-[#110B0E]/60 to-[#110B0E]/25" />
+              <div className="absolute inset-0 bg-gradient-to-r from-[#110B0E]/85 via-[#110B0E]/30 to-transparent hidden md:block" />
+            </motion.div>
+          )}
         </AnimatePresence>
 
-        {/* ── Content Area: Editorial Narrative & Category Showcase (Naturally filling screen) ── */}
+        {/* Content Area */}
         <div className="relative z-20 px-4 sm:px-8 max-w-7xl mx-auto w-full my-auto py-4 sm:py-6">
           <div className="max-w-2xl text-left space-y-3.5 sm:space-y-4">
             
+            {/* Season Badge */}
+            <motion.div 
+              initial={{ opacity: 0, y: 15 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5 }}
+              className="inline-flex items-center gap-2 bg-[#701626]/80 backdrop-blur-md px-3.5 sm:px-4 py-1 sm:py-1.5 rounded-full border border-[#C5A059]/40 shadow-lg"
+            >
+              <Sparkles className="w-3.5 h-3.5 text-[#DFBF77]" />
+              <span className="text-[9px] sm:text-[10px] uppercase tracking-[0.25em] text-[#DFBF77] font-bold">
+                {currentCategory?.season || 'Festive Couture'} · {currentCategory?.count || 6} Pieces
+              </span>
+            </motion.div>
+
+            {/* Dynamic Collection Title */}
             <AnimatePresence mode="wait">
               <motion.div
-                key={currentCategory.id}
-                initial={{ opacity: 0, y: 15 }}
+                key={currentCategory?.id || currentCategory?.slug}
+                initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -15 }}
-                transition={{ duration: 0.45 }}
-                className="space-y-3 sm:space-y-3.5"
+                transition={{ duration: 0.5 }}
+                className="space-y-2"
               >
-                {/* Compact Combined Badge */}
-                <div className="flex items-center gap-2">
-                  <span className="inline-flex items-center gap-1.5 bg-[#701626]/90 backdrop-blur-md text-[#F3E8CE] px-3.5 py-1.5 rounded-full text-[9px] sm:text-[10px] uppercase tracking-[0.25em] font-bold shadow-md border border-[#C5A059]/40">
-                    <Sparkles className="w-3 h-3 text-[#DFBF77]" />
-                    <span>{currentCategory.season} · {currentCategory.count} Pieces</span>
-                  </span>
-                </div>
-
-                {/* Title and Tagline (Larger on Mobile) */}
-                <div className="space-y-1">
-                  <h1 className="font-display text-5xl sm:text-7xl lg:text-8xl font-bold text-white leading-tight tracking-tight drop-shadow-md">
-                    {currentCategory.name}
-                  </h1>
-                  <p className="font-script text-3xl sm:text-4xl lg:text-5xl text-[#DFBF77] font-normal leading-tight pt-0.5">
-                    {currentCategory.tagline}
-                  </p>
-                </div>
-
-                {/* Description (Visible on Mobile to fill vertical space beautifully) */}
-                <p className="text-xs sm:text-sm text-white/90 font-light leading-relaxed max-w-lg pt-1 drop-shadow-sm block">
-                  {currentCategory.description}
+                <h1 className="font-display text-4xl sm:text-6xl md:text-7xl font-bold text-white tracking-tight leading-[1.08] drop-shadow-md">
+                  {currentCategory?.name}
+                </h1>
+                <p className="text-sm sm:text-base text-white/85 font-light max-w-lg leading-relaxed drop-shadow">
+                  {currentCategory?.description}
                 </p>
-
-                {/* Single Compact Action Row */}
-                <div className="flex items-center gap-3 pt-2">
-                  <Link
-                    to={`/collections/${currentCategory.slug}`}
-                    className="px-7 sm:px-8 py-3.5 bg-[#701626] hover:bg-[#8E1E34] text-white text-xs uppercase tracking-[0.2em] font-bold rounded-full transition-all shadow-xl shadow-black/50 border border-[#C5A059]/50 hover:scale-105 flex items-center gap-2"
-                  >
-                    <span>Explore {currentCategory.name}</span>
-                    <ArrowRight className="w-3.5 h-3.5" />
-                  </Link>
-
-                  {/* Prev/Next arrows in the same single row */}
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={handlePrev}
-                      className="w-11 h-11 sm:w-12 sm:h-12 rounded-full bg-white/10 hover:bg-white/25 text-white backdrop-blur-xl border border-white/20 flex items-center justify-center shadow-lg transition-transform hover:scale-110 active:scale-95"
-                      title="Previous Category"
-                    >
-                      <ChevronLeft className="w-5 h-5 sm:w-6 sm:h-6" />
-                    </button>
-                    <button
-                      onClick={handleNext}
-                      className="w-11 h-11 sm:w-12 sm:h-12 rounded-full bg-[#701626] hover:bg-[#8E1E34] text-white backdrop-blur-xl border border-[#C5A059]/50 flex items-center justify-center shadow-lg transition-transform hover:scale-110 active:scale-95"
-                      title="Next Category"
-                    >
-                      <ChevronRight className="w-5 h-5 sm:w-6 sm:h-6" />
-                    </button>
-                  </div>
-                </div>
               </motion.div>
             </AnimatePresence>
+
+            {/* Action Buttons */}
+            <div className="flex flex-wrap items-center gap-3 pt-2">
+              <Link
+                to={`/collections/${currentCategory?.slug}`}
+                className="px-7 py-3.5 bg-[#701626] hover:bg-[#8E1E34] text-white text-xs uppercase tracking-[0.2em] font-bold rounded-full transition-all shadow-xl shadow-[#701626]/30 border border-[#C5A059]/40 flex items-center gap-2 group cursor-pointer"
+              >
+                <span>Explore {currentCategory?.name}</span>
+                <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
+              </Link>
+              
+              <Link
+                to="/collections"
+                className="px-6 py-3.5 bg-white/10 hover:bg-white/20 backdrop-blur-md text-white text-xs uppercase tracking-[0.18em] font-semibold rounded-full transition-all border border-white/20"
+              >
+                View All Categories
+              </Link>
+            </div>
 
           </div>
         </div>
 
-        {/* ── 3. Bottom Minimalist Luxury Text Tabs (01 Kurties · 02 Sarees · 03 Shawls · 04 Tops) ── */}
-        <div className="relative z-20 px-4 sm:px-8 pb-10 sm:pb-12">
-          <div className="max-w-3xl mx-auto">
-            <div className="flex items-center justify-between gap-1 sm:gap-2 p-1.5 rounded-full bg-black/45 backdrop-blur-2xl border border-[#C5A059]/35 shadow-2xl">
-              {COLLECTIONS.map((col, idx) => {
+        {/* Bottom Interactive Navigation */}
+        <div className="relative z-20 w-full px-4 sm:px-8 pb-4 sm:pb-6 max-w-7xl mx-auto">
+          <div className="flex flex-col md:flex-row items-center justify-between gap-3 pt-3 border-t border-white/15">
+            
+            {/* Arrows */}
+            <div className="hidden sm:flex items-center gap-2">
+              <button 
+                onClick={handlePrev}
+                className="w-9 h-9 rounded-full bg-white/10 hover:bg-[#701626] border border-white/20 text-white flex items-center justify-center transition-all cursor-pointer"
+                title="Previous Category"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+              <button 
+                onClick={handleNext}
+                className="w-9 h-9 rounded-full bg-white/10 hover:bg-[#701626] border border-white/20 text-white flex items-center justify-center transition-all cursor-pointer"
+                title="Next Category"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Category Tabs */}
+            <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 w-full md:w-auto">
+              {heroCategories.map((col: Collection, idx: number) => {
                 const isActive = activeSlide === idx;
                 return (
                   <button
-                    key={col.id}
+                    key={col.id || col.slug}
                     onClick={() => {
                       setDirection(idx > activeSlide ? 1 : -1);
                       setActiveSlide(idx);
                     }}
-                    className={`relative flex-1 py-2 sm:py-2.5 px-2 sm:px-4 rounded-full text-center transition-all duration-300 ${
-                      isActive ? 'text-white' : 'text-white/60 hover:text-white/90'
+                    className={`relative px-3 sm:px-5 py-2.5 rounded-xl sm:rounded-2xl transition-all text-center sm:text-left cursor-pointer overflow-hidden ${
+                      isActive 
+                        ? 'bg-[#701626] text-white border border-[#C5A059]/60 shadow-lg' 
+                        : 'bg-black/30 hover:bg-black/50 text-white/70 border border-white/10'
                     }`}
                   >
-                    {isActive && (
-                      <motion.div
-                        layoutId="activeHeroCategoryTab"
-                        className="absolute inset-0 bg-[#701626] rounded-full border border-[#C5A059]/60 shadow-lg shadow-[#701626]/40"
-                        transition={{ type: 'spring', stiffness: 450, damping: 35 }}
-                      />
-                    )}
                     <span className="relative z-10 flex items-center justify-center gap-1.5 sm:gap-2">
                       <span className={`text-[8.5px] sm:text-[10px] font-bold uppercase tracking-wider ${isActive ? 'text-[#DFBF77]' : 'text-white/40'}`}>
                         0{idx + 1}
@@ -251,17 +266,27 @@ export default function Home() {
 
         {/* Category Filter Pills */}
         <div className="flex flex-wrap items-center justify-center gap-2 pb-10">
-          {CATEGORY_FILTERS.map((cat) => (
+          <button
+            onClick={() => setSelectedCategory('all')}
+            className={`px-5 py-2 rounded-full text-xs font-semibold tracking-wide transition-all ${
+              selectedCategory === 'all'
+                ? 'bg-[#701626] text-white shadow-lg shadow-[#701626]/20 border border-[#C5A059]/50 scale-105'
+                : 'bg-white text-[#6D6268] hover:text-[#110B0E] border border-[#C5A059]/30 hover:border-[#701626]/40 shadow-sm'
+            }`}
+          >
+            ✨ All Pieces
+          </button>
+          {allCategories.map((cat) => (
             <button
-              key={cat.value}
-              onClick={() => setSelectedCategory(cat.value)}
+              key={cat.slug}
+              onClick={() => setSelectedCategory(cat.slug)}
               className={`px-5 py-2 rounded-full text-xs font-semibold tracking-wide transition-all ${
-                selectedCategory === cat.value
+                selectedCategory === cat.slug
                   ? 'bg-[#701626] text-white shadow-lg shadow-[#701626]/20 border border-[#C5A059]/50 scale-105'
                   : 'bg-white text-[#6D6268] hover:text-[#110B0E] border border-[#C5A059]/30 hover:border-[#701626]/40 shadow-sm'
               }`}
             >
-              {cat.label}
+              {cat.name}
             </button>
           ))}
         </div>
@@ -279,49 +304,90 @@ export default function Home() {
         <LiyawelDivider />
       </div>
 
-      {/* ── THE 4 SIGNATURE COLLECTIONS DIRECTORY ── */}
+      {/* ── THE SIGNATURE COLLECTIONS DIRECTORY (LANDSCAPE EDITORIAL LOOKBOOK) ── */}
       <section className="py-20 px-4 sm:px-8 max-w-7xl mx-auto relative z-10">
-        <div className="flex items-end justify-between mb-10">
+        <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-10">
           <div className="space-y-1">
-            <span className="text-[10px] uppercase tracking-[0.3em] text-[#701626] font-bold">Signature Silhouettes</span>
-            <h2 className="font-display text-3xl sm:text-5xl font-bold text-[#110B0E]">The Collections</h2>
+            <span className="text-[10px] uppercase tracking-[0.3em] text-[#701626] font-bold">
+              Signature Silhouettes & Lookbooks
+            </span>
+            <h2 className="font-display text-3xl sm:text-5xl font-bold text-[#110B0E]">
+              The Collections
+            </h2>
           </div>
-          <Link to="/collections" className="text-xs uppercase tracking-[0.2em] text-[#701626] font-bold hover:underline flex items-center gap-1.5">
-            <span>View All 4 Categories</span>
+          <Link
+            to="/collections"
+            className="text-xs uppercase tracking-[0.2em] text-[#701626] font-bold hover:underline flex items-center gap-1.5 self-start sm:self-auto"
+          >
+            <span>View All Collections</span>
             <ArrowRight className="w-3.5 h-3.5" />
           </Link>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          {COLLECTIONS.map((col) => (
-            <Link
-              key={col.id}
-              to={`/collections/${col.slug}`}
-              className="group block relative rounded-[2rem] overflow-hidden aspect-[3/4] bg-white border border-[#C5A059]/30 shadow-md hover:shadow-2xl transition-all duration-500"
-            >
-              <img
-                src={col.heroImage}
-                alt={col.name}
-                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-[#110B0E]/90 via-[#110B0E]/20 to-transparent" />
-              
-              <div className="absolute top-3.5 right-3.5 bg-white/95 backdrop-blur-md px-3 py-1 rounded-full text-[8px] text-[#701626] font-bold uppercase tracking-[0.2em] shadow-md border border-[#C5A059]/40">
-                {col.season}
-              </div>
+        {/* 2-Column Wide Landscape Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 sm:gap-8">
+          {allCategories.map((col, idx) => {
+            const count = allProducts.filter((p) =>
+              p.categories.some((c) => c.slug === col.slug)
+            ).length;
 
-              <div className="absolute bottom-0 left-0 right-0 p-5 space-y-1 text-white">
-                <p className="text-[9px] uppercase tracking-[0.2em] text-[#DFBF77] font-semibold">{col.count} Pieces</p>
-                <h3 className="font-display text-2xl font-bold group-hover:text-[#DFBF77] transition-colors leading-tight">
-                  {col.name}
-                </h3>
-                <p className="text-[11px] text-white/75 font-light line-clamp-2 leading-relaxed">{col.description}</p>
-                <span className="inline-flex items-center gap-1 text-[11px] text-[#DFBF77] font-bold pt-1 uppercase tracking-wider">
-                  Explore →
-                </span>
-              </div>
-            </Link>
-          ))}
+            return (
+              <Link
+                key={col.id || col.slug}
+                to={`/collections/${col.slug}`}
+                className="group block relative rounded-[2rem] overflow-hidden aspect-[16/10] sm:aspect-[16/9] bg-[#110B0E] border border-[#C5A059]/40 shadow-lg hover:shadow-2xl hover:border-[#C5A059] transition-all duration-500"
+              >
+                {/* Landscape Hero Image */}
+                <img
+                  src={col.heroImage}
+                  alt={col.name}
+                  className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-700 opacity-90 group-hover:opacity-100"
+                />
+
+                {/* Atmospheric Gradient Overlays */}
+                <div className="absolute inset-0 bg-gradient-to-t from-[#110B0E] via-[#110B0E]/40 to-black/20" />
+                <div className="absolute inset-0 bg-gradient-to-r from-[#110B0E]/70 via-transparent to-transparent hidden sm:block" />
+
+                {/* Top Bar Badges */}
+                <div className="absolute top-4 left-4 right-4 flex items-center justify-between pointer-events-none">
+                  <span className="bg-[#701626]/90 backdrop-blur-md px-3 py-1 rounded-full text-[9px] text-[#DFBF77] font-bold uppercase tracking-[0.22em] border border-[#C5A059]/40 shadow-md">
+                    Edit 0{idx + 1}
+                  </span>
+                  <span className="bg-white/95 backdrop-blur-md px-3.5 py-1 rounded-full text-[8.5px] text-[#701626] font-bold uppercase tracking-[0.2em] shadow-md border border-[#C5A059]/40">
+                    {col.season || 'Curated Edit'}
+                  </span>
+                </div>
+
+                {/* Bottom Content Area */}
+                <div className="absolute bottom-0 left-0 right-0 p-5 sm:p-7 space-y-2 text-white">
+                  <div className="flex items-center gap-2">
+                    <span className="w-1.5 h-1.5 rounded-full bg-[#C5A059]" />
+                    <p className="text-[10px] uppercase tracking-[0.25em] text-[#DFBF77] font-bold">
+                      {count > 0 ? `${count} Silhouettes Handcrafted` : 'Atelier Release'}
+                    </p>
+                  </div>
+
+                  <h3 className="font-display text-2xl sm:text-3xl lg:text-4xl font-bold group-hover:text-[#DFBF77] transition-colors leading-tight">
+                    {col.name}
+                  </h3>
+
+                  <p className="text-xs sm:text-sm text-white/80 font-light line-clamp-2 max-w-lg leading-relaxed">
+                    {col.description}
+                  </p>
+
+                  <div className="pt-2 flex items-center justify-between">
+                    <span className="inline-flex items-center gap-2 text-xs font-bold text-[#DFBF77] uppercase tracking-[0.18em] group-hover:translate-x-1 transition-transform">
+                      <span>Explore Lookbook</span>
+                      <ArrowRight className="w-3.5 h-3.5" />
+                    </span>
+                    <span className="text-[10px] text-white/50 font-mono tracking-wider">
+                      azhai.lk/{col.slug}
+                    </span>
+                  </div>
+                </div>
+              </Link>
+            );
+          })}
         </div>
       </section>
 
@@ -330,8 +396,8 @@ export default function Home() {
         <LiyawelDivider />
       </div>
 
-      {/* ── INTERACTIVE FABRIC & CRAFT SWATCH EXPLORER ── */}
-      <FabricExplorer />
+      {/* ── BESPOKE CUSTOM TAILORING STUDIO ── */}
+      <TailoringStudio />
 
       {/* Liyawel Cultural Vine Divider */}
       <div className="max-w-4xl mx-auto px-5">
@@ -346,7 +412,7 @@ export default function Home() {
         <div className="text-center space-y-2 mb-10">
           <div className="inline-flex items-center gap-2 text-[#701626] text-xs font-bold uppercase tracking-[0.25em]">
             <Camera className="w-4 h-4 text-[#C5A059]" />
-            <span>#AzhaiGirl Community</span>
+            <span>#AzhaiCommunity</span>
           </div>
           <h2 className="font-display text-3xl sm:text-5xl font-bold text-[#110B0E]">
             Seen in real life
@@ -378,20 +444,30 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ── THE STORY FOOTNOTE ── */}
-      <section className="py-20 px-4 sm:px-8 bg-[#F7F4EE] text-center border-t border-[#C5A059]/30 relative overflow-hidden">
-        <div className="max-w-2xl mx-auto space-y-6 relative z-10">
-          <img src="/logo-light.png" alt="Azhai" className="h-12 mx-auto object-contain" />
-          <h2 className="font-display text-2xl sm:text-4xl font-bold text-[#110B0E] leading-tight">
-            "Azhai is not just clothing; it is a call to rediscovering the inherent beauty within."
-          </h2>
-          <p className="font-script text-2xl sm:text-3xl text-[#701626]">— Preethi</p>
-          <div className="pt-1">
+      {/* ── ATELIER MANIFESTO & ANIMATED BRAND CENTERPIECE ── */}
+      <section className="py-20 px-4 sm:px-8 bg-[#F7F4EE]/60 text-center border-t border-[#C5A059]/30 relative overflow-hidden">
+        <div className="max-w-3xl mx-auto space-y-6 relative z-10 p-8 sm:p-12 rounded-[3rem] bg-white border border-[#C5A059]/40 shadow-xl">
+          
+          <AnimatedLogo size="lg" withAura={true} replayable={true} />
+
+          <div className="space-y-3 pt-2">
+            <span className="text-[10px] uppercase tracking-[0.3em] text-[#701626] font-bold">
+              Atelier Manifesto
+            </span>
+            <h2 className="font-display text-2xl sm:text-4xl font-bold text-[#110B0E] leading-relaxed">
+              "Azhai is not just clothing; it is an invitation to celebrate your own inherent elegance through the living art of handloom silk."
+            </h2>
+            <p className="font-script text-3xl sm:text-4xl text-[#701626] pt-1">
+              — Preethi
+            </p>
+          </div>
+
+          <div className="pt-2">
             <Link
               to="/story"
               className="inline-flex items-center gap-3 px-8 py-3.5 bg-[#701626] hover:bg-[#8E1E34] text-white text-xs uppercase tracking-[0.22em] font-bold rounded-full transition-all shadow-xl shadow-[#701626]/20 border border-[#C5A059]/30"
             >
-              <span>Read Our Full Story</span>
+              <span>Discover Our Story & Weaving Heritage</span>
               <ArrowRight className="w-4 h-4" />
             </Link>
           </div>

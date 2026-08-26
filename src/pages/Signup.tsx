@@ -4,6 +4,7 @@ import { motion } from 'framer-motion';
 import { User, Mail, Phone, Lock, Eye, EyeOff, UserPlus, Sparkles, ArrowRight, ShieldCheck, Check } from 'lucide-react';
 import { useAuthStore } from '@/store/auth';
 import { validateEmail, validatePhone, getPasswordStrength } from '@/lib/auth-utils';
+import { sendBrevoEmail, buildWelcomeEmailHtml } from '@/lib/brevo';
 
 export default function Signup() {
   const [fullName, setFullName] = useState('');
@@ -61,6 +62,13 @@ export default function Signup() {
     setLoading(false);
 
     if (res.success) {
+      // Trigger Welcome Email to Customer
+      sendBrevoEmail({
+        to: [{ email: email.trim(), name: fullName.trim() }],
+        subject: '✨ Welcome to Azhai Atelier — Handcrafted Luxury Couture',
+        htmlContent: buildWelcomeEmailHtml({ customerName: fullName.trim(), email: email.trim() }),
+      }).catch((err) => console.error('[Welcome Email Error]:', err));
+
       navigate('/account', { replace: true });
     } else {
       setError(res.error || 'Failed to create account.');
@@ -120,7 +128,7 @@ export default function Signup() {
                   type="text"
                   value={fullName}
                   onChange={(e) => setFullName(e.target.value)}
-                  placeholder="e.g. Preethi Kumaran"
+                  placeholder="e.g. Preethi"
                   required
                   className="w-full pl-10 pr-4 py-3 rounded-2xl bg-[#F7F4EE]/70 border border-[#C5A059]/30 focus:border-[#701626] focus:bg-white focus:outline-none text-xs text-[#110B0E] transition-all"
                 />

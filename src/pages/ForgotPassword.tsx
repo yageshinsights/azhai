@@ -4,6 +4,7 @@ import { motion } from 'framer-motion';
 import { Mail, KeyRound, ArrowLeft, Sparkles, CheckCircle2, ShieldCheck } from 'lucide-react';
 import { useAuthStore } from '@/store/auth';
 import { validateEmail } from '@/lib/auth-utils';
+import { sendBrevoEmail, buildPasswordResetEmailHtml } from '@/lib/brevo';
 
 export default function ForgotPassword() {
   const [email, setEmail] = useState('');
@@ -36,6 +37,14 @@ export default function ForgotPassword() {
     if (res.success && res.token) {
       setGeneratedToken(res.token);
       setSubmitted(true);
+
+      // Trigger Brevo Password Reset Email
+      const resetUrl = `${window.location.origin}/reset-password?token=${res.token}`;
+      sendBrevoEmail({
+        to: [{ email: email.trim() }],
+        subject: '🔐 Reset Your Azhai Atelier Password',
+        htmlContent: buildPasswordResetEmailHtml({ resetUrl }),
+      }).catch((err) => console.error('[Password Reset Email Error]:', err));
     } else {
       setError(res.error || 'Unable to process reset request.');
     }

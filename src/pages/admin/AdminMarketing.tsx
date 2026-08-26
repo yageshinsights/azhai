@@ -1,0 +1,637 @@
+import { useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { 
+  Tag, 
+  Plus, 
+  Sparkles, 
+  Megaphone, 
+  Percent, 
+  Check, 
+  Trash2, 
+  Calendar, 
+  Save, 
+  ShoppingCart,
+  Mail,
+  Send,
+  Eye,
+  RefreshCw,
+  Clock,
+  ArrowRight
+} from 'lucide-react';
+import AdminLayout from '@/components/admin/AdminLayout';
+import { useAdminStore, type Coupon } from '@/store/admin';
+import CouponModal from '@/components/admin/CouponModal';
+import { 
+  sendBrevoEmail, 
+  buildAbandonedCartEmailHtml,
+  buildWelcomeEmailHtml,
+  buildOrderConfirmationHtml,
+  buildOrderShippedHtml,
+  buildOrderDeliveredHtml,
+  buildPostDeliveryFeedbackEmailHtml
+} from '@/lib/brevo';
+
+interface AbandonedCart {
+  id: string;
+  customerName: string;
+  customerEmail: string;
+  items: { name: string; price: string; size: string; image: string }[];
+  totalValue: number;
+  abandonedAt: string;
+  emailSent: boolean;
+}
+
+const SAMPLE_ABANDONED_CARTS: AbandonedCart[] = [
+  {
+    id: 'cart-1',
+    customerName: 'Ananya Varma',
+    customerEmail: 'ananya.v@gmail.com',
+    items: [
+      { name: 'Ivory Hand-Painted Lotus Organza Saree', price: 'LKR 18,500', size: 'Free Size', image: 'https://images.unsplash.com/photo-1610030469983-98e550d6193c?auto=format&fit=crop&w=600&q=80' },
+      { name: 'Pure Mulberry Silk Shawl (Crimson Gold)', price: 'LKR 8,900', size: 'Standard', image: 'https://images.unsplash.com/photo-1617627143750-d86bc21e42bb?auto=format&fit=crop&w=600&q=80' }
+    ],
+    totalValue: 27400,
+    abandonedAt: '2 hours ago',
+    emailSent: false
+  },
+  {
+    id: 'cart-2',
+    customerName: 'Divya Sivaram',
+    customerEmail: 'divya.s@yahoo.com',
+    items: [
+      { name: 'Sacred Crimson Kanjivaram Silk Saree', price: 'LKR 26,500', size: 'Free Size', image: 'https://images.unsplash.com/photo-1583391733956-3750e0ff4e8b?auto=format&fit=crop&w=600&q=80' }
+    ],
+    totalValue: 26500,
+    abandonedAt: '6 hours ago',
+    emailSent: true
+  },
+  {
+    id: 'cart-3',
+    customerName: 'Kavitha Nathan',
+    customerEmail: 'kavitha.n@hotmail.com',
+    items: [
+      { name: 'Emerald Handloom Anarkali Kurti (Custom)', price: 'LKR 14,200', size: 'Custom Fit', image: 'https://images.unsplash.com/photo-1567401893414-76b7b1e5a7a5?auto=format&fit=crop&w=600&q=80' }
+    ],
+    totalValue: 14200,
+    abandonedAt: '1 day ago',
+    emailSent: false
+  }
+];
+
+export default function AdminMarketing() {
+  const { coupons, addCoupon, toggleCoupon, deleteCoupon, settings, updateSettings } = useAdminStore();
+  const [activeTab, setActiveTab] = useState<'coupons' | 'abandoned' | 'templates'>('coupons');
+  const [isCouponModalOpen, setIsCouponModalOpen] = useState(false);
+  const [tickerText, setTickerText] = useState(settings.announcementTicker.text);
+  const [tickerEnabled, setTickerEnabled] = useState(settings.announcementTicker.enabled);
+  const [savedToast, setSavedToast] = useState<string | null>(null);
+
+  // Abandoned Carts State
+  const [abandonedCarts, setAbandonedCarts] = useState<AbandonedCart[]>(SAMPLE_ABANDONED_CARTS);
+  const [sendingCartId, setSendingCartId] = useState<string | null>(null);
+
+  // Test Email State
+  const [testEmailAddress, setTestEmailAddress] = useState('yagesh.xtreme@gmail.com');
+  const [sendingTestType, setSendingTestType] = useState<string | null>(null);
+
+  const showToast = (msg: string) => {
+    setSavedToast(msg);
+    setTimeout(() => setSavedToast(null), 3000);
+  };
+
+  const handleSaveTicker = (e: React.FormEvent) => {
+    e.preventDefault();
+    updateSettings({
+      announcementTicker: {
+        enabled: tickerEnabled,
+        text: tickerText,
+        link: settings.announcementTicker.link,
+      },
+    });
+    showToast('Announcement banner saved & live!');
+  };
+
+  const handleSaveNewCoupon = (couponData: any) => {
+    addCoupon(couponData);
+    showToast('New coupon created successfully!');
+  };
+
+  // 1-Click Send Abandoned Cart Recovery Email
+  const handleSendRecoveryEmail = async (cart: AbandonedCart) => {
+    setSendingCartId(cart.id);
+    await sendBrevoEmail({
+      to: [{ email: cart.customerEmail, name: cart.customerName }],
+      subject: `✨ Your Azhai bag is waiting for you (Enjoy 5% privilege)`,
+      htmlContent: buildAbandonedCartEmailHtml({
+        customerName: cart.customerName,
+        items: cart.items,
+        couponCode: 'ATELIER5',
+      }),
+    });
+    
+    setAbandonedCarts(prev => prev.map(c => c.id === cart.id ? { ...c, emailSent: true } : c));
+    setSendingCartId(null);
+    showToast(`Recovery email dispatched to ${cart.customerEmail}!`);
+  };
+
+  // Send Test Email Template to Admin
+  const handleSendTestEmail = async (type: string) => {
+    if (!testEmailAddress) return;
+    setSendingTestType(type);
+
+    let html = '';
+    let subject = '';
+
+    if (type === 'welcome') {
+      subject = '✨ [TEST] Welcome to Azhai Atelier';
+      html = buildWelcomeEmailHtml({ customerName: 'Preethi', email: testEmailAddress });
+    } else if (type === 'order') {
+      subject = '✨ [TEST] Order Confirmed #AZH-84920';
+      html = buildOrderConfirmationHtml({
+        orderId: 'AZH-84920',
+        customerName: 'Preethi',
+        total: 18500,
+        items: [{ name: 'Ivory Hand-Painted Lotus Organza Saree', size: 'Free Size', quantity: 1, price: 'LKR 18,500' }],
+        deliveryMethod: 'Express Colombo Same-Day',
+        paymentMethod: 'Cash on Delivery (COD)',
+      });
+    } else if (type === 'shipped') {
+      subject = '🚚 [TEST] Dispatched: Order #AZH-84920';
+      html = buildOrderShippedHtml({
+        orderId: 'AZH-84920',
+        customerName: 'Preethi',
+        courierName: 'PromptX Express Courier',
+        trackingNumber: 'PRX-928104LK',
+        destinationCity: 'Colombo 07',
+      });
+    } else if (type === 'abandoned') {
+      subject = '🛒 [TEST] You left something exquisite in your bag';
+      html = buildAbandonedCartEmailHtml({
+        customerName: 'Preethi',
+        items: [{ name: 'Sacred Crimson Kanjivaram Silk Saree', price: 'LKR 26,500', size: 'Free Size' }],
+        couponCode: 'ATELIER5',
+      });
+    } else if (type === 'feedback') {
+      subject = '⭐ [TEST] How was your Azhai fit?';
+      html = buildPostDeliveryFeedbackEmailHtml({
+        orderId: 'AZH-84920',
+        customerName: 'Preethi',
+      });
+    }
+
+    await sendBrevoEmail({
+      to: [{ email: testEmailAddress, name: 'Store Owner' }],
+      subject,
+      htmlContent: html,
+    });
+
+    setSendingTestType(null);
+    showToast(`Test "${type.toUpperCase()}" email sent to ${testEmailAddress}!`);
+  };
+
+  return (
+    <AdminLayout>
+      <div className="space-y-8 max-w-7xl">
+        
+        {/* Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] uppercase tracking-[0.25em] text-[#701626] font-bold">
+                Marketing & Growth Automation
+              </span>
+            </div>
+            <h1 className="font-display text-3xl font-bold text-[#110B0E] pt-1">
+              Promotions, Emails & Recovery
+            </h1>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setIsCouponModalOpen(true)}
+              className="px-5 py-2.5 bg-[#701626] hover:bg-[#8E1E34] text-white text-xs font-bold uppercase tracking-wider rounded-2xl shadow-sm transition-all flex items-center gap-2 cursor-pointer"
+            >
+              <Plus className="w-4 h-4" /> Create Promo Coupon
+            </button>
+          </div>
+        </div>
+
+        {/* Global Toast */}
+        {savedToast && (
+          <motion.div
+            initial={{ opacity: 0, y: -6 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-900 text-xs font-bold flex items-center gap-2"
+          >
+            <Check className="w-4 h-4 text-emerald-600" /> {savedToast}
+          </motion.div>
+        )}
+
+        {/* ── 3 MARKETING TABS ── */}
+        <div className="flex items-center gap-2 border-b border-[#C5A059]/30 pb-3">
+          <button
+            onClick={() => setActiveTab('coupons')}
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2 ${
+              activeTab === 'coupons'
+                ? 'bg-[#701626] text-white shadow-md'
+                : 'bg-white text-[#6D6268] border border-[#C5A059]/20 hover:border-[#701626]'
+            }`}
+          >
+            <Tag className="w-4 h-4" />
+            <span>Promo Coupons & Announcement ({coupons.length})</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('abandoned')}
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2 ${
+              activeTab === 'abandoned'
+                ? 'bg-[#701626] text-white shadow-md'
+                : 'bg-white text-[#6D6268] border border-[#C5A059]/20 hover:border-[#701626]'
+            }`}
+          >
+            <ShoppingCart className="w-4 h-4 text-[#C5A059]" />
+            <span>Abandoned Carts ({abandonedCarts.length})</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('templates')}
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2 ${
+              activeTab === 'templates'
+                ? 'bg-[#701626] text-white shadow-md'
+                : 'bg-white text-[#6D6268] border border-[#C5A059]/20 hover:border-[#701626]'
+            }`}
+          >
+            <Mail className="w-4 h-4 text-[#701626]" />
+            <span>Email Templates Studio (11 Flows)</span>
+          </button>
+        </div>
+
+        {/* TAB 1: COUPONS & BANNER */}
+        {activeTab === 'coupons' && (
+          <div className="space-y-8">
+            {/* ── LIVE STOREFRONT ANNOUNCEMENT TICKER MANAGER ── */}
+            <div className="bg-white rounded-3xl p-6 sm:p-8 border border-[#C5A059]/30 shadow-sm space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 text-[#701626]">
+                  <Megaphone className="w-5 h-5" />
+                  <h3 className="font-display text-xl font-bold text-[#110B0E]">
+                    Header Announcement Banner
+                  </h3>
+                </div>
+              </div>
+              <p className="text-xs text-[#6D6268] font-light">
+                Controls the top promotional marquee message displayed across all storefront pages:
+              </p>
+
+              <form onSubmit={handleSaveTicker} className="space-y-4 pt-2">
+                <div className="flex items-center gap-3">
+                  <label className="text-xs font-bold text-[#110B0E]">Banner Status:</label>
+                  <button
+                    type="button"
+                    onClick={() => setTickerEnabled(!tickerEnabled)}
+                    className={`px-3 py-1 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                      tickerEnabled ? 'bg-emerald-700 text-white' : 'bg-gray-200 text-gray-700'
+                    }`}
+                  >
+                    {tickerEnabled ? 'Active (Visible on Store)' : 'Disabled (Hidden)'}
+                  </button>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="block text-xs font-bold text-[#110B0E] uppercase tracking-wider">
+                    Announcement Message
+                  </label>
+                  <input
+                    type="text"
+                    value={tickerText}
+                    onChange={(e) => setTickerText(e.target.value)}
+                    placeholder="✨ Festive Drop Live: Complimentary Island-wide Delivery on Orders over LKR 15,000..."
+                    className="w-full px-4 py-3 rounded-2xl bg-[#F7F4EE]/70 border border-[#C5A059]/30 text-xs focus:border-[#701626] focus:bg-white focus:outline-none"
+                  />
+                </div>
+
+                {/* Live Preview Box */}
+                <div className="p-3 rounded-xl bg-[#701626] text-[#F3E8CE] text-xs font-medium text-center truncate border border-[#C5A059]/40">
+                  <span className="text-[10px] uppercase tracking-wider text-[#DFBF77] font-bold pr-2">Live Preview:</span>
+                  {tickerText}
+                </div>
+
+                <div className="flex justify-end">
+                  <button
+                    type="submit"
+                    className="px-6 py-2.5 bg-[#701626] hover:bg-[#8E1E34] text-white text-xs font-bold uppercase tracking-wider rounded-2xl shadow-sm transition-all flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <Save className="w-3.5 h-3.5" /> Save Banner Updates
+                  </button>
+                </div>
+              </form>
+            </div>
+
+            {/* ── PROMOTIONAL COUPONS TABLE ── */}
+            <div className="bg-white rounded-3xl border border-[#C5A059]/30 shadow-sm overflow-hidden p-6 space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="font-display text-xl font-bold text-[#110B0E]">
+                  Active Discount Coupons ({coupons.length})
+                </h3>
+              </div>
+
+              <div className="overflow-x-auto rounded-2xl border border-[#C5A059]/25">
+                <table className="w-full text-xs text-left min-w-[700px]">
+                  <thead className="bg-[#701626] text-[#F3E8CE] uppercase tracking-wider text-[10px]">
+                    <tr>
+                      <th className="p-3.5 whitespace-nowrap min-w-[120px]">Coupon Code</th>
+                      <th className="p-3.5 whitespace-nowrap min-w-[150px]">Discount Benefit</th>
+                      <th className="p-3.5 whitespace-nowrap min-w-[110px]">Min Spend</th>
+                      <th className="p-3.5 whitespace-nowrap min-w-[110px]">Usage Count</th>
+                      <th className="p-3.5 whitespace-nowrap min-w-[100px]">Expiry Date</th>
+                      <th className="p-3.5 whitespace-nowrap min-w-[90px]">Status</th>
+                      <th className="p-3.5 text-right whitespace-nowrap min-w-[80px]">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[#C5A059]/15">
+                    {coupons.map((c, idx) => (
+                      <tr key={c.id} className={idx % 2 === 0 ? 'bg-white' : 'bg-[#FCFBF8]'}>
+                        <td className="p-3.5 font-bold text-[#701626] font-mono text-sm tracking-wider whitespace-nowrap">
+                          {c.code}
+                        </td>
+                        <td className="p-3.5 font-bold text-[#110B0E] whitespace-nowrap">
+                          {c.discountType === 'percentage' ? `${c.value}% Off Cart` : `LKR ${c.value.toLocaleString()} Flat Off`}
+                        </td>
+                        <td className="p-3.5 text-[#6D6268] whitespace-nowrap">
+                          {c.minSpend ? `LKR ${c.minSpend.toLocaleString()}` : 'No Minimum'}
+                        </td>
+                        <td className="p-3.5 font-bold text-[#110B0E] whitespace-nowrap">
+                          {c.usageCount} redemptions
+                        </td>
+                        <td className="p-3.5 text-[#6D6268] whitespace-nowrap">
+                          {c.expiresAt || 'Never'}
+                        </td>
+                        <td className="p-3.5 whitespace-nowrap">
+                          <button
+                            onClick={() => toggleCoupon(c.id)}
+                            className={`text-[10px] font-bold px-2.5 py-1 rounded-full whitespace-nowrap inline-block cursor-pointer transition-colors ${
+                              c.isActive
+                                ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
+                                : 'bg-gray-100 text-gray-600 border border-gray-200'
+                            }`}
+                          >
+                            {c.isActive ? 'Active' : 'Disabled'}
+                          </button>
+                        </td>
+                        <td className="p-3.5 text-right whitespace-nowrap">
+                          <button
+                            onClick={() => deleteCoupon(c.id)}
+                            className="p-1.5 text-gray-400 hover:text-rose-600 rounded-lg transition-colors cursor-pointer"
+                            title="Delete Coupon"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* TAB 2: ABANDONED CART RECOVERY */}
+        {activeTab === 'abandoned' && (
+          <div className="space-y-6">
+            <div className="bg-white rounded-3xl p-6 sm:p-8 border border-[#C5A059]/30 shadow-sm space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                  <h3 className="font-display text-xl font-bold text-[#110B0E] flex items-center gap-2">
+                    <ShoppingCart className="w-5 h-5 text-[#701626]" />
+                    <span>Unrecovered Bags & Direct Outreach ({abandonedCarts.length})</span>
+                  </h3>
+                  <p className="text-xs text-[#6D6268] font-light">
+                    Shoppers who left handcrafted items in their bag without completing payment.
+                  </p>
+                </div>
+                <div className="text-xs bg-[#701626]/10 text-[#701626] font-bold px-3 py-1.5 rounded-xl">
+                  Total Recoverable Value: LKR {abandonedCarts.reduce((acc, c) => acc + c.totalValue, 0).toLocaleString()}
+                </div>
+              </div>
+
+              <div className="space-y-4 pt-2">
+                {abandonedCarts.map((cart) => (
+                  <div
+                    key={cart.id}
+                    className="p-5 rounded-2xl bg-[#FCFBF8] border border-[#DFBF77] flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-xs"
+                  >
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-sm text-[#110B0E]">{cart.customerName}</span>
+                        <span className="text-xs text-[#6D6268]">({cart.customerEmail})</span>
+                        <span className="text-[10px] bg-amber-50 text-amber-800 border border-amber-200 px-2 py-0.5 rounded-full font-bold flex items-center gap-1">
+                          <Clock className="w-3 h-3" /> {cart.abandonedAt}
+                        </span>
+                      </div>
+
+                      {/* Items Preview */}
+                      <div className="flex flex-wrap items-center gap-2">
+                        {cart.items.map((it, idx) => (
+                          <div key={idx} className="flex items-center gap-2 bg-white px-2.5 py-1.5 rounded-xl border border-[#C5A059]/30 text-xs">
+                            <img src={it.image} alt="" className="w-6 h-6 object-cover rounded-md" />
+                            <span className="font-medium text-[#110B0E] truncate max-w-[180px]">{it.name}</span>
+                            <span className="text-[#701626] font-bold">{it.price}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-3 self-end sm:self-auto shrink-0">
+                      <div className="text-right">
+                        <p className="text-[10px] uppercase text-[#6D6268] font-bold">Cart Total</p>
+                        <p className="font-display text-base font-bold text-[#701626]">
+                          LKR {cart.totalValue.toLocaleString()}
+                        </p>
+                      </div>
+
+                      <button
+                        type="button"
+                        disabled={sendingCartId === cart.id || cart.emailSent}
+                        onClick={() => handleSendRecoveryEmail(cart)}
+                        className={`px-4 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 transition-all cursor-pointer ${
+                          cart.emailSent
+                            ? 'bg-emerald-50 text-emerald-800 border border-emerald-200 cursor-default'
+                            : 'bg-[#701626] hover:bg-[#8E1E34] text-white shadow-sm'
+                        }`}
+                      >
+                        {sendingCartId === cart.id ? (
+                          <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                        ) : cart.emailSent ? (
+                          <>
+                            <Check className="w-3.5 h-3.5 text-emerald-600" />
+                            <span>Email Dispatched</span>
+                          </>
+                        ) : (
+                          <>
+                            <Send className="w-3.5 h-3.5" />
+                            <span>Send Recovery Email (5% Off)</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* TAB 3: EMAIL TEMPLATES & TEST-SEND STUDIO */}
+        {activeTab === 'templates' && (
+          <div className="space-y-6">
+            <div className="bg-white rounded-3xl p-6 sm:p-8 border border-[#C5A059]/30 shadow-sm space-y-6">
+              <div>
+                <h3 className="font-display text-xl font-bold text-[#110B0E] flex items-center gap-2">
+                  <Mail className="w-5 h-5 text-[#701626]" />
+                  <span>Transactional & Lifecycle Email Templates (11 Active Flows)</span>
+                </h3>
+                <p className="text-xs text-[#6D6268] font-light">
+                  Preview and test-send all handcrafted luxury HTML templates directly to your inbox.
+                </p>
+              </div>
+
+              {/* Brevo API Key Status Banner */}
+              {!(typeof import.meta !== 'undefined' && import.meta.env?.VITE_BREVO_API_KEY) ? (
+                <div className="p-4 rounded-2xl bg-amber-50 border border-amber-200 text-xs text-amber-900 space-y-2">
+                  <div className="flex items-center gap-2 font-bold text-amber-800">
+                    <span>⚠️ Brevo Email API Key Not Configured (Simulation Mode)</span>
+                  </div>
+                  <p className="text-[11px] leading-relaxed text-amber-800/90">
+                    Emails are currently simulated in the browser console. To deliver live emails to real Gmail/Yahoo inboxes, add your Brevo API key to your <code className="bg-amber-100 px-1.5 py-0.5 rounded font-mono text-[10px]">.env</code> file:
+                  </p>
+                  <pre className="p-2.5 bg-amber-900/10 rounded-xl font-mono text-[10px] text-amber-950 overflow-x-auto">
+                    VITE_BREVO_API_KEY=xkeysib-your_brevo_v3_api_key<br/>
+                    VITE_SENDER_EMAIL=orders@azhaiclothing.lk
+                  </pre>
+                  <p className="text-[10px] text-amber-700">
+                    💡 Get a free API key at <a href="https://app.brevo.com/settings/keys/api" target="_blank" rel="noopener noreferrer" className="underline font-bold">Brevo.com &rarr; SMTP & API Keys</a>.
+                  </p>
+                </div>
+              ) : (
+                <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-800 flex items-center gap-2 font-bold">
+                  <Check className="w-4 h-4 text-emerald-600" />
+                  <span>Brevo Email Engine Connected & Live ({import.meta.env.VITE_SENDER_EMAIL || 'orders@azhaiclothing.lk'})</span>
+                </div>
+              )}
+
+              {/* Test Sender Bar */}
+              <div className="p-4 rounded-2xl bg-[#FCFBF8] border border-[#DFBF77] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="space-y-0.5">
+                  <span className="text-[10px] font-bold text-[#701626] uppercase tracking-wider">Test Recipient Address:</span>
+                  <input
+                    type="email"
+                    value={testEmailAddress}
+                    onChange={(e) => setTestEmailAddress(e.target.value)}
+                    placeholder="preethi@azhai.lk"
+                    className="w-full sm:w-72 px-3 py-1.5 text-xs bg-white rounded-xl border border-[#C5A059]/40 font-semibold text-[#110B0E]"
+                  />
+                </div>
+                <p className="text-[11px] text-[#6D6268]">
+                  Click any "Test Send" button below to dispatch a live sample to this email.
+                </p>
+              </div>
+
+              {/* Template Grid */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {[
+                  {
+                    type: 'order',
+                    title: '1. Order Confirmation & Invoice',
+                    desc: 'Sent upon checkout with full itemized table, custom tailoring specs, and courier estimate.',
+                    tag: 'Purchase',
+                    previewUrl: '/email-previews/order-confirmation.html'
+                  },
+                  {
+                    type: 'abandoned',
+                    title: '2. Abandoned Bag Recovery',
+                    desc: 'Reminds shoppers of left items with a 1-click cart restore & 5% coupon (ATELIER5).',
+                    tag: 'Conversion',
+                    previewUrl: '/email-previews/abandoned-cart.html'
+                  },
+                  {
+                    type: 'shipped',
+                    title: '3. Dispatched & In Transit',
+                    desc: 'Sent when admin inputs courier partner (PromptX/Koombiyo) and tracking number.',
+                    tag: 'Fulfillment',
+                    previewUrl: '/email-previews/order-shipped.html'
+                  },
+                  {
+                    type: 'welcome',
+                    title: '4. Welcome to Azhai Atelier',
+                    desc: 'Sent immediately upon account creation. Welcomes customer with heritage privileges.',
+                    tag: 'Onboarding',
+                    previewUrl: '/email-previews/welcome-atelier.html'
+                  },
+                  {
+                    type: 'feedback',
+                    title: '5. Fit & Craftsmanship Review',
+                    desc: 'Requests 5-star rating and custom fit feedback after package arrival.',
+                    tag: 'Retention',
+                    previewUrl: '/email-previews/fit-review.html'
+                  }
+                ].map((tmpl) => (
+                  <div
+                    key={tmpl.type}
+                    className="p-5 rounded-2xl bg-[#FCFBF8] border border-[#C5A059]/30 flex flex-col justify-between space-y-3"
+                  >
+                    <div className="space-y-1">
+                      <div className="flex items-center justify-between">
+                        <h4 className="font-display text-sm font-bold text-[#110B0E]">{tmpl.title}</h4>
+                        <span className="text-[9px] uppercase font-bold text-[#701626] bg-[#701626]/8 px-2 py-0.5 rounded-full border border-[#C5A059]/30">
+                          {tmpl.tag}
+                        </span>
+                      </div>
+                      <p className="text-xs text-[#6D6268] leading-relaxed font-light">{tmpl.desc}</p>
+                    </div>
+
+                    <div className="flex items-center justify-between pt-3 border-t border-[#C5A059]/20">
+                      <a
+                        href={tmpl.previewUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs text-[#701626] font-bold hover:underline flex items-center gap-1"
+                      >
+                        <Eye className="w-3.5 h-3.5" />
+                        <span>Live Preview ↗</span>
+                      </a>
+
+                      <button
+                        type="button"
+                        disabled={sendingTestType === tmpl.type}
+                        onClick={() => handleSendTestEmail(tmpl.type)}
+                        className="px-3.5 py-1.5 rounded-xl bg-[#701626] hover:bg-[#8E1E34] text-white text-[11px] font-bold flex items-center gap-1.5 cursor-pointer shadow-xs transition-colors"
+                      >
+                        {sendingTestType === tmpl.type ? (
+                          <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          <>
+                            <Send className="w-3 h-3" />
+                            <span>Send Test Sample</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+      </div>
+
+      {/* Coupon Modal */}
+      <CouponModal
+        isOpen={isCouponModalOpen}
+        onClose={() => setIsCouponModalOpen(false)}
+        onSave={handleSaveNewCoupon}
+      />
+    </AdminLayout>
+  );
+}

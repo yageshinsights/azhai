@@ -1,6 +1,6 @@
 import { useParams, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { CheckCircle2, Package, Truck, MessageCircle, ArrowRight, Sparkles, Crown, UserPlus, FileText } from 'lucide-react';
+import { CheckCircle2, Truck, ArrowRight, Crown, UserPlus, FileText, Mail, Sparkles } from 'lucide-react';
 import { useCartStore } from '@/store/cart';
 import { useAuthStore } from '@/store/auth';
 
@@ -30,10 +30,6 @@ export default function OrderSuccess() {
     placedAt: new Date().toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' })
   };
 
-  const whatsappMessage = encodeURIComponent(
-    `Hello Preethi! ✨ I just placed order #${order.orderId} for LKR ${order.total.toLocaleString('en-US')} on Azhai Clothing. Please confirm my dispatch.`
-  );
-
   return (
     <div className="min-h-screen bg-[#FCFBF8] pt-24 pb-20 text-[#110B0E]">
       <div className="max-w-3xl mx-auto px-4 sm:px-8">
@@ -57,9 +53,30 @@ export default function OrderSuccess() {
               Thank You, {order.customer.fullName.split(' ')[0]}!
             </h1>
             <p className="text-sm text-[#6D6268] max-w-md mx-auto font-light leading-relaxed">
-              Your order <strong className="text-[#701626] font-bold">#{order.orderId}</strong> has been received and is being carefully packaged with love by Preethi.
+              Your order <strong className="text-[#701626] font-bold">#{order.orderId}</strong> has been received and is being prepared with dedication by our Colombo atelier.
             </p>
           </div>
+
+          {/* Email Confirmation Alert Banner */}
+          <motion.div 
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 }}
+            className="p-4 sm:p-5 rounded-2xl bg-[#FCFBF8] border border-[#DFBF77] flex items-center gap-3.5 text-left shadow-xs"
+          >
+            <div className="w-10 h-10 rounded-xl bg-[#701626]/10 text-[#701626] flex items-center justify-center shrink-0">
+              <Mail className="w-5 h-5" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-xs font-bold text-[#110B0E] flex items-center gap-1.5">
+                <span>Confirmation Dispatched to Email</span>
+                <Sparkles className="w-3 h-3 text-[#C5A059]" />
+              </p>
+              <p className="text-[11px] text-[#6D6268] truncate">
+                We sent your receipt, tailoring breakdown & tracking updates to <strong className="text-[#701626]">{order.customer.email}</strong>.
+              </p>
+            </div>
+          </motion.div>
 
           {/* Quick Tracking Status */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-left p-5 rounded-2xl bg-[#F7F4EE] border border-[#C5A059]/30 text-xs">
@@ -71,7 +88,7 @@ export default function OrderSuccess() {
               </p>
             </div>
             <div className="space-y-1">
-              <span className="text-[10px] uppercase tracking-wider text-[#6D6268] font-bold">Payment Status</span>
+              <span className="text-[10px] uppercase tracking-wider text-[#6D6268] font-bold">Payment Method</span>
               <p className="font-bold text-[#701626]">{order.paymentMethod}</p>
             </div>
           </div>
@@ -82,8 +99,8 @@ export default function OrderSuccess() {
             
             {order.items.length > 0 && (
               <div className="divide-y divide-[#C5A059]/20">
-                {order.items.map(item => (
-                  <div key={`${item.id}-${item.size}`} className="py-3 flex items-center justify-between gap-4">
+                {order.items.map((item, idx) => (
+                  <div key={`${item.id}-${item.size}-${idx}`} className="py-3 flex items-center justify-between gap-4">
                     <div className="flex items-center gap-3">
                       <div className="w-12 h-14 rounded-lg bg-[#F7F4EE] overflow-hidden shrink-0 border border-[#C5A059]/30">
                         <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
@@ -99,24 +116,24 @@ export default function OrderSuccess() {
               </div>
             )}
 
-            {/* Total Breakdown */}
-            <div className="pt-3 border-t border-[#C5A059]/20 space-y-1.5 text-xs text-[#6D6268]">
+            {/* Price Calculations */}
+            <div className="space-y-2 pt-4 border-t border-[#C5A059]/20 text-xs text-[#6D6268]">
               <div className="flex justify-between">
                 <span>Subtotal</span>
-                <span>LKR {order.subtotal.toLocaleString('en-US')}</span>
+                <span className="font-semibold text-[#110B0E]">LKR {order.subtotal.toLocaleString('en-US')}</span>
               </div>
               {order.discount > 0 && (
                 <div className="flex justify-between text-emerald-700 font-semibold">
-                  <span>Discount</span>
+                  <span>Privilege Savings</span>
                   <span>- LKR {order.discount.toLocaleString('en-US')}</span>
                 </div>
               )}
               <div className="flex justify-between">
-                <span>Delivery ({order.deliveryMethod})</span>
-                <span>{order.shipping === 0 ? 'FREE' : `LKR ${order.shipping}`}</span>
+                <span>Courier Delivery</span>
+                <span>{order.shipping === 0 ? 'FREE Complimentary' : `LKR ${order.shipping.toLocaleString('en-US')}`}</span>
               </div>
-              <div className="flex justify-between items-baseline pt-2 border-t border-[#C5A059]/30 text-[#110B0E] font-bold text-sm">
-                <span>Total Paid / Due</span>
+              <div className="flex justify-between pt-2 border-t border-[#C5A059]/30 text-sm font-bold text-[#110B0E]">
+                <span>Total Amount</span>
                 <span className="font-display text-xl text-[#701626]">
                   LKR {order.total.toLocaleString('en-US')}
                 </span>
@@ -135,20 +152,10 @@ export default function OrderSuccess() {
           {/* Action Buttons */}
           <div className="pt-6 border-t border-[#C5A059]/30 space-y-3">
             <div className="flex flex-col sm:flex-row gap-3 justify-center">
-              <a
-                href={`https://wa.me/?text=${whatsappMessage}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="px-6 py-3.5 bg-emerald-700 hover:bg-emerald-800 text-white text-xs uppercase tracking-[0.2em] font-bold rounded-2xl flex items-center justify-center gap-2 shadow-md transition-colors"
-              >
-                <MessageCircle className="w-4 h-4" />
-                <span>Confirm on WhatsApp</span>
-              </a>
-
               {isAuthenticated ? (
                 <Link
                   to={`/account?tab=orders&order=${order.orderId}`}
-                  className="px-6 py-3.5 bg-[#701626] hover:bg-[#8E1E34] text-white text-xs uppercase tracking-[0.2em] font-bold rounded-2xl flex items-center justify-center gap-2 shadow-md transition-colors"
+                  className="px-7 py-3.5 bg-[#701626] hover:bg-[#8E1E34] text-white text-xs uppercase tracking-[0.2em] font-bold rounded-2xl flex items-center justify-center gap-2 shadow-md transition-colors"
                 >
                   <FileText className="w-4 h-4" />
                   <span>View in My Orders</span>
@@ -156,7 +163,7 @@ export default function OrderSuccess() {
               ) : (
                 <Link
                   to="/signup"
-                  className="px-6 py-3.5 bg-[#F7F4EE] hover:bg-[#C5A059]/20 text-[#110B0E] hover:text-[#701626] text-xs uppercase tracking-[0.2em] font-bold rounded-2xl flex items-center justify-center gap-2 border border-[#C5A059]/40 transition-colors"
+                  className="px-7 py-3.5 bg-[#701626] hover:bg-[#8E1E34] text-white text-xs uppercase tracking-[0.2em] font-bold rounded-2xl flex items-center justify-center gap-2 shadow-md transition-colors"
                 >
                   <UserPlus className="w-4 h-4" />
                   <span>Create Account to Track</span>
@@ -165,7 +172,7 @@ export default function OrderSuccess() {
 
               <Link
                 to="/collections"
-                className="px-6 py-3.5 bg-white hover:bg-gray-50 text-[#110B0E] text-xs uppercase tracking-[0.2em] font-bold rounded-2xl flex items-center justify-center gap-2 border border-[#C5A059]/30 transition-colors"
+                className="px-6 py-3.5 bg-white hover:bg-gray-50 text-[#110B0E] text-xs uppercase tracking-[0.2em] font-bold rounded-2xl flex items-center justify-center gap-2 border border-[#C5A059]/40 transition-colors"
               >
                 <span>Continue Shopping</span>
                 <ArrowRight className="w-4 h-4" />

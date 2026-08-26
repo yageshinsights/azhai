@@ -156,10 +156,34 @@ export default function CartDrawer() {
                           <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
                         </div>
                         <div className="flex-1 min-w-0 space-y-1">
-                          <h3 className="font-display text-base font-bold text-[#110B0E] leading-tight line-clamp-2">{item.name}</h3>
-                          {item.size && (
-                            <p className="text-[10px] uppercase tracking-wider text-[#6D6268] font-medium">Size: {item.size}</p>
+                          {item.tailoring && (
+                            <span className="inline-flex items-center gap-1 text-[9px] font-bold uppercase tracking-wider text-[#701626] bg-[#701626]/10 px-2 py-0.5 rounded-full">
+                              ✂️ Custom Tailored
+                            </span>
                           )}
+                          <h3 className="font-display text-base font-bold text-[#110B0E] leading-tight line-clamp-2">{item.name}</h3>
+                          
+                          {item.tailoring ? (
+                            <div className="space-y-0.5 pt-0.5">
+                              <p className="text-[10px] text-[#6D6268]">
+                                Fabric: <strong className="text-[#110B0E]">{item.tailoring.fabricName}</strong>
+                              </p>
+                              <p className="text-[10px] text-[#6D6268]">
+                                Size: <strong className="text-[#110B0E]">{item.tailoring.sizeLabel}</strong>
+                                {item.tailoring.sizeLabel === 'Custom' && item.tailoring.measurements && (
+                                  <span className="text-[9px] text-[#701626] ml-1 font-mono">
+                                    ({Object.entries(item.tailoring.measurements).slice(0, 3).map(([k, v]) => `${k}:${v}"`).join(', ')})
+                                  </span>
+                                )}
+                              </p>
+                              <p className="text-[9px] text-[#C5A059] font-medium">⏱ {item.tailoring.leadTime}</p>
+                            </div>
+                          ) : (
+                            item.size && (
+                              <p className="text-[10px] uppercase tracking-wider text-[#6D6268] font-medium">Size: {item.size}</p>
+                            )
+                          )}
+
                           <p className="font-display text-base font-bold text-[#701626]">{item.price}</p>
                           <div className="flex items-center gap-3 pt-2">
                             <div className="flex items-center gap-2 bg-[#F7F4EE] rounded-full px-2.5 py-0.5 border border-[#C5A059]/40">
