@@ -245,6 +245,16 @@ const INITIAL_COUPONS: Coupon[] = [
     isActive: true,
     expiresAt: '2026-12-31',
   },
+  {
+    id: 'coup-3',
+    code: 'ATELIER5',
+    discountType: 'percentage',
+    value: 5,
+    minSpend: 5000,
+    usageCount: 0,
+    isActive: true,
+    expiresAt: '2026-12-31',
+  },
 ];
 
 const INITIAL_SETTINGS: StoreSettings = {
@@ -442,36 +452,51 @@ export const useAdminStore = create<AdminState>()(
           const { data: dbSettings } = await supabase.from('store_settings').select('*').eq('id', 1).single();
           if (dbSettings) {
             const current = get().settings;
-            let localCustom: Partial<StoreSettings> | null = null;
+            const tickerData = (typeof dbSettings.announcement_ticker === 'object' && dbSettings.announcement_ticker !== null)
+              ? dbSettings.announcement_ticker
+              : {};
+
+            const comingSoonFromDb = tickerData.comingSoonMode ?? (dbSettings as any).coming_soon_mode;
+            const bankAccountsFromDb = tickerData.bankAccounts ?? (dbSettings as any).bank_accounts;
+            const seoFromDb = tickerData.seo ?? (dbSettings as any).seo;
+            const socialLinksFromDb = tickerData.socialLinks ?? (dbSettings as any).social_links;
+            const studioFromDb = tickerData.studio ?? (dbSettings as any).studio;
+            const phoneFromDb = tickerData.phoneNumber ?? (dbSettings as any).phone_number;
+
+            const mergedSettings: StoreSettings = {
+              ...current,
+              storeName: dbSettings.store_name ?? current.storeName,
+              tagline: dbSettings.tagline ?? current.tagline,
+              enableCOD: dbSettings.enable_cod ?? current.enableCOD,
+              maxCODAmount: Number(dbSettings.max_cod_amount ?? current.maxCODAmount),
+              freeShippingThreshold: Number(dbSettings.free_shipping_threshold ?? current.freeShippingThreshold),
+              standardShippingFee: Number(dbSettings.standard_shipping_fee ?? current.standardShippingFee),
+              expressShippingFee: Number(dbSettings.express_shipping_fee ?? current.expressShippingFee),
+              whatsappNumber: dbSettings.whatsapp_number ?? current.whatsappNumber,
+              atelierAddress: dbSettings.atelier_address ?? current.atelierAddress,
+              announcementTicker: {
+                enabled: tickerData.enabled ?? current.announcementTicker.enabled,
+                text: tickerData.text ?? current.announcementTicker.text,
+                link: tickerData.link ?? current.announcementTicker.link,
+              },
+              comingSoonMode: comingSoonFromDb ?? current.comingSoonMode ?? INITIAL_SETTINGS.comingSoonMode,
+              bankAccounts: bankAccountsFromDb ?? current.bankAccounts ?? INITIAL_SETTINGS.bankAccounts,
+              seo: seoFromDb ?? current.seo ?? INITIAL_SETTINGS.seo,
+              socialLinks: socialLinksFromDb ?? current.socialLinks ?? INITIAL_SETTINGS.socialLinks,
+              studio: studioFromDb ?? current.studio ?? INITIAL_SETTINGS.studio,
+              phoneNumber: phoneFromDb ?? current.phoneNumber ?? INITIAL_SETTINGS.phoneNumber,
+            };
+
+            set({ settings: mergedSettings });
+
             if (typeof window !== 'undefined') {
               try {
-                const raw = localStorage.getItem('azhai_store_settings_custom');
-                if (raw) localCustom = JSON.parse(raw);
+                localStorage.setItem('azhai_store_settings_custom', JSON.stringify(mergedSettings));
+                window.dispatchEvent(new CustomEvent('azhai:settings-updated', { detail: mergedSettings }));
               } catch {
                 // ignore
               }
             }
-
-            set({
-              settings: {
-                ...current,
-                storeName: localCustom?.storeName || dbSettings.store_name || current.storeName,
-                tagline: localCustom?.tagline || dbSettings.tagline || current.tagline,
-                enableCOD: localCustom?.enableCOD ?? (dbSettings.enable_cod ?? current.enableCOD),
-                maxCODAmount: Number(localCustom?.maxCODAmount ?? (dbSettings.max_cod_amount ?? current.maxCODAmount)),
-                freeShippingThreshold: Number(localCustom?.freeShippingThreshold ?? (dbSettings.free_shipping_threshold ?? current.freeShippingThreshold)),
-                standardShippingFee: Number(localCustom?.standardShippingFee ?? (dbSettings.standard_shipping_fee ?? current.standardShippingFee)),
-                expressShippingFee: Number(localCustom?.expressShippingFee ?? (dbSettings.express_shipping_fee ?? current.expressShippingFee)),
-                whatsappNumber: localCustom?.whatsappNumber || dbSettings.whatsapp_number || current.whatsappNumber,
-                phoneNumber: localCustom?.phoneNumber || dbSettings.phone_number || current.phoneNumber,
-                atelierAddress: localCustom?.atelierAddress || dbSettings.atelier_address || current.atelierAddress,
-                announcementTicker: localCustom?.announcementTicker || dbSettings.announcement_ticker || current.announcementTicker,
-                seo: localCustom?.seo || dbSettings.seo || current.seo,
-                socialLinks: localCustom?.socialLinks || dbSettings.social_links || current.socialLinks,
-                studio: localCustom?.studio || dbSettings.studio || current.studio,
-                bankAccounts: localCustom?.bankAccounts || dbSettings.bank_accounts || current.bankAccounts || INITIAL_SETTINGS.bankAccounts,
-              },
-            });
           }
 
           // 6. Fetch Orders
@@ -735,10 +760,11 @@ export const useAdminStore = create<AdminState>()(
 
       syncNewOrder: (placedOrder) => {
         const isCOD = placedOrder.paymentMethod.toLowerCase().includes('cash on delivery') || placedOrder.paymentMethod.toLowerCase().includes('cod');
+        const isBank = placedOrder.paymentMethod.toLowerCase().includes('bank');
         const newAdminOrder: AdminOrder = {
           ...placedOrder,
-          status: 'confirmed',
-          paymentStatus: isCOD ? 'pending_cod' : 'paid',
+          status: isBank ? 'pending' : (placedOrder.status || 'confirmed'),
+          paymentStatus: isCOD ? 'pending_cod' : isBank ? 'pending_bank' : (placedOrder.paymentStatus || 'paid'),
           courierPartner: placedOrder.courierPartner || 'Sri Lanka Post',
           trackingNumber: placedOrder.trackingNumber,
           weightGrams: placedOrder.weightGrams,
@@ -1082,37 +1108,38 @@ export const useAdminStore = create<AdminState>()(
 
         if (isSupabaseConfigured()) {
           try {
-            const dbPayload: any = {};
-            if (newSettings.storeName !== undefined) dbPayload.store_name = newSettings.storeName;
-            if (newSettings.tagline !== undefined) dbPayload.tagline = newSettings.tagline;
-            if (newSettings.enableCOD !== undefined) dbPayload.enable_cod = newSettings.enableCOD;
-            if (newSettings.maxCODAmount !== undefined) dbPayload.max_cod_amount = newSettings.maxCODAmount;
-            if (newSettings.freeShippingThreshold !== undefined) dbPayload.free_shipping_threshold = newSettings.freeShippingThreshold;
-            if (newSettings.standardShippingFee !== undefined) dbPayload.standard_shipping_fee = newSettings.standardShippingFee;
-            if (newSettings.expressShippingFee !== undefined) dbPayload.express_shipping_fee = newSettings.expressShippingFee;
-            if (newSettings.whatsappNumber !== undefined) dbPayload.whatsapp_number = newSettings.whatsappNumber;
-            if (newSettings.phoneNumber !== undefined) dbPayload.phone_number = newSettings.phoneNumber;
-            if (newSettings.atelierAddress !== undefined) dbPayload.atelier_address = newSettings.atelierAddress;
-            if (newSettings.announcementTicker !== undefined) dbPayload.announcement_ticker = newSettings.announcementTicker;
-            if (newSettings.seo !== undefined) dbPayload.seo = newSettings.seo;
-            if (newSettings.socialLinks !== undefined) dbPayload.social_links = newSettings.socialLinks;
-            if (newSettings.studio !== undefined) dbPayload.studio = newSettings.studio;
-            if (newSettings.bankAccounts !== undefined) dbPayload.bank_accounts = newSettings.bankAccounts;
+            const current = get().settings;
+            // Pack extended store settings into the announcement_ticker JSONB container
+            // so settings like comingSoonMode, bankAccounts, SEO, and studio info are persistently saved in Supabase
+            const tickerPayload = {
+              ...(typeof current.announcementTicker === 'object' && current.announcementTicker !== null
+                ? current.announcementTicker
+                : {}),
+              comingSoonMode: current.comingSoonMode,
+              bankAccounts: current.bankAccounts,
+              seo: current.seo,
+              socialLinks: current.socialLinks,
+              studio: current.studio,
+              phoneNumber: current.phoneNumber,
+            };
+
+            const dbPayload: any = {
+              store_name: current.storeName,
+              tagline: current.tagline,
+              enable_cod: current.enableCOD,
+              max_cod_amount: current.maxCODAmount,
+              free_shipping_threshold: current.freeShippingThreshold,
+              standard_shipping_fee: current.standardShippingFee,
+              express_shipping_fee: current.expressShippingFee,
+              whatsapp_number: current.whatsappNumber,
+              atelier_address: current.atelierAddress,
+              announcement_ticker: tickerPayload,
+              updated_at: new Date().toISOString(),
+            };
 
             const { error } = await supabase.from('store_settings').update(dbPayload).eq('id', 1);
             if (error) {
-              // If unknown column in Supabase, update basic columns only
-              const basicPayload: any = {};
-              if (newSettings.storeName !== undefined) basicPayload.store_name = newSettings.storeName;
-              if (newSettings.tagline !== undefined) basicPayload.tagline = newSettings.tagline;
-              if (newSettings.enableCOD !== undefined) basicPayload.enable_cod = newSettings.enableCOD;
-              if (newSettings.maxCODAmount !== undefined) basicPayload.max_cod_amount = newSettings.maxCODAmount;
-              if (newSettings.freeShippingThreshold !== undefined) basicPayload.free_shipping_threshold = newSettings.freeShippingThreshold;
-              if (newSettings.standardShippingFee !== undefined) basicPayload.standard_shipping_fee = newSettings.standardShippingFee;
-              if (newSettings.expressShippingFee !== undefined) basicPayload.express_shipping_fee = newSettings.expressShippingFee;
-              if (newSettings.whatsappNumber !== undefined) basicPayload.whatsapp_number = newSettings.whatsappNumber;
-              if (newSettings.atelierAddress !== undefined) basicPayload.atelier_address = newSettings.atelierAddress;
-              await supabase.from('store_settings').update(basicPayload).eq('id', 1);
+              console.warn('[Supabase Settings Update Error]:', error);
             }
           } catch (err) {
             console.warn('[Supabase Settings Update]: Local store updated successfully', err);
@@ -1462,6 +1489,7 @@ export const useAdminStore = create<AdminState>()(
       },
 
       uploadOrderBankSlip: (orderId, slipUrl, reference) => {
+        const submittedAt = new Date().toISOString();
         set((state) => ({
           orders: state.orders.map((o) => {
             if (o.orderId === orderId) {
@@ -1471,13 +1499,41 @@ export const useAdminStore = create<AdminState>()(
                   ...(o.bankTransferDetails as any),
                   slipUrl,
                   referenceNumber: reference || o.bankTransferDetails?.referenceNumber,
-                  submittedAt: new Date().toISOString(),
+                  submittedAt,
                 },
               };
             }
             return o;
           }),
         }));
+
+        // Persist uploaded bank slip to Supabase Postgres
+        if (isSupabaseConfigured()) {
+          (async () => {
+            try {
+              const { data: existingOrder } = await supabase
+                .from('orders')
+                .select('bank_transfer_details')
+                .eq('order_code', orderId)
+                .maybeSingle();
+
+              const existingDetails = (existingOrder?.bank_transfer_details as Record<string, any>) || {};
+              await supabase
+                .from('orders')
+                .update({
+                  bank_transfer_details: {
+                    ...existingDetails,
+                    slipUrl,
+                    referenceNumber: reference || existingDetails.referenceNumber,
+                    submittedAt,
+                  },
+                })
+                .eq('order_code', orderId);
+            } catch (err) {
+              console.error('[Supabase uploadOrderBankSlip Error]:', err);
+            }
+          })();
+        }
 
         // Also update in auth store local storage if patron has order stored
         try {
@@ -1494,7 +1550,7 @@ export const useAdminStore = create<AdminState>()(
                       ...(ord.bankTransferDetails || {}),
                       slipUrl,
                       referenceNumber: reference || ord.bankTransferDetails?.referenceNumber,
-                      submittedAt: new Date().toISOString(),
+                      submittedAt,
                     },
                   };
                 }
@@ -1509,6 +1565,9 @@ export const useAdminStore = create<AdminState>()(
       },
 
       verifyBankTransferPayment: async (orderId, adminNotes) => {
+        const verifiedAt = new Date().toISOString();
+        const verifiedBy = get().adminUser?.name || 'Preethi (Owner)';
+
         set((state) => ({
           orders: state.orders.map((o) => {
             if (o.orderId === orderId) {
@@ -1519,8 +1578,8 @@ export const useAdminStore = create<AdminState>()(
                 adminNotes: adminNotes || o.adminNotes,
                 bankTransferDetails: {
                   ...(o.bankTransferDetails as any),
-                  verifiedAt: new Date().toISOString(),
-                  verifiedBy: state.adminUser?.name || 'Preethi (Owner)',
+                  verifiedAt,
+                  verifiedBy,
                 },
               };
             }
@@ -1530,12 +1589,27 @@ export const useAdminStore = create<AdminState>()(
 
         if (isSupabaseConfigured()) {
           try {
+            const { data: existingOrder } = await supabase
+              .from('orders')
+              .select('status, bank_transfer_details')
+              .eq('order_code', orderId)
+              .maybeSingle();
+
+            const currentStatus = existingOrder?.status;
+            const updatedStatus = currentStatus === 'pending' ? 'confirmed' : (currentStatus || 'confirmed');
+            const existingDetails = (existingOrder?.bank_transfer_details as Record<string, any>) || {};
+
             await supabase
               .from('orders')
               .update({
                 payment_status: 'paid',
-                status: 'confirmed',
+                status: updatedStatus,
                 admin_notes: adminNotes,
+                bank_transfer_details: {
+                  ...existingDetails,
+                  verifiedAt,
+                  verifiedBy,
+                },
               })
               .eq('order_code', orderId);
           } catch (err) {

@@ -392,20 +392,33 @@ export function buildAdminOrderAlertHtml(order: {
 }): string {
   const itemsHtml = order.items
     .map(
-      (item) => `
+      (item) => {
+        let tailoringInfo = '';
+        if (item.tailoring) {
+          const measures = item.tailoring.measurements && typeof item.tailoring.measurements === 'object'
+            ? Object.entries(item.tailoring.measurements)
+                .filter(([_, val]) => val !== undefined && val !== null && val !== '')
+                .map(([key, val]) => `${key.replace(/_/g, ' ')}: ${val}"`)
+                .join(' · ')
+            : '';
+          tailoringInfo = `<br><small style="color: #701626; font-weight: bold;">✂️ Bespoke Fitting: ${item.tailoring.dressTypeName || item.tailoring.sizeLabel}${measures ? ` (${measures})` : ''}</small>`;
+        }
+
+        return `
       <tr>
         <td style="padding: 10px 0; border-bottom: 1px solid #ddd; width: 60px;">
           <img src="${item.image || 'https://images.unsplash.com/photo-1610030469983-98e550d6193c?auto=format&fit=crop&w=200&q=80'}" style="width: 50px; height: 60px; object-fit: cover; border-radius: 8px;" />
         </td>
         <td style="padding: 10px 10px; border-bottom: 1px solid #ddd;">
           <strong>${item.name}</strong> (${item.size || 'M'} x ${item.quantity})
-          ${item.tailoring ? `<br><small style="color: #701626; font-weight: bold;">✂️ Bespoke Fitting: ${JSON.stringify(item.tailoring.measurements || {})}</small>` : ''}
+          ${tailoringInfo}
         </td>
         <td style="padding: 10px 0; border-bottom: 1px solid #ddd; text-align: right; font-weight: bold; color: #701626;">
           ${item.price}
         </td>
       </tr>
-    `
+    `;
+      }
     )
     .join('');
 

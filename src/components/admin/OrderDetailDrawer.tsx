@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   X, 
@@ -23,9 +23,13 @@ import {
   CheckCircle2,
   Upload,
   RefreshCw,
-  Copy
+  Copy,
+  AlertTriangle,
+  History,
+  Scissors
 } from 'lucide-react';
-import { useAdminStore, type AdminOrder, type OrderStatus } from '@/store/admin';
+import type { AdminOrder, OrderStatus } from '@/store/admin';
+import { useAdminStore } from '@/store/admin';
 import { 
   sendBrevoEmail,
   buildOrderConfirmationHtml,
@@ -35,6 +39,7 @@ import {
   buildOrderCancelledHtml,
   buildPostDeliveryFeedbackEmailHtml
 } from '@/lib/brevo';
+import { STORE_PHONE, STORE_SUPPORT_EMAIL } from '@/lib/constants';
 import PrintablePackingSlip from '@/components/admin/PrintablePackingSlip';
 import BankBadge from '@/components/BankBadge';
 import { compressToWebP } from '@/lib/image-compressor';
@@ -65,6 +70,16 @@ export default function OrderDetailDrawer({ order, isOpen, onClose }: OrderDetai
   const [adminBankNotes, setAdminBankNotes] = useState('');
   const [isUploadingAdminSlip, setIsUploadingAdminSlip] = useState(false);
   const [slipModalUrl, setSlipModalUrl] = useState<string | null>(null);
+
+  // Synchronize local form inputs when active order changes
+  useEffect(() => {
+    if (order) {
+      setCourierPartner(order.courierPartner || 'Sri Lanka Post');
+      setTrackingNumber(order.trackingNumber || '');
+      setAdminNotes(order.adminNotes || '');
+      setAdminBankNotes(order.bankTransferDetails?.notes || '');
+    }
+  }, [order?.orderId]);
 
   if (!isOpen || !order) return null;
 

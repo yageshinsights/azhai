@@ -227,7 +227,7 @@ export default function Checkout() {
             order_code: orderData.orderId,
             user_id: user?.id || null,
             customer_details: orderData.customer,
-            delivery_notes: state.giftNote || null,
+            delivery_notes: deliveryNotes.trim() || null,
             gift_note: state.giftNote || null,
             coupon_code: state.appliedCoupon || null,
             subtotal: orderData.subtotal,
@@ -240,6 +240,8 @@ export default function Checkout() {
             payment_status: paymentMethod === 'card' ? 'paid' : paymentMethod === 'bank' ? 'pending_bank' : 'pending_cod',
             bank_transfer_details: orderData.bankTransferDetails || null,
             status: paymentMethod === 'bank' ? 'pending' : 'confirmed',
+            courier_partner: orderData.courierPartner || 'Sri Lanka Post',
+            tracking_number: orderData.trackingNumber || null,
           })
           .select()
           .single();
@@ -285,7 +287,7 @@ export default function Checkout() {
         orderId: orderData.orderId,
         customerName: fullName,
         total: finalTotal,
-        items: items.map((i) => ({ name: i.name, size: i.size, quantity: i.quantity, price: i.price, tailoring: i.tailoring })),
+        items: items.map((i) => ({ name: i.name, size: i.size, quantity: i.quantity, price: i.price, image: i.image, tailoring: i.tailoring })),
         deliveryMethod: orderData.deliveryMethod,
         paymentMethod: orderData.paymentMethod,
         bankTransferDetails: orderData.bankTransferDetails,
@@ -298,7 +300,7 @@ export default function Checkout() {
       });
 
       // Also send Admin Notification to Store Owner
-      const adminEmail = import.meta.env.VITE_ADMIN_NOTIFICATION_EMAIL || 'orders@azhai.lk';
+      const adminEmail = import.meta.env.VITE_ADMIN_NOTIFICATION_EMAIL || 'orders@azhaiclothing.lk';
       const adminHtml = buildAdminOrderAlertHtml({
         orderId: orderData.orderId,
         customerName: fullName,
@@ -308,7 +310,7 @@ export default function Checkout() {
         city,
         district,
         total: finalTotal,
-        items: items.map((i) => ({ name: i.name, size: i.size, quantity: i.quantity, price: i.price, tailoring: i.tailoring })),
+        items: items.map((i) => ({ name: i.name, size: i.size, quantity: i.quantity, price: i.price, image: i.image, tailoring: i.tailoring })),
         deliveryMethod: orderData.deliveryMethod,
         paymentMethod: orderData.paymentMethod,
       });
@@ -351,7 +353,7 @@ export default function Checkout() {
 
     setIsSubmitting(true);
 
-    const generatedOrderId = `AZH-${Math.floor(10000 + Math.random() * 90000)}`;
+    const generatedOrderId = `AZH-${Date.now().toString(36).toUpperCase()}-${Math.floor(1000 + Math.random() * 9000)}`;
 
     const orderData = {
       orderId: generatedOrderId,
@@ -362,6 +364,7 @@ export default function Checkout() {
       total: finalTotal,
       coupon: state.appliedCoupon,
       giftNote: state.giftNote,
+      deliveryNotes: deliveryNotes.trim() || undefined,
       customer: {
         fullName,
         email,
@@ -413,17 +416,28 @@ export default function Checkout() {
 
     // If PayHere Card Payment selected, trigger PayHere Gateway modal
     if (paymentMethod === 'card') {
+      if (finalTotal <= 0) {
+        // Zero-balance orders (e.g. 100% discount promo) bypass external payment gateways
+        orderData.paymentStatus = 'paid';
+        orderData.status = 'confirmed';
+        finalizeOrderPlacement(orderData);
+        return;
+      }
+
+      const rawItemsName = items.map((i) => `${i.name} (${i.size || 'M'})`).join(', ');
+      const truncatedItems = rawItemsName.length > 240 ? `${rawItemsName.substring(0, 237)}...` : rawItemsName;
       const nameParts = fullName.trim().split(' ');
+
       startPayHerePayment(
         {
           orderId: generatedOrderId,
-          itemsName: items.map((i) => `${i.name} (${i.size || 'M'})`).join(', '),
+          itemsName: truncatedItems,
           amount: finalTotal,
           currency: 'LKR',
           firstName: nameParts[0] || fullName,
           lastName: nameParts.slice(1).join(' ') || 'Customer',
           email,
-          phone,
+          phone: phone.replace(/[^\d+]/g, ''),
           address,
           city,
           country: 'Sri Lanka',

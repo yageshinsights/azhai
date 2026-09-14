@@ -1,5 +1,5 @@
 import { useParams, Link } from 'react-router-dom';
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   CheckCircle2, Truck, ArrowRight, Crown, UserPlus, FileText, Mail, 
@@ -31,6 +31,8 @@ export default function OrderSuccess() {
   const [localSlipUrl, setLocalSlipUrl] = useState<string | null>(null);
   const [referenceInput, setReferenceInput] = useState('');
   const [previewModalUrl, setPreviewModalUrl] = useState<string | null>(null);
+  const [dbOrder, setDbOrder] = useState<any>(null);
+  const [isFetchingDb, setIsFetchingDb] = useState(false);
 
   const handleCopy = (text: string, field: string) => {
     navigator.clipboard.writeText(text);
@@ -38,7 +40,72 @@ export default function OrderSuccess() {
     setTimeout(() => setCopiedField(null), 2000);
   };
 
-  // Multi-tier order lookup: lastOrder -> authOrders -> adminOrders
+  // If order is not present in in-memory/localStorage stores (e.g. guest refreshes or opens from SMS/email), fetch from Supabase
+  useEffect(() => {
+    if (!orderId) return;
+    const hasLocal = (lastOrder && lastOrder.orderId === orderId) ||
+      authOrders.some((o) => o.orderId === orderId) ||
+      adminOrders.some((o) => o.orderId === orderId);
+
+    if (hasLocal) return;
+
+    if (isSupabaseConfigured()) {
+      setIsFetchingDb(true);
+      (async () => {
+        try {
+          const { data: ord, error: ordErr } = await supabase
+            .from('orders')
+            .select(`
+              *,
+              order_items (*)
+            `)
+            .eq('order_code', orderId)
+            .maybeSingle();
+
+          if (ord && !ordErr) {
+            setDbOrder({
+              orderId: ord.order_code,
+              items: (ord.order_items || []).map((it: any, idx: number) => ({
+                id: it.id || idx,
+                name: it.product_name || it.name,
+                price: it.price,
+                image: it.image_url || it.image,
+                quantity: it.quantity,
+                size: it.size,
+                tailoring: it.tailoring,
+              })),
+              subtotal: Number(ord.subtotal) || 0,
+              discount: Number(ord.discount) || 0,
+              shipping: Number(ord.shipping) || 0,
+              total: Number(ord.total) || 0,
+              customer: ord.customer_details || {
+                fullName: 'Valued Patron',
+                email: 'customer@azhaiclothing.lk',
+                phone: '',
+                address: '',
+                city: '',
+                district: 'Colombo',
+              },
+              deliveryMethod: ord.delivery_method || 'Standard Courier',
+              paymentMethod: ord.payment_method || 'Confirmed Order',
+              placedAt: ord.created_at
+                ? new Date(ord.created_at).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' })
+                : new Date().toLocaleString(),
+              paymentStatus: ord.payment_status,
+              bankTransferDetails: ord.bank_transfer_details,
+              status: ord.status,
+            });
+          }
+        } catch (err) {
+          console.error('[Supabase OrderSuccess DB Fetch Error]:', err);
+        } finally {
+          setIsFetchingDb(false);
+        }
+      })();
+    }
+  }, [orderId, lastOrder, authOrders, adminOrders]);
+
+  // Multi-tier order lookup: lastOrder -> authOrders -> adminOrders -> dbOrder
   const order = useMemo(() => {
     if (lastOrder && (!orderId || lastOrder.orderId === orderId)) {
       return lastOrder;
@@ -80,8 +147,12 @@ export default function OrderSuccess() {
       };
     }
 
+    if (dbOrder) {
+      return dbOrder;
+    }
+
     return lastOrder || null;
-  }, [orderId, lastOrder, authOrders, adminOrders]);
+  }, [orderId, lastOrder, authOrders, adminOrders, dbOrder]);
 
   if (!order) {
     return (
@@ -269,16 +340,40 @@ export default function OrderSuccess() {
                       r.readAsDataURL(webpFile);
                     });
                   }
+                } else if (file.type === 'application/pdf') {
+                  if (isSupabaseConfigured()) {
+                    const safeName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
+                    const fileName = `order-slips/${order.orderId}-${Date.now()}-${safeName}`;
+                    const { error } = await supabase.storage.from('product-images').upload(fileName, file, {
+                      contentType: 'application/pdf',
+                      upsert: true,
+                    });
+                    if (!error) {
+                      const { data } = supabase.storage.from('product-images').getPublicUrl(fileName);
+                      uploadedUrl = data.publicUrl;
+                    }
+                  }
+                  if (!uploadedUrl) {
+                    throw new Error('PDF upload requires cloud storage connection. Please send your deposit slip via WhatsApp.');
+                  }
                 } else {
-                  uploadedUrl = await new Promise<string>((resolve) => {
-                    const r = new FileReader();
-                    r.onload = () => resolve(r.result as string);
-                    r.readAsDataURL(file);
-                  });
+                  throw new Error('Unsupported file type. Please upload a JPG, PNG, or PDF deposit slip.');
                 }
 
                 setLocalSlipUrl(uploadedUrl);
                 useAdminStore.getState().uploadOrderBankSlip(order.orderId, uploadedUrl, referenceInput.trim());
+
+                if (dbOrder && dbOrder.orderId === order.orderId) {
+                  setDbOrder((prev: any) => ({
+                    ...prev,
+                    bankTransferDetails: {
+                      ...(prev?.bankTransferDetails || {}),
+                      slipUrl: uploadedUrl,
+                      referenceNumber: referenceInput.trim() || prev?.bankTransferDetails?.referenceNumber,
+                      submittedAt: new Date().toISOString(),
+                    },
+                  }));
+                }
 
                 if (lastOrder && lastOrder.orderId === order.orderId) {
                   useCartStore.getState().setLastOrder({
@@ -556,7 +651,7 @@ export default function OrderSuccess() {
             
             {order.items.length > 0 && (
               <div className="divide-y divide-[#C5A059]/20">
-                {order.items.map((item, idx) => (
+                {order.items.map((item: any, idx: number) => (
                   <div key={`${item.id}-${item.size}-${idx}`} className="py-3 flex items-center justify-between gap-4">
                     <div className="flex items-center gap-3">
                       <div className="w-12 h-14 rounded-lg bg-[#F7F4EE] overflow-hidden shrink-0 border border-[#C5A059]/30">

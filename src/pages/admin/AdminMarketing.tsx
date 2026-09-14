@@ -157,6 +157,15 @@ export default function AdminMarketing() {
         deliveryMethod: 'Sri Lanka Post Speed Post (Zone A)',
         paymentMethod: 'PayHere (Online Visa/MasterCard)',
       });
+    } else if (type === 'abandoned') {
+      subject = '✨ [TEST] Your Azhai bag is waiting for you (Enjoy 5% privilege)';
+      html = buildAbandonedCartEmailHtml({
+        customerName: 'Preethi',
+        items: [
+          { name: 'Kanchipuram Silk Bridal Saree (Crimson & Gold)', price: 'LKR 48,000', size: 'Free Size', image: 'https://images.unsplash.com/photo-1610030469983-98e550d6193c?auto=format&fit=crop&w=600&q=80' }
+        ],
+        couponCode: 'ATELIER5',
+      });
     } else if (type === 'shipped') {
       subject = '🚚 [TEST] Your Azhai Ensemble is on the Way (#AZH-84920)';
       html = buildOrderShippedHtml({

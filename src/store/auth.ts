@@ -199,19 +199,22 @@ export const useAuthStore = create<AuthState>()(
                   passwordHash,
                   user: userObj,
                   addresses: mappedAddresses,
-                  orders: [],
+                  orders: get().orders || [],
                   wishlist: mappedWishlist,
-                  familyProfiles: [],
+                  familyProfiles: get().familyProfiles || [],
                 });
               }
 
+              const existingAccount = accountIdx >= 0 ? existingAccounts[accountIdx] : null;
               set({
                 user: userObj,
                 isAuthenticated: true,
-                addresses: mappedAddresses,
+                addresses: mappedAddresses.length > 0 ? mappedAddresses : (existingAccount?.addresses || get().addresses),
                 wishlist: mappedWishlist,
                 sessionToken,
                 accounts: updatedAccounts,
+                orders: existingAccount?.orders || get().orders || [],
+                familyProfiles: existingAccount?.familyProfiles || get().familyProfiles || [],
               });
 
               return { success: true };
@@ -486,11 +489,29 @@ export const useAuthStore = create<AuthState>()(
         const account = get().accounts.find(
           (a) => a.email.toLowerCase() === currentUser.email.toLowerCase()
         );
-        if (!account) return { success: false, error: 'Account record not found.' };
 
-        const currentHash = await hashPassword(currentPassword);
-        if (account.passwordHash !== currentHash) {
-          return { success: false, error: 'Current password is incorrect.' };
+        if (account) {
+          const currentHash = await hashPassword(currentPassword);
+          if (account.passwordHash !== currentHash) {
+            return { success: false, error: 'Current password is incorrect.' };
+          }
+        }
+
+        // Sync password with Supabase Auth if configured
+        if (isSupabaseConfigured()) {
+          try {
+            const { error: sbErr } = await supabase.auth.updateUser({ password: newPassword });
+            if (sbErr && !account) {
+              return { success: false, error: sbErr.message };
+            }
+          } catch (err: any) {
+            console.error('[Supabase changePassword Error]:', err);
+            if (!account) {
+              return { success: false, error: err?.message || 'Failed to update password.' };
+            }
+          }
+        } else if (!account) {
+          return { success: false, error: 'Account record not found.' };
         }
 
         const newHash = await hashPassword(newPassword);
@@ -512,11 +533,21 @@ export const useAuthStore = create<AuthState>()(
         const account = get().accounts.find(
           (a) => a.email.toLowerCase() === currentUser.email.toLowerCase()
         );
-        if (!account) return { success: false, error: 'Account not found.' };
 
-        const currentHash = await hashPassword(password);
-        if (account.passwordHash !== currentHash) {
-          return { success: false, error: 'Incorrect password.' };
+        if (account) {
+          const currentHash = await hashPassword(password);
+          if (account.passwordHash !== currentHash) {
+            return { success: false, error: 'Incorrect password.' };
+          }
+        }
+
+        // Sign out and invalidate Supabase session so user is not restored on refresh
+        if (isSupabaseConfigured()) {
+          try {
+            await supabase.auth.signOut();
+          } catch (err) {
+            console.error('[Supabase deleteAccount signOut Error]:', err);
+          }
         }
 
         set((state) => ({
@@ -527,6 +558,8 @@ export const useAuthStore = create<AuthState>()(
           isAuthenticated: false,
           addresses: [],
           orders: [],
+          wishlist: [],
+          familyProfiles: [],
           sessionToken: null,
         }));
 

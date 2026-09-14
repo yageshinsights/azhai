@@ -11,7 +11,6 @@ export default function ForgotPassword() {
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [generatedToken, setGeneratedToken] = useState<string | null>(null);
   const [submitted, setSubmitted] = useState(false);
 
   const { requestPasswordReset } = useAuthStore();
@@ -35,17 +34,19 @@ export default function ForgotPassword() {
     const res = await requestPasswordReset(email);
     setLoading(false);
 
-    if (res.success && res.token) {
-      setGeneratedToken(res.token);
+    if (res.success) {
       setSubmitted(true);
 
-      // Trigger Brevo Password Reset Email
-      const resetUrl = `${window.location.origin}/reset-password?token=${res.token}`;
-      sendBrevoEmail({
-        to: [{ email: email.trim() }],
-        subject: '🔐 Reset Your Azhai Atelier Password',
-        htmlContent: buildPasswordResetEmailHtml({ resetUrl }),
-      }).catch((err) => console.error('[Password Reset Email Error]:', err));
+      // Trigger Brevo Password Reset Email if token was created internally
+      const baseUrl = import.meta.env.VITE_STORE_URL || window.location.origin;
+      if (res.token) {
+        const resetUrl = `${baseUrl}/reset-password?token=${res.token}`;
+        sendBrevoEmail({
+          to: [{ email: email.trim() }],
+          subject: '🔐 Reset Your Azhai Atelier Password',
+          htmlContent: buildPasswordResetEmailHtml({ resetUrl }),
+        }).catch((err) => console.error('[Password Reset Email Error]:', err));
+      }
     } else {
       setError(res.error || 'Unable to process reset request.');
     }
@@ -91,25 +92,14 @@ export default function ForgotPassword() {
                 <div className="w-12 h-12 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center mx-auto">
                   <CheckCircle2 className="w-6 h-6" />
                 </div>
-                <div className="space-y-1">
-                  <p className="text-xs font-bold text-emerald-900">Reset Link Ready</p>
+                <div className="space-y-1.5">
+                  <p className="text-xs font-bold text-emerald-900">Recovery Link Dispatched</p>
                   <p className="text-[11px] text-emerald-800 font-light leading-relaxed">
-                    A password recovery token has been generated for{' '}
-                    <strong className="font-semibold">{email}</strong>.
+                    A secure password recovery link has been sent to{' '}
+                    <strong className="font-semibold">{email}</strong>. Please check your inbox (and spam folder) and click the link within 1 hour to set a new password.
                   </p>
                 </div>
               </div>
-
-              {/* Instant Reset Action Pill */}
-              {generatedToken && (
-                <button
-                  type="button"
-                  onClick={() => navigate(`/reset-password?token=${generatedToken}`)}
-                  className="w-full py-3.5 bg-[#701626] hover:bg-[#8E1E34] text-white text-xs font-bold uppercase tracking-[0.2em] rounded-2xl shadow-md transition-all flex items-center justify-center gap-2"
-                >
-                  <KeyRound className="w-4 h-4" /> Continue to Set New Password
-                </button>
-              )}
 
               <div className="text-center pt-2">
                 <Link

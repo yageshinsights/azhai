@@ -1,4 +1,5 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Mail, MessageCircle, MapPin, Clock, Send, Sparkles, CheckCircle2, Phone, ExternalLink, PhoneCall } from 'lucide-react';
 import SEOHead from '@/components/SEOHead';
@@ -6,8 +7,18 @@ import { useAdminStore, cleanWhatsAppDigits } from '@/store/admin';
 import { STORE_ADDRESS_FULL, STORE_PHONE, STORE_SUPPORT_EMAIL } from '@/lib/constants';
 import { sendBrevoEmail } from '@/lib/brevo';
 
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
 export default function Contact() {
   const settings = useAdminStore((s) => s.settings);
+  const [searchParams] = useSearchParams();
 
   const activeAddress = settings?.atelierAddress || STORE_ADDRESS_FULL;
   const activePhone = settings?.phoneNumber || STORE_PHONE;
@@ -16,11 +27,26 @@ export default function Contact() {
   const activeEmail = settings?.studio?.supportEmail || STORE_SUPPORT_EMAIL;
   const activeHours = settings?.studio?.openingHours || 'Mon – Sat: 10:00 AM – 7:30 PM (Closed on Poya)';
 
+  const initialOrder = searchParams.get('order');
+  const initialRating = searchParams.get('rating');
+  const initialTopic = searchParams.get('topic');
+
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
-  const [topic, setTopic] = useState('Bespoke Sizing & Styling');
-  const [message, setMessage] = useState('');
+  const [topic, setTopic] = useState(() => {
+    if (initialOrder || initialRating) return 'Order Feedback & Review';
+    if (initialTopic) return initialTopic;
+    return 'Bespoke Sizing & Styling';
+  });
+  const [message, setMessage] = useState(() => {
+    if (initialOrder && initialRating) {
+      return `Order Reference: ${initialOrder}\nCustomer Rating: ${initialRating} / 5 Stars ⭐\n\nReview & Fitting Experience: `;
+    } else if (initialOrder) {
+      return `Order Reference: ${initialOrder}\n\nInquiry regarding this order: `;
+    }
+    return '';
+  });
   const [submitted, setSubmitted] = useState(false);
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -30,20 +56,27 @@ export default function Contact() {
       const list = stored ? JSON.parse(stored) : [];
       list.push({
         id: `inq_${Date.now()}`,
-        name,
-        email,
-        phone,
-        topic,
-        message,
+        name: name.trim(),
+        email: email.trim(),
+        phone: phone.trim(),
+        topic: topic.trim(),
+        message: message.trim(),
         createdAt: new Date().toISOString(),
       });
       localStorage.setItem('azhai-inquiries', JSON.stringify(list));
 
+      // Sanitize fields before embedding into HTML email to prevent injection attacks
+      const safeName = escapeHtml(name.trim());
+      const safeEmail = escapeHtml(email.trim());
+      const safePhone = escapeHtml(phone.trim() || 'Not provided');
+      const safeTopic = escapeHtml(topic.trim());
+      const safeMessage = escapeHtml(message.trim());
+
       // Send immediate email notification to Atelier management via Brevo
       sendBrevoEmail({
         to: [{ email: activeEmail, name: 'Azhai Atelier Operations' }],
-        replyTo: { email, name },
-        subject: `[Atelier Inquiry] ${topic} — from ${name}`,
+        replyTo: { email: email.trim(), name: name.trim() },
+        subject: `[Atelier Inquiry] ${safeTopic} — from ${safeName}`,
         htmlContent: `
           <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; background: #FCFBF8; border: 1px solid #C5A059; border-radius: 16px;">
             <div style="border-bottom: 2px solid #701626; padding-bottom: 12px; margin-bottom: 18px;">
@@ -53,24 +86,24 @@ export default function Contact() {
             <table style="width: 100%; border-collapse: collapse; font-size: 14px; margin-bottom: 20px;">
               <tr>
                 <td style="padding: 6px 0; color: #6D6268; width: 120px;"><strong>Patron Name:</strong></td>
-                <td style="padding: 6px 0; color: #110B0E;">${name}</td>
+                <td style="padding: 6px 0; color: #110B0E;">${safeName}</td>
               </tr>
               <tr>
                 <td style="padding: 6px 0; color: #6D6268;"><strong>Email:</strong></td>
-                <td style="padding: 6px 0;"><a href="mailto:${email}" style="color: #701626; font-weight: bold;">${email}</a></td>
+                <td style="padding: 6px 0;"><a href="mailto:${safeEmail}" style="color: #701626; font-weight: bold;">${safeEmail}</a></td>
               </tr>
               <tr>
                 <td style="padding: 6px 0; color: #6D6268;"><strong>Phone:</strong></td>
-                <td style="padding: 6px 0; color: #110B0E;">${phone || 'Not provided'}</td>
+                <td style="padding: 6px 0; color: #110B0E;">${safePhone}</td>
               </tr>
               <tr>
                 <td style="padding: 6px 0; color: #6D6268;"><strong>Inquiry Topic:</strong></td>
-                <td style="padding: 6px 0; color: #701626; font-weight: bold;">${topic}</td>
+                <td style="padding: 6px 0; color: #701626; font-weight: bold;">${safeTopic}</td>
               </tr>
             </table>
             <div style="background: #ffffff; border: 1px solid #E6DEC9; border-radius: 12px; padding: 16px; margin-bottom: 18px;">
               <div style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em; color: #C5A059; font-weight: bold; margin-bottom: 6px;">Message Content</div>
-              <p style="margin: 0; color: #110B0E; font-size: 14px; line-height: 1.6; white-space: pre-wrap;">${message}</p>
+              <p style="margin: 0; color: #110B0E; font-size: 14px; line-height: 1.6; white-space: pre-wrap;">${safeMessage}</p>
             </div>
             <p style="font-size: 11px; color: #9E9399; margin: 0; text-align: center;">
               Submitted through the Azhai Boutique Concierge Form on ${new Date().toLocaleString('en-LK', { timeZone: 'Asia/Colombo' })}
@@ -327,6 +360,7 @@ export default function Contact() {
                       <option value="Wedding & Bridal Inquiries">Wedding & Bridal Trousseau Orders</option>
                       <option value="Order Tracking & Dispatch">Order Tracking & Dispatch Updates</option>
                       <option value="Exchange & Returns">14-Day Doorstep Exchange Request</option>
+                      <option value="Order Feedback & Review">Order Feedback & Review</option>
                       <option value="Other Inquiries">Other Inquiries</option>
                     </select>
                   </div>

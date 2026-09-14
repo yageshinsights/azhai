@@ -54,8 +54,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setLoading(false);
     });
 
+    // Listen to real-time store settings updates (e.g. Coming Soon mode toggle, announcement changes)
+    const settingsChannel = supabase
+      .channel('public:store_settings_changes')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'store_settings' },
+        () => {
+          useAdminStore.getState().fetchSupabaseData();
+        }
+      )
+      .subscribe();
+
     return () => {
       subscription.unsubscribe();
+      supabase.removeChannel(settingsChannel);
     };
   }, []);
 

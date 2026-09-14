@@ -342,12 +342,24 @@ export default function OrderDetail({ order, onBack }: OrderDetailProps) {
                         r.readAsDataURL(webpFile);
                       });
                     }
+                  } else if (file.type === 'application/pdf') {
+                    if (isSupabaseConfigured()) {
+                      const safeName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
+                      const fileName = `order-slips/${liveOrder.orderId}-${Date.now()}-${safeName}`;
+                      const { error } = await supabase.storage.from('product-images').upload(fileName, file, {
+                        contentType: 'application/pdf',
+                        upsert: true,
+                      });
+                      if (!error) {
+                        const { data } = supabase.storage.from('product-images').getPublicUrl(fileName);
+                        uploadedUrl = data.publicUrl;
+                      }
+                    }
+                    if (!uploadedUrl) {
+                      throw new Error('PDF upload requires cloud storage. Please send your deposit slip via WhatsApp.');
+                    }
                   } else {
-                    uploadedUrl = await new Promise<string>((resolve) => {
-                      const r = new FileReader();
-                      r.onload = () => resolve(r.result as string);
-                      r.readAsDataURL(file);
-                    });
+                    throw new Error('Unsupported file format. Please upload JPG, PNG, or PDF.');
                   }
 
                   setLocalSlipUrl(uploadedUrl);

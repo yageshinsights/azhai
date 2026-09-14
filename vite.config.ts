@@ -13,7 +13,15 @@ export default defineConfig(({ mode }) => {
       {
         name: 'brevo-dev-proxy',
         configureServer(server) {
-          server.middlewares.use('/api/send-email', (req, res) => {
+          server.middlewares.use('/api/send-email', (req, res, next) => {
+            if (req.method === 'OPTIONS') {
+              res.statusCode = 204;
+              res.setHeader('Access-Control-Allow-Origin', '*');
+              res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+              res.setHeader('Access-Control-Allow-Headers', 'Content-Type, api-key');
+              res.end();
+              return;
+            }
             if (req.method === 'POST') {
               let body = '';
               req.on('data', (chunk) => { body += chunk; });
@@ -45,6 +53,8 @@ export default defineConfig(({ mode }) => {
                   res.end(JSON.stringify({ error: err.message || 'Internal dev server proxy error' }));
                 }
               });
+            } else {
+              next();
             }
           });
         },
