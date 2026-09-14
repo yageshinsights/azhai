@@ -29,10 +29,41 @@ export interface SendEmailPayload {
 
 export async function sendBrevoEmail(payload: SendEmailPayload): Promise<{ success: boolean; error?: string }> {
   if (!BREVO_API_KEY) {
-    console.info(`[Brevo Email Simulated] To: ${payload.to.map(t => t.email).join(', ')} | Subject: "${payload.subject}"`);
+    console.warn(`[Brevo Email Simulation]: No VITE_BREVO_API_KEY found in .env. Email was NOT dispatched to inboxes. Target: ${payload.to.map(t => t.email).join(', ')} | Subject: "${payload.subject}"`);
     return { success: true };
   }
 
+  const emailBody = {
+    sender: { name: SENDER_NAME, email: SENDER_EMAIL },
+    to: payload.to,
+    subject: payload.subject,
+    htmlContent: payload.htmlContent,
+    replyTo: payload.replyTo || { name: SENDER_NAME, email: SENDER_EMAIL },
+  };
+
+  // 1. Try server-side proxy endpoint (/api/send-email) which bypasses browser CORS
+  try {
+    const proxyRes = await fetch('/api/send-email', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        apiKey: BREVO_API_KEY,
+        payload: emailBody,
+      }),
+    });
+
+    if (proxyRes.ok) {
+      console.log(`[Brevo Email Sent via Server Proxy]: Dispatched to ${payload.to.map(t => t.email).join(', ')}`);
+      return { success: true };
+    }
+
+    const errData = await proxyRes.json().catch(() => ({}));
+    console.warn('[Brevo Proxy Non-200]:', errData);
+  } catch (proxyErr) {
+    console.warn('[Brevo Proxy Unreachable, trying direct fetch]:', proxyErr);
+  }
+
+  // 2. Direct fallback to Brevo REST API
   try {
     const response = await fetch('https://api.brevo.com/v3/smtp/email', {
       method: 'POST',
@@ -40,25 +71,20 @@ export async function sendBrevoEmail(payload: SendEmailPayload): Promise<{ succe
         'Content-Type': 'application/json',
         'api-key': BREVO_API_KEY,
       },
-      body: JSON.stringify({
-        sender: { name: SENDER_NAME, email: SENDER_EMAIL },
-        to: payload.to,
-        subject: payload.subject,
-        htmlContent: payload.htmlContent,
-        replyTo: payload.replyTo || { name: SENDER_NAME, email: SENDER_EMAIL },
-      }),
+      body: JSON.stringify(emailBody),
     });
 
     if (!response.ok) {
       const errorData = await response.json();
-      console.error('[Brevo Email Error]:', errorData);
+      console.error('[Brevo Email Direct Error]:', errorData);
       return { success: false, error: errorData.message || 'Failed to send email' };
     }
 
+    console.log(`[Brevo Email Sent Direct]: Dispatched to ${payload.to.map(t => t.email).join(', ')}`);
     return { success: true };
   } catch (err: any) {
     console.error('[Brevo Fetch Exception]:', err);
-    return { success: false, error: err?.message || 'Network error' };
+    return { success: false, error: err?.message || 'Network/CORS error communicating with Brevo' };
   }
 }
 
