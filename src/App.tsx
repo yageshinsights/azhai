@@ -31,7 +31,9 @@ const ShippingPolicy = lazy(() => import('@/pages/ShippingPolicy'));
 const ReturnsExchanges = lazy(() => import('@/pages/ReturnsExchanges'));
 const PrivacyPolicy = lazy(() => import('@/pages/PrivacyPolicy'));
 const TermsConditions = lazy(() => import('@/pages/TermsConditions'));
+const ComingSoon = lazy(() => import('@/pages/ComingSoon'));
 const NotFound = lazy(() => import('@/pages/NotFound'));
+import { useAdminStore } from '@/store/admin';
 
 // ── Master Admin Portal Pages (Lazy Loaded) ──
 const AdminLogin = lazy(() => import('@/pages/admin/AdminLogin'));
@@ -96,6 +98,7 @@ function AnimatedRoutes() {
             <Route path="/returns-exchanges" element={<ReturnsExchanges />} />
             <Route path="/privacy-policy" element={<PrivacyPolicy />} />
             <Route path="/terms" element={<TermsConditions />} />
+            <Route path="/coming-soon" element={<ComingSoon />} />
 
             {/* ── MASTER ADMIN PORTAL ROUTES ── */}
             <Route path="/admin/login" element={<AdminLogin />} />
@@ -200,6 +203,20 @@ function AnimatedRoutes() {
 function MainLayout() {
   const location = useLocation();
   const isAdminRoute = location.pathname.startsWith('/admin');
+  const isComingSoonRoute = location.pathname === '/coming-soon';
+  const comingSoonEnabled = useAdminStore((s) => s.settings?.comingSoonMode?.enabled);
+  const isPreviewUnlocked = typeof window !== 'undefined' && sessionStorage.getItem('azhai_preview_unlocked') === 'true';
+  const showComingSoon = isComingSoonRoute || (comingSoonEnabled && !isAdminRoute && !isPreviewUnlocked);
+
+  if (showComingSoon && !isAdminRoute) {
+    return (
+      <main className="overflow-x-hidden min-h-screen bg-[#0F080A]">
+        <Suspense fallback={<AtelierLoader />}>
+          <ComingSoon />
+        </Suspense>
+      </main>
+    );
+  }
 
   return (
     <>

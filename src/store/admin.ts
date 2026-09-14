@@ -110,6 +110,15 @@ export interface BankAccount {
   displayOrder?: number;
 }
 
+export interface ComingSoonSettings {
+  enabled: boolean;
+  headline?: string;
+  subheadline?: string;
+  targetLaunchDate?: string;
+  secretPasscode?: string;
+  privilegeDiscountCode?: string;
+}
+
 export interface StoreSettings {
   storeName: string;
   tagline: string;
@@ -130,6 +139,7 @@ export interface StoreSettings {
   socialLinks: SocialLinksSettings;
   studio: StudioSettings;
   bankAccounts?: BankAccount[];
+  comingSoonMode?: ComingSoonSettings;
 }
 
 interface AdminState {
@@ -295,6 +305,14 @@ const INITIAL_SETTINGS: StoreSettings = {
       displayOrder: 2,
     },
   ],
+  comingSoonMode: {
+    enabled: false,
+    headline: 'Something Rare & Sacred Is Unfolding.',
+    subheadline: 'A sanctuary dedicated to the art of dressing women. Thoughtfully handcrafted silhouettes, timeless heirloom drapes, and bespoke made-to-measure creations designed to celebrate your individuality and grace.',
+    targetLaunchDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
+    secretPasscode: 'azhai2026',
+    privilegeDiscountCode: 'AZHAI-VIP10',
+  },
 };
 
 function getInitialSettings(): StoreSettings {

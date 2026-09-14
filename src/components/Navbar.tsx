@@ -12,7 +12,9 @@ import {
   Heart,
   LogOut,
   Sparkles,
-  Scissors
+  Scissors,
+  ChevronDown,
+  ChevronRight
 } from 'lucide-react';
 import { useCartStore } from '@/store/cart';
 import { useAuthStore } from '@/store/auth';
@@ -27,6 +29,8 @@ export default function Navbar() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [accountDropdownOpen, setAccountDropdownOpen] = useState(false);
+  const [collectionsDropdownOpen, setCollectionsDropdownOpen] = useState(false);
+  const [mobileCollectionsOpen, setMobileCollectionsOpen] = useState(false);
 
   const { totalItems, toggleCart } = useCartStore();
   const { user, isAuthenticated, logout, wishlist, orders } = useAuthStore();
@@ -55,6 +59,7 @@ export default function Navbar() {
   useEffect(() => {
     setMobileOpen(false);
     setAccountDropdownOpen(false);
+    setCollectionsDropdownOpen(false);
   }, [location]);
 
   const handleMobileLogout = () => {
@@ -122,47 +127,104 @@ export default function Navbar() {
 
             {/* Desktop Navigation Links */}
             <nav className="hidden lg:flex items-center gap-3.5 xl:gap-7 shrink-0">
-              {adminCategories && adminCategories.length > 0 ? (
-                adminCategories.slice(0, 4).map((cat) => (
-                  <Link
-                    key={cat.id || cat.slug}
-                    to={`/collections/${cat.slug}`}
-                    className={`text-[11px] xl:text-xs font-semibold uppercase tracking-[0.14em] xl:tracking-[0.22em] transition-all py-1.5 ${
-                      location.pathname === `/collections/${cat.slug}`
-                        ? 'text-[#701626] font-bold border-b-2 border-[#701626]'
-                        : 'text-[#110B0E]/80 hover:text-[#701626]'
-                    }`}
-                  >
-                    {cat.name}
-                  </Link>
-                ))
-              ) : (
+              
+              {/* 1. Collections (with Submenu) */}
+              <div
+                className="relative"
+                onMouseEnter={() => setCollectionsDropdownOpen(true)}
+                onMouseLeave={() => setCollectionsDropdownOpen(false)}
+              >
                 <Link
                   to="/collections"
-                  className={`text-[11px] xl:text-xs font-semibold uppercase tracking-[0.14em] xl:tracking-[0.22em] transition-all py-1.5 ${
-                    location.pathname === '/collections'
+                  className={`text-[11px] xl:text-xs font-semibold uppercase tracking-[0.14em] xl:tracking-[0.22em] transition-all py-1.5 flex items-center gap-1 cursor-pointer ${
+                    location.pathname.startsWith('/collections')
                       ? 'text-[#701626] font-bold border-b-2 border-[#701626]'
                       : 'text-[#110B0E]/80 hover:text-[#701626]'
                   }`}
                 >
-                  Collections
+                  <span>Collections</span>
+                  <ChevronDown
+                    className={`w-3 h-3 transition-transform duration-200 ${
+                      collectionsDropdownOpen ? 'rotate-180 text-[#701626]' : 'opacity-60'
+                    }`}
+                  />
                 </Link>
-              )}
 
-              {/* 5. Custom Tailoring */}
+                {/* Collections Submenu Dropdown */}
+                <AnimatePresence>
+                  {collectionsDropdownOpen && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 8, scale: 0.98 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, y: 6, scale: 0.98 }}
+                      transition={{ duration: 0.15 }}
+                      className="absolute top-full left-0 pt-2 w-60 z-50"
+                    >
+                      <div className="bg-white/95 backdrop-blur-xl rounded-2xl p-2 border border-[#C5A059]/40 shadow-[0_12px_30px_rgba(112,22,38,0.12)] space-y-1">
+                        {/* All Collections Link */}
+                        <Link
+                          to="/collections"
+                          onClick={() => setCollectionsDropdownOpen(false)}
+                          className={`flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold transition-all ${
+                            location.pathname === '/collections'
+                              ? 'bg-[#701626] text-white shadow-xs'
+                              : 'text-[#110B0E] hover:bg-[#F7F4EE] hover:text-[#701626]'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2">
+                            <Sparkles className={`w-3.5 h-3.5 ${location.pathname === '/collections' ? 'text-[#DFBF77]' : 'text-[#C5A059]'}`} />
+                            <span>All Collections</span>
+                          </div>
+                          <ChevronRight className="w-3.5 h-3.5 opacity-60" />
+                        </Link>
+
+                        {/* Submenu category items */}
+                        {adminCategories && adminCategories.length > 0 && (
+                          <>
+                            <div className="h-px bg-[#C5A059]/20 my-1" />
+                            <div className="max-h-60 overflow-y-auto space-y-0.5">
+                              {adminCategories.map((cat) => (
+                                <Link
+                                  key={cat.id || cat.slug}
+                                  to={`/collections/${cat.slug}`}
+                                  onClick={() => setCollectionsDropdownOpen(false)}
+                                  className={`flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium transition-all ${
+                                    location.pathname === `/collections/${cat.slug}`
+                                      ? 'bg-[#701626]/10 text-[#701626] font-bold'
+                                      : 'text-[#6D6268] hover:bg-[#F7F4EE] hover:text-[#701626]'
+                                  }`}
+                                >
+                                  <span>{cat.name}</span>
+                                  {cat.season && (
+                                    <span className="text-[9px] uppercase tracking-wider text-[#C5A059] bg-[#F7F4EE] px-1.5 py-0.5 rounded font-bold">
+                                      {cat.season}
+                                    </span>
+                                  )}
+                                </Link>
+                              ))}
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+
+              {/* 2. Custom Tailoring */}
               <Link
                 to="/tailoring"
-                className={`text-[11px] xl:text-xs font-semibold uppercase tracking-[0.14em] xl:tracking-[0.22em] transition-all py-1.5 flex items-center gap-1 ${
+                className={`text-[11px] xl:text-xs font-semibold uppercase tracking-[0.14em] xl:tracking-[0.22em] transition-all py-1.5 flex items-center gap-1.5 ${
                   location.pathname === '/tailoring' 
                     ? 'text-[#701626] font-bold border-b-2 border-[#701626]' 
-                    : 'text-[#701626] hover:text-[#8E1E34]'
+                    : 'text-[#110B0E]/80 hover:text-[#701626]'
                 }`}
               >
                 <Scissors className="w-3.5 h-3.5 text-[#C5A059]" />
                 <span>Custom Tailoring</span>
               </Link>
 
-              {/* 6. Our Story */}
+              {/* 3. Our Story */}
               <Link
                 to="/story"
                 className={`text-[11px] xl:text-xs font-semibold uppercase tracking-[0.14em] xl:tracking-[0.22em] transition-all py-1.5 ${
@@ -172,6 +234,18 @@ export default function Navbar() {
                 }`}
               >
                 Our Story
+              </Link>
+
+              {/* 4. Contact Us */}
+              <Link
+                to="/contact"
+                className={`text-[11px] xl:text-xs font-semibold uppercase tracking-[0.14em] xl:tracking-[0.22em] transition-all py-1.5 ${
+                  location.pathname === '/contact' 
+                    ? 'text-[#701626] font-bold border-b-2 border-[#701626]' 
+                    : 'text-[#110B0E]/80 hover:text-[#701626]'
+                }`}
+              >
+                Contact Us
               </Link>
 
             </nav>
@@ -390,42 +464,67 @@ export default function Navbar() {
                 {/* Simple Menu List */}
                 <div className="space-y-3 divide-y divide-[#C5A059]/20">
                   
-                  {/* Collections */}
-                  <div className="pt-2 space-y-3">
+                  {/* 1. Collections & Submenu */}
+                  <div className="pt-2 space-y-2">
                     <div className="flex items-center justify-between">
-                      <p className="text-[10px] uppercase tracking-[0.25em] text-[#701626] font-bold">The Collections</p>
                       <Link
                         to="/collections"
                         onClick={() => setMobileOpen(false)}
-                        className="text-[11px] text-[#C5A059] font-medium hover:underline"
+                        className="block text-xl font-display font-bold text-[#110B0E] hover:text-[#701626]"
                       >
-                        View All
+                        Collections
                       </Link>
+                      <button
+                        type="button"
+                        onClick={() => setMobileCollectionsOpen(!mobileCollectionsOpen)}
+                        className="p-1.5 text-[#701626] hover:bg-[#F7F4EE] rounded-xl transition-colors cursor-pointer"
+                        aria-label="Toggle collections sub-menu"
+                      >
+                        <ChevronDown
+                          className={`w-5 h-5 transition-transform duration-200 ${
+                            mobileCollectionsOpen ? 'rotate-180' : ''
+                          }`}
+                        />
+                      </button>
                     </div>
 
-                    {adminCategories && adminCategories.length > 0 ? (
-                      adminCategories.slice(0, 6).map((cat) => (
-                        <Link
-                          key={cat.id || cat.slug}
-                          to={`/collections/${cat.slug}`}
-                          onClick={() => setMobileOpen(false)}
-                          className="block text-lg font-display font-bold text-[#110B0E] hover:text-[#701626]"
+                    {/* Collapsible Submenu */}
+                    <AnimatePresence>
+                      {mobileCollectionsOpen && (
+                        <motion.div
+                          initial={{ opacity: 0, height: 0 }}
+                          animate={{ opacity: 1, height: 'auto' }}
+                          exit={{ opacity: 0, height: 0 }}
+                          transition={{ duration: 0.2 }}
+                          className="pl-3 border-l-2 border-[#C5A059]/40 space-y-2 pt-1 overflow-hidden"
                         >
-                          {cat.name}
-                        </Link>
-                      ))
-                    ) : (
-                      <Link
-                        to="/collections"
-                        onClick={() => setMobileOpen(false)}
-                        className="block text-lg font-display font-bold text-[#110B0E] hover:text-[#701626]"
-                      >
-                        Explore All Collections
-                      </Link>
-                    )}
+                          <Link
+                            to="/collections"
+                            onClick={() => setMobileOpen(false)}
+                            className="text-xs font-bold text-[#701626] py-1 flex items-center gap-1.5 hover:underline"
+                          >
+                            <Sparkles className="w-3.5 h-3.5 text-[#C5A059]" />
+                            <span>View All Collections</span>
+                          </Link>
+
+                          {adminCategories && adminCategories.length > 0 && (
+                            adminCategories.map((cat) => (
+                              <Link
+                                key={cat.id || cat.slug}
+                                to={`/collections/${cat.slug}`}
+                                onClick={() => setMobileOpen(false)}
+                                className="block text-sm text-[#110B0E]/80 hover:text-[#701626] py-1 font-medium"
+                              >
+                                {cat.name}
+                              </Link>
+                            ))
+                          )}
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
                   </div>
 
-                  {/* Bespoke Custom Tailoring */}
+                  {/* 2. Custom Tailoring */}
                   <div className="pt-4">
                     <Link
                       to="/tailoring"
@@ -445,13 +544,25 @@ export default function Navbar() {
                     </Link>
                   </div>
 
-                  {/* Our Story */}
+                  {/* 3. Our Story */}
                   <div className="pt-4">
                     <Link
                       to="/story"
-                      className="block py-2 font-display text-lg font-bold text-[#110B0E] hover:text-[#701626]"
+                      onClick={() => setMobileOpen(false)}
+                      className="block py-1 font-display text-xl font-bold text-[#110B0E] hover:text-[#701626]"
                     >
                       Our Story
+                    </Link>
+                  </div>
+
+                  {/* 4. Contact Us */}
+                  <div className="pt-4">
+                    <Link
+                      to="/contact"
+                      onClick={() => setMobileOpen(false)}
+                      className="block py-1 font-display text-xl font-bold text-[#110B0E] hover:text-[#701626]"
+                    >
+                      Contact Us
                     </Link>
                   </div>
 
