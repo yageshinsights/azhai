@@ -475,8 +475,14 @@ export const useAdminStore = create<AdminState>()(
           }
 
           // 6. Fetch Orders
-          const { data: dbOrders } = await supabase.from('orders').select('*, order_items(*)').order('created_at', { ascending: false });
-          if (dbOrders && dbOrders.length > 0) {
+          const { data: dbOrders, error: ordersFetchErr } = await supabase
+            .from('orders')
+            .select('*, order_items(*)')
+            .order('created_at', { ascending: false });
+
+          if (ordersFetchErr) {
+            console.error('[Supabase Fetch Orders Error]:', ordersFetchErr);
+          } else if (dbOrders) {
             const mappedOrders: AdminOrder[] = dbOrders.map((o: any) => ({
               orderId: o.order_code,
               items: (o.order_items || []).map((item: any) => ({
@@ -506,7 +512,18 @@ export const useAdminStore = create<AdminState>()(
               costPrice: o.cost_price ? Number(o.cost_price) : Math.round(Number(o.subtotal) * 0.45),
             }));
 
-            set({ orders: mappedOrders });
+            // Merge Supabase orders with local orders so nothing is lost
+            const currentOrders = get().orders || [];
+            const mergedMap = new Map<string, AdminOrder>();
+
+            mappedOrders.forEach((o) => mergedMap.set(o.orderId, o));
+            currentOrders.forEach((o) => {
+              if (!mergedMap.has(o.orderId)) {
+                mergedMap.set(o.orderId, o);
+              }
+            });
+
+            set({ orders: Array.from(mergedMap.values()) });
           }
 
           // 7. Fetch Tailoring Tables (Safe with fallback)

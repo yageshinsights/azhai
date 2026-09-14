@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { 
   Package, 
@@ -11,7 +11,8 @@ import {
   Printer, 
   MessageCircle,
   ExternalLink,
-  ChevronRight
+  ChevronRight,
+  RefreshCw
 } from 'lucide-react';
 import AdminLayout from '@/components/admin/AdminLayout';
 import { useAdminStore, type AdminOrder, type OrderStatus } from '@/store/admin';
@@ -19,12 +20,24 @@ import OrderDetailDrawer from '@/components/admin/OrderDetailDrawer';
 import PrintablePackingSlip from '@/components/admin/PrintablePackingSlip';
 
 export default function AdminOrders() {
-  const { orders } = useAdminStore();
+  const { orders, fetchSupabaseData } = useAdminStore();
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [paymentFilter, setPaymentFilter] = useState<string>('all');
   const [selectedOrder, setSelectedOrder] = useState<AdminOrder | null>(null);
   const [printOrder, setPrintOrder] = useState<AdminOrder | null>(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  // Auto-fetch latest orders from Supabase on mount
+  useEffect(() => {
+    fetchSupabaseData();
+  }, [fetchSupabaseData]);
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    await fetchSupabaseData();
+    setIsRefreshing(false);
+  };
 
   // Filtering Logic
   const filteredOrders = orders.filter((o) => {
@@ -74,6 +87,17 @@ export default function AdminOrders() {
             <h1 className="font-display text-3xl font-bold text-[#110B0E] pt-1">
               Customer Orders & Dispatch
             </h1>
+          </div>
+
+          <div>
+            <button
+              onClick={handleRefresh}
+              disabled={isRefreshing}
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-[#701626] hover:bg-[#8E1E34] text-white text-xs font-bold transition-all shadow-sm cursor-pointer disabled:opacity-50"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
+              <span>{isRefreshing ? 'Refreshing...' : 'Refresh Orders'}</span>
+            </button>
           </div>
         </div>
 

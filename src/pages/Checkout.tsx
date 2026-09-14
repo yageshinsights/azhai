@@ -245,18 +245,34 @@ export default function Checkout() {
           .single();
 
         if (insertedOrder && !orderErr) {
-          const orderItemsPayload = items.map((item) => ({
-            order_id: insertedOrder.id,
-            product_id: item.id,
-            product_name: item.name,
-            price: item.price,
-            image_url: item.image,
-            size: item.tailoring ? `Tailored: ${item.tailoring.sizeLabel}` : (item.size || 'M'),
-            custom_measurements: item.tailoring || null,
-            quantity: item.quantity,
-          }));
+          const orderItemsPayload = items.map((item) => {
+            // Foreign key to products table is optional; set null to safely allow custom/catalog items
+            const safeProductId = null;
 
-          await supabase.from('order_items').insert(orderItemsPayload);
+            let sizeLabel = item.size || 'M';
+            if (item.tailoring) {
+              sizeLabel = `Tailored (${item.tailoring.sizeLabel}) - ${item.tailoring.fabricName}`;
+            }
+
+            return {
+              order_id: insertedOrder.id,
+              product_id: safeProductId,
+              product_name: item.name,
+              price: typeof item.price === 'string' ? item.price : `LKR ${Number(item.price).toLocaleString()}`,
+              image_url: item.image || null,
+              size: sizeLabel,
+              quantity: Number(item.quantity) || 1,
+            };
+          });
+
+          const { error: itemsErr } = await supabase.from('order_items').insert(orderItemsPayload);
+          if (itemsErr) {
+            console.error('[Supabase Order Items Insert Error]:', itemsErr);
+          } else {
+            console.log('[Supabase Sync]: Order and items successfully saved to database');
+          }
+        } else if (orderErr) {
+          console.error('[Supabase Order Insert Error]:', orderErr);
         }
       } catch (err) {
         console.error('[Supabase Order Insert Error]:', err);
