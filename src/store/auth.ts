@@ -1,8 +1,9 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import type { PlacedOrder } from './cart';
-import { hashPassword, generateSessionToken, generateResetToken } from '@/lib/auth-utils';
+import { hashPassword, generateSessionToken, generateResetToken, isUUID } from '@/lib/auth-utils';
 import { useAdminStore } from './admin';
+import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 
 export interface User {
   id: string;
@@ -120,6 +121,107 @@ export const useAuthStore = create<AuthState>()(
 
       login: async (email, password) => {
         const normalizedEmail = email.trim().toLowerCase();
+
+        // 1. Attempt Supabase Auth login if configured
+        if (isSupabaseConfigured()) {
+          try {
+            const { data: sbData, error: sbError } = await supabase.auth.signInWithPassword({
+              email: normalizedEmail,
+              password,
+            });
+
+            if (sbData?.user && !sbError) {
+              const su = sbData.user;
+              // Fetch user profile from Supabase
+              const { data: profile } = await supabase
+                .from('profiles')
+                .select('*')
+                .eq('id', su.id)
+                .single();
+
+              // Fetch user addresses from Supabase
+              const { data: addresses } = await supabase
+                .from('addresses')
+                .select('*')
+                .eq('user_id', su.id);
+
+              // Fetch user wishlist from Supabase
+              const { data: wishlist } = await supabase
+                .from('wishlist')
+                .select('product_slug')
+                .eq('user_id', su.id);
+
+              const userObj: User = {
+                id: su.id,
+                fullName: profile?.full_name || su.user_metadata?.full_name || 'Valued Patron',
+                email: normalizedEmail,
+                phone: profile?.phone || su.user_metadata?.phone || '',
+                avatar: profile?.avatar_url || undefined,
+                dob: profile?.dob || undefined,
+                createdAt: profile?.created_at || su.created_at || new Date().toISOString(),
+                lastLoginAt: new Date().toISOString(),
+                preferences: profile?.preferences || { newsletter: true, smsAlerts: true },
+              };
+
+              const mappedAddresses: SavedAddress[] = (addresses || []).map((a: any) => ({
+                id: a.id,
+                label: a.label || 'Home',
+                fullName: a.full_name,
+                phone: a.phone,
+                address: a.address,
+                city: a.city,
+                district: a.district,
+                postalCode: a.postal_code || undefined,
+                isDefault: !!a.is_default,
+              }));
+
+              const mappedWishlist: string[] = (wishlist || []).map((w: any) => w.product_slug);
+
+              const sessionToken = sbData.session?.access_token || generateSessionToken();
+
+              // Merge into local accounts list
+              const existingAccounts = get().accounts;
+              const accountIdx = existingAccounts.findIndex((a) => a.email.toLowerCase() === normalizedEmail);
+              const passwordHash = await hashPassword(password);
+
+              let updatedAccounts = [...existingAccounts];
+              if (accountIdx >= 0) {
+                updatedAccounts[accountIdx] = {
+                  ...updatedAccounts[accountIdx],
+                  user: userObj,
+                  addresses: mappedAddresses.length > 0 ? mappedAddresses : updatedAccounts[accountIdx].addresses,
+                  wishlist: mappedWishlist.length > 0 ? mappedWishlist : updatedAccounts[accountIdx].wishlist,
+                  passwordHash,
+                };
+              } else {
+                updatedAccounts.push({
+                  email: normalizedEmail,
+                  passwordHash,
+                  user: userObj,
+                  addresses: mappedAddresses,
+                  orders: [],
+                  wishlist: mappedWishlist,
+                  familyProfiles: [],
+                });
+              }
+
+              set({
+                user: userObj,
+                isAuthenticated: true,
+                addresses: mappedAddresses,
+                wishlist: mappedWishlist,
+                sessionToken,
+                accounts: updatedAccounts,
+              });
+
+              return { success: true };
+            }
+          } catch (sbEx) {
+            console.warn('[Supabase Login Notice]: Falling back to local vault', sbEx);
+          }
+        }
+
+        // 2. Fallback to local accounts simulation
         const accounts = get().accounts;
         const account = accounts.find((a) => a.email.toLowerCase() === normalizedEmail);
 
@@ -160,9 +262,39 @@ export const useAuthStore = create<AuthState>()(
           return { success: false, error: 'An account with this email already exists. Please log in.' };
         }
 
+        // 1. Register with Supabase Auth if configured
+        let supabaseUserId: string | null = null;
+        if (isSupabaseConfigured()) {
+          try {
+            const { data: sbData, error: sbErr } = await supabase.auth.signUp({
+              email: normalizedEmail,
+              password: data.password,
+              options: {
+                data: {
+                  full_name: data.fullName.trim(),
+                  phone: data.phone.trim(),
+                },
+              },
+            });
+
+            if (sbData?.user) {
+              supabaseUserId = sbData.user.id;
+            } else if (sbErr) {
+              console.warn('[Supabase Auth Signup Notice]:', sbErr.message);
+              if (sbErr.message.toLowerCase().includes('already registered')) {
+                return { success: false, error: 'An account with this email already exists. Please log in.' };
+              }
+            }
+          } catch (sbEx) {
+            console.warn('[Supabase Signup Exception]:', sbEx);
+          }
+        }
+
         const passwordHash = await hashPassword(data.password);
+        const newUserId = supabaseUserId || (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function' ? crypto.randomUUID() : 'usr_' + Math.random().toString(36).substring(2, 9));
+
         const newUser: User = {
-          id: 'usr_' + Math.random().toString(36).substring(2, 9),
+          id: newUserId,
           fullName: data.fullName.trim(),
           email: normalizedEmail,
           phone: data.phone.trim(),
@@ -212,6 +344,11 @@ export const useAuthStore = create<AuthState>()(
       },
 
       logout: () => {
+        // Sign out of Supabase session if configured
+        if (isSupabaseConfigured()) {
+          supabase.auth.signOut().catch(() => {});
+        }
+
         // Sync current state back to accounts array before clearing
         const currentUser = get().user;
         if (currentUser) {
@@ -248,6 +385,7 @@ export const useAuthStore = create<AuthState>()(
           });
         }
       },
+
 
       requestPasswordReset: async (email) => {
         const normalizedEmail = email.trim().toLowerCase();
@@ -316,6 +454,28 @@ export const useAuthStore = create<AuthState>()(
           console.warn('[Admin CRM Profile Sync Warning]:', err);
         }
 
+        // Synchronize to Supabase profiles table if configured
+        if (isSupabaseConfigured() && isUUID(updatedUser.id)) {
+          (async () => {
+            try {
+              const dbPayload: any = {
+                full_name: updatedUser.fullName,
+                phone: updatedUser.phone || '',
+              };
+              if (updatedUser.avatar !== undefined) dbPayload.avatar_url = updatedUser.avatar;
+              if (updatedUser.dob !== undefined) dbPayload.dob = updatedUser.dob;
+              if (updatedUser.preferences !== undefined) dbPayload.preferences = updatedUser.preferences;
+
+              await supabase
+                .from('profiles')
+                .update(dbPayload)
+                .eq('id', updatedUser.id);
+            } catch (err) {
+              console.warn('[Supabase Profile Sync Exception]:', err);
+            }
+          })();
+        }
+
         return { success: true };
       },
 
@@ -374,9 +534,13 @@ export const useAuthStore = create<AuthState>()(
       },
 
       addAddress: (address) => {
+        const addrId = (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function')
+          ? crypto.randomUUID()
+          : 'addr_' + Math.random().toString(36).substring(2, 9);
+
         const newAddr: SavedAddress = {
           ...address,
-          id: 'addr_' + Math.random().toString(36).substring(2, 9),
+          id: addrId,
         };
 
         set((state) => {
@@ -396,6 +560,37 @@ export const useAuthStore = create<AuthState>()(
               : state.accounts,
           };
         });
+
+        const currentUser = get().user;
+        if (isSupabaseConfigured() && currentUser && isUUID(currentUser.id)) {
+          (async () => {
+            try {
+              if (address.isDefault) {
+                await supabase
+                  .from('addresses')
+                  .update({ is_default: false })
+                  .eq('user_id', currentUser.id);
+              }
+
+              await supabase
+                .from('addresses')
+                .insert({
+                  id: isUUID(addrId) ? addrId : undefined,
+                  user_id: currentUser.id,
+                  label: address.label || 'Home',
+                  full_name: address.fullName,
+                  phone: address.phone,
+                  address: address.address,
+                  city: address.city,
+                  district: address.district,
+                  postal_code: address.postalCode || null,
+                  is_default: !!address.isDefault,
+                });
+            } catch (err) {
+              console.warn('[Supabase Insert Address Exception]:', err);
+            }
+          })();
+        }
       },
 
       updateAddress: (id, updates) => {
@@ -416,6 +611,38 @@ export const useAuthStore = create<AuthState>()(
               : state.accounts,
           };
         });
+
+        const currentUser = get().user;
+        if (isSupabaseConfigured() && currentUser && isUUID(currentUser.id) && isUUID(id)) {
+          (async () => {
+            try {
+              if (updates.isDefault) {
+                await supabase
+                  .from('addresses')
+                  .update({ is_default: false })
+                  .eq('user_id', currentUser.id);
+              }
+
+              const dbPayload: any = {};
+              if (updates.label !== undefined) dbPayload.label = updates.label;
+              if (updates.fullName !== undefined) dbPayload.full_name = updates.fullName;
+              if (updates.phone !== undefined) dbPayload.phone = updates.phone;
+              if (updates.address !== undefined) dbPayload.address = updates.address;
+              if (updates.city !== undefined) dbPayload.city = updates.city;
+              if (updates.district !== undefined) dbPayload.district = updates.district;
+              if (updates.postalCode !== undefined) dbPayload.postal_code = updates.postalCode;
+              if (updates.isDefault !== undefined) dbPayload.is_default = updates.isDefault;
+
+              await supabase
+                .from('addresses')
+                .update(dbPayload)
+                .eq('id', id)
+                .eq('user_id', currentUser.id);
+            } catch (err) {
+              console.warn('[Supabase Update Address Exception]:', err);
+            }
+          })();
+        }
       },
 
       removeAddress: (id) => {
@@ -433,6 +660,21 @@ export const useAuthStore = create<AuthState>()(
               : state.accounts,
           };
         });
+
+        const currentUser = get().user;
+        if (isSupabaseConfigured() && currentUser && isUUID(currentUser.id) && isUUID(id)) {
+          (async () => {
+            try {
+              await supabase
+                .from('addresses')
+                .delete()
+                .eq('id', id)
+                .eq('user_id', currentUser.id);
+            } catch (err) {
+              console.warn('[Supabase Delete Address Exception]:', err);
+            }
+          })();
+        }
       },
 
       setDefaultAddress: (id) => {
@@ -453,6 +695,28 @@ export const useAuthStore = create<AuthState>()(
               : state.accounts,
           };
         });
+
+        const currentUser = get().user;
+        if (isSupabaseConfigured() && currentUser && isUUID(currentUser.id)) {
+          (async () => {
+            try {
+              await supabase
+                .from('addresses')
+                .update({ is_default: false })
+                .eq('user_id', currentUser.id);
+
+              if (isUUID(id)) {
+                await supabase
+                  .from('addresses')
+                  .update({ is_default: true })
+                  .eq('id', id)
+                  .eq('user_id', currentUser.id);
+              }
+            } catch (err) {
+              console.warn('[Supabase Set Default Address Exception]:', err);
+            }
+          })();
+        }
       },
 
       addFamilyProfile: (profile) => {
@@ -559,56 +823,105 @@ export const useAuthStore = create<AuthState>()(
       },
 
       toggleWishlist: (slug) => {
-        set((state) => {
-          const exists = state.wishlist.includes(slug);
-          const updated = exists ? state.wishlist.filter((s) => s !== slug) : [...state.wishlist, slug];
-          const currentUser = state.user;
-          return { 
-            wishlist: updated,
-            accounts: currentUser
-              ? state.accounts.map((acc) =>
-                  acc.email.toLowerCase() === currentUser.email.toLowerCase()
-                    ? { ...acc, wishlist: updated }
-                    : acc
-                )
-              : state.accounts,
-          };
-        });
+        const exists = get().wishlist.includes(slug);
+        const updated = exists ? get().wishlist.filter((s) => s !== slug) : [...get().wishlist, slug];
+        const currentUser = get().user;
+
+        set((state) => ({ 
+          wishlist: updated,
+          accounts: currentUser
+            ? state.accounts.map((acc) =>
+                acc.email.toLowerCase() === currentUser.email.toLowerCase()
+                  ? { ...acc, wishlist: updated }
+                  : acc
+              )
+            : state.accounts,
+        }));
+
+        if (isSupabaseConfigured() && currentUser && isUUID(currentUser.id)) {
+          (async () => {
+            try {
+              if (exists) {
+                await supabase
+                  .from('wishlist')
+                  .delete()
+                  .eq('user_id', currentUser.id)
+                  .eq('product_slug', slug);
+              } else {
+                await supabase
+                  .from('wishlist')
+                  .insert({
+                    user_id: currentUser.id,
+                    product_slug: slug,
+                  });
+              }
+            } catch (err) {
+              console.warn('[Supabase Wishlist Sync Exception]:', err);
+            }
+          })();
+        }
       },
 
       addToWishlist: (slug) => {
-        set((state) => {
-          if (state.wishlist.includes(slug)) return state;
-          const updated = [...state.wishlist, slug];
-          const currentUser = state.user;
-          return { 
-            wishlist: updated,
-            accounts: currentUser
-              ? state.accounts.map((acc) =>
-                  acc.email.toLowerCase() === currentUser.email.toLowerCase()
-                    ? { ...acc, wishlist: updated }
-                    : acc
-                )
-              : state.accounts,
-          };
-        });
+        if (get().wishlist.includes(slug)) return;
+        const updated = [...get().wishlist, slug];
+        const currentUser = get().user;
+
+        set((state) => ({ 
+          wishlist: updated,
+          accounts: currentUser
+            ? state.accounts.map((acc) =>
+                acc.email.toLowerCase() === currentUser.email.toLowerCase()
+                  ? { ...acc, wishlist: updated }
+                  : acc
+              )
+            : state.accounts,
+        }));
+
+        if (isSupabaseConfigured() && currentUser && isUUID(currentUser.id)) {
+          (async () => {
+            try {
+              await supabase
+                .from('wishlist')
+                .insert({
+                  user_id: currentUser.id,
+                  product_slug: slug,
+                });
+            } catch (err) {
+              console.warn('[Supabase Add Wishlist Exception]:', err);
+            }
+          })();
+        }
       },
 
       removeFromWishlist: (slug) => {
-        set((state) => {
-          const updated = state.wishlist.filter((s) => s !== slug);
-          const currentUser = state.user;
-          return { 
-            wishlist: updated,
-            accounts: currentUser
-              ? state.accounts.map((acc) =>
-                  acc.email.toLowerCase() === currentUser.email.toLowerCase()
-                    ? { ...acc, wishlist: updated }
-                    : acc
-                )
-              : state.accounts,
-          };
-        });
+        const updated = get().wishlist.filter((s) => s !== slug);
+        const currentUser = get().user;
+
+        set((state) => ({ 
+          wishlist: updated,
+          accounts: currentUser
+            ? state.accounts.map((acc) =>
+                acc.email.toLowerCase() === currentUser.email.toLowerCase()
+                  ? { ...acc, wishlist: updated }
+                  : acc
+              )
+            : state.accounts,
+        }));
+
+        if (isSupabaseConfigured() && currentUser && isUUID(currentUser.id)) {
+          (async () => {
+            try {
+              await supabase
+                .from('wishlist')
+                .delete()
+                .eq('user_id', currentUser.id)
+                .eq('product_slug', slug);
+            } catch (err) {
+              console.warn('[Supabase Remove Wishlist Exception]:', err);
+            }
+          })();
+        }
       },
 
       cleanWishlist: (validSlugs) => {

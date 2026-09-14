@@ -27,7 +27,7 @@ export function getWhatsAppUrl(
   let digits = customDigits;
   if (!digits && typeof window !== 'undefined') {
     try {
-      const stored = localStorage.getItem('azhai-admin-store');
+      const stored = localStorage.getItem('azhai-admin-store-v3') || localStorage.getItem('azhai-admin-store');
       if (stored) {
         const parsed = JSON.parse(stored);
         const raw = parsed?.state?.settings?.whatsappNumber;

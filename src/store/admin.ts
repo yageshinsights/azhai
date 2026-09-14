@@ -634,7 +634,7 @@ export const useAdminStore = create<AdminState>()(
 
         // Synchronize updated order status, tracking, and notes to localStorage auth store
         try {
-          const authKey = 'azhai-auth-store';
+          const authKey = 'azhai-auth-store-v2';
           const storedAuth = localStorage.getItem(authKey);
           if (storedAuth) {
             const parsed = JSON.parse(storedAuth);
@@ -1481,7 +1481,7 @@ export const useAdminStore = create<AdminState>()(
 
         // Also update in auth store local storage if patron has order stored
         try {
-          const authKey = 'azhai-auth-store';
+          const authKey = 'azhai-auth-store-v2';
           const raw = localStorage.getItem(authKey);
           if (raw) {
             const parsed = JSON.parse(raw);
@@ -1544,7 +1544,7 @@ export const useAdminStore = create<AdminState>()(
         }
 
         try {
-          const authKey = 'azhai-auth-store';
+          const authKey = 'azhai-auth-store-v2';
           const raw = localStorage.getItem(authKey);
           if (raw) {
             const parsed = JSON.parse(raw);
