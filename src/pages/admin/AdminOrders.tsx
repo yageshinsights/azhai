@@ -116,7 +116,8 @@ export default function AdminOrders() {
                 className="w-full px-4 py-2.5 rounded-2xl bg-[#F7F4EE]/70 border border-[#C5A059]/30 text-xs text-[#110B0E] font-medium focus:outline-none focus:border-[#701626]"
               >
                 <option value="all">All Payment Types</option>
-                <option value="paid">Paid (Card / Bank)</option>
+                <option value="paid">Paid (Card / Bank Verified)</option>
+                <option value="pending_bank">Pending Bank Slip Verification</option>
                 <option value="pending_cod">Pending COD Collection</option>
                 <option value="refunded">Refunded</option>
               </select>
@@ -131,7 +132,7 @@ export default function AdminOrders() {
               <thead className="bg-[#701626] text-[#F3E8CE] uppercase tracking-wider text-[10px]">
                 <tr>
                   <th className="p-4 whitespace-nowrap min-w-[110px]">Order ID</th>
-                  <th className="p-4 whitespace-nowrap min-w-[160px]">Patron & Contact</th>
+                  <th className="p-4 whitespace-nowrap min-w-[160px]">Patron &amp; Contact</th>
                   <th className="p-4 whitespace-nowrap min-w-[130px]">Destination</th>
                   <th className="p-4 whitespace-nowrap min-w-[120px]">Items</th>
                   <th className="p-4 whitespace-nowrap min-w-[130px]">Total Amount</th>
@@ -173,14 +174,34 @@ export default function AdminOrders() {
 
                       <td className="p-4 font-display text-sm font-bold text-[#701626] whitespace-nowrap">
                         LKR {order.total.toLocaleString()}
-                        <p className="text-[9.5px] font-sans font-bold text-gray-500 pt-0.5 uppercase">
-                          {order.paymentStatus === 'paid' ? 'Paid' : 'COD Due'}
-                        </p>
+                        <div className="pt-1">
+                          {order.paymentStatus === 'paid' ? (
+                            <span className="text-[9.5px] font-sans font-bold text-emerald-800 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded uppercase">
+                              Paid
+                            </span>
+                          ) : order.paymentStatus === 'pending_bank' ? (
+                            order.bankTransferDetails?.slipUrl ? (
+                              <span className="text-[9.5px] font-sans font-bold text-blue-800 bg-blue-50 border border-blue-200 px-1.5 py-0.5 rounded inline-flex items-center gap-1">
+                                <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
+                                Slip Attached
+                              </span>
+                            ) : (
+                              <span className="text-[9.5px] font-sans font-bold text-amber-800 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded inline-flex items-center gap-1">
+                                <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                                Bank Slip Pending
+                              </span>
+                            )
+                          ) : (
+                            <span className="text-[9.5px] font-sans font-bold text-orange-800 bg-orange-50 border border-orange-200 px-1.5 py-0.5 rounded uppercase">
+                              COD Due
+                            </span>
+                          )}
+                        </div>
                       </td>
 
                       <td className="p-4 whitespace-nowrap">
                         <span className="bg-[#F7F4EE] px-2.5 py-1 rounded-lg font-bold text-[#110B0E] text-[10.5px] border border-[#C5A059]/20 inline-block whitespace-nowrap">
-                          {order.courierPartner || 'PromptX'}
+                          {order.courierPartner || 'Sri Lanka Post'}
                         </span>
                         {order.trackingNumber && (
                           <p className="text-[9.5px] text-[#6D6268] pt-0.5 font-mono">

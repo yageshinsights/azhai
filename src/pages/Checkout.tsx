@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { useLocation, useNavigate, Link } from 'react-router-dom';
 import { 
@@ -14,14 +14,23 @@ import {
   Tag, 
   Lock,
   Building2,
-  Calendar
+  Calendar,
+  Copy
 } from 'lucide-react';
 import { useCartStore } from '@/store/cart';
 import { useAuthStore } from '@/store/auth';
 import { useAdminStore } from '@/store/admin';
+import BankBadge from '@/components/BankBadge';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import { sendBrevoEmail, buildOrderConfirmationHtml, buildAdminOrderAlertHtml } from '@/lib/brevo';
 import { startPayHerePayment } from '@/lib/payhere';
+import SEOHead from '@/components/SEOHead';
+import { 
+  calculateSLPostShipping, 
+  estimateCartWeight, 
+  SL_POST_MAX_COD_VALUE_LKR,
+  generateSLPostTrackingNumber
+} from '@/lib/slpost-calculator';
 
 const SRI_LANKA_DISTRICTS = [
   'Colombo',
@@ -59,6 +68,7 @@ export default function Checkout() {
   const { items, clearCart, setLastOrder, totalPrice } = useCartStore();
   const { user, isAuthenticated, addresses, addAddress, addOrder } = useAuthStore();
   const settings = useAdminStore((s) => s.settings);
+  const adminProducts = useAdminStore((s) => s.products);
 
   // Default address pre-fill
   const defaultAddr = addresses.find((a) => a.isDefault) || addresses[0];
@@ -72,25 +82,92 @@ export default function Checkout() {
   const [district, setDistrict] = useState(defaultAddr?.district || 'Colombo');
   const [postalCode, setPostalCode] = useState(defaultAddr?.postalCode || '');
   const [deliveryMethod, setDeliveryMethod] = useState<'standard' | 'express'>('standard');
-  const [paymentMethod, setPaymentMethod] = useState<'cod' | 'card' | 'koko' | 'bank'>(
+  const [paymentMethod, setPaymentMethod] = useState<'cod' | 'card' | 'bank'>(
     settings.enableCOD ? 'cod' : 'card'
   );
+
+  // Auto-switch away from COD if admin disables it
+  useEffect(() => {
+    if (!settings.enableCOD && paymentMethod === 'cod') {
+      setPaymentMethod('card');
+    }
+  }, [settings.enableCOD, paymentMethod]);
+
   const [deliveryNotes, setDeliveryNotes] = useState('');
   const [saveAddressToAccount, setSaveAddressToAccount] = useState(false);
   const [selectedAddrId, setSelectedAddrId] = useState<string>(defaultAddr?.id || '');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  const activeBankAccounts = (settings.bankAccounts || []).filter((b) => b.isActive !== false);
+  const [selectedBankId, setSelectedBankId] = useState<string>(activeBankAccounts[0]?.id || '');
+  const [copiedBankAcc, setCopiedBankAcc] = useState(false);
+
+  useEffect(() => {
+    if (!selectedBankId && activeBankAccounts.length > 0) {
+      setSelectedBankId(activeBankAccounts[0].id);
+    }
+  }, [activeBankAccounts, selectedBankId]);
+
+  const chosenBank = activeBankAccounts.find((b) => b.id === selectedBankId) || activeBankAccounts[0];
+
+  const handleCopyAccount = (accNum: string) => {
+    navigator.clipboard.writeText(accNum);
+    setCopiedBankAcc(true);
+    setTimeout(() => setCopiedBankAcc(false), 2000);
+  };
+
   const rawTotal = totalPrice();
   const discount = state.discountAmount || 0;
 
-  // Dynamic Shipping Fee
-  const isFreeStandard = rawTotal >= settings.freeShippingThreshold;
-  const isFreeShipping = isFreeStandard;
-  const shippingFee = deliveryMethod === 'express' 
-    ? settings.expressShippingFee 
-    : (isFreeShipping ? 0 : settings.standardShippingFee);
+  // Exact Cumulative Cart Weight (Garments + Atelier Keepsake Packaging)
+  const cartWeightGrams = estimateCartWeight(
+    items.map((item) => {
+      const matched = adminProducts?.find(
+        (p) => String(p.id) === String(item.id) || p.name === item.name
+      );
+      return {
+        name: item.name,
+        quantity: item.quantity,
+        weightGrams: matched?.weightGrams,
+      };
+    })
+  );
+
+  const isWithinZone = district === 'Colombo' || district === 'Gampaha' || district === 'Kalutara';
+
+  // Sri Lanka Post Dynamic Calculation Engine
+  const slPostCalc = calculateSLPostShipping({
+    weightGrams: cartWeightGrams,
+    orderValueLKR: Math.max(0, rawTotal - discount),
+    isCOD: paymentMethod === 'cod',
+    isWithinZone,
+  });
+
+  const isFreeDeliveryEligible = Boolean(
+    settings.freeShippingThreshold &&
+    settings.freeShippingThreshold > 0 &&
+    (rawTotal - discount) >= settings.freeShippingThreshold
+  );
+
+  // Dynamic Shipping Fee (Standard SL Post weight-based vs COD formula + Free shipping threshold)
+  let shippingFee = 0;
+  if (deliveryMethod === 'express') {
+    shippingFee = settings.expressShippingFee || 850;
+  } else {
+    if (isFreeDeliveryEligible) {
+      // Complimentary shipping: Postage is free; for COD, only the SL Post Money Order handling fee applies
+      shippingFee = paymentMethod === 'cod' ? (slPostCalc.moneyOrderCommission + slPostCalc.serviceCharge) : 0;
+    } else {
+      if (paymentMethod === 'cod') {
+        shippingFee = slPostCalc.totalShippingFee;
+      } else {
+        shippingFee = slPostCalc.postageFee;
+      }
+    }
+  }
 
   const finalTotal = Math.max(0, rawTotal - discount + shippingFee);
+  const maxAllowedCOD = Math.min(settings.maxCODAmount || SL_POST_MAX_COD_VALUE_LKR, SL_POST_MAX_COD_VALUE_LKR);
 
   const handleSelectSavedAddress = (id: string) => {
     setSelectedAddrId(id);
@@ -160,8 +237,9 @@ export default function Checkout() {
             cost_price: Math.round(orderData.subtotal * 0.45),
             delivery_method: orderData.deliveryMethod,
             payment_method: orderData.paymentMethod,
-            payment_status: paymentMethod === 'card' ? 'paid' : 'pending_cod',
-            status: 'confirmed',
+            payment_status: paymentMethod === 'card' ? 'paid' : paymentMethod === 'bank' ? 'pending_bank' : 'pending_cod',
+            bank_transfer_details: orderData.bankTransferDetails || null,
+            status: paymentMethod === 'bank' ? 'pending' : 'confirmed',
           })
           .select()
           .single();
@@ -194,6 +272,7 @@ export default function Checkout() {
         items: items.map((i) => ({ name: i.name, size: i.size, quantity: i.quantity, price: i.price, tailoring: i.tailoring })),
         deliveryMethod: orderData.deliveryMethod,
         paymentMethod: orderData.paymentMethod,
+        bankTransferDetails: orderData.bankTransferDetails,
       });
 
       await sendBrevoEmail({
@@ -241,6 +320,19 @@ export default function Checkout() {
       return;
     }
 
+    // Strict COD Limit Validation (SL Post official max limit is LKR 100,000)
+    const maxAllowedCOD = Math.min(settings.maxCODAmount || 100000, SL_POST_MAX_COD_VALUE_LKR);
+    if (paymentMethod === 'cod') {
+      if (!settings.enableCOD) {
+        alert('Cash on Delivery (COD) is currently unavailable. Please select another payment method.');
+        return;
+      }
+      if (finalTotal > maxAllowedCOD) {
+        alert(`Cash on Delivery is limited to orders up to LKR ${maxAllowedCOD.toLocaleString()} under Sri Lanka Post COD regulations. Please select Credit/Debit Card or Bank Deposit.`);
+        return;
+      }
+    }
+
     setIsSubmitting(true);
 
     const generatedOrderId = `AZH-${Math.floor(10000 + Math.random() * 90000)}`;
@@ -263,15 +355,43 @@ export default function Checkout() {
         district,
         postalCode,
       },
-      deliveryMethod: deliveryMethod === 'express' ? 'Express Colombo Same-Day' : 'Island-wide Standard Courier (1-3 Days)',
+      courierPartner: 'Sri Lanka Post',
+      trackingNumber: generateSLPostTrackingNumber(),
+      weightGrams: cartWeightGrams,
+      deliveryMethod: deliveryMethod === 'express' ? 'Express Colombo Same-Day' : 'Sri Lanka Post Speed Post Courier',
+      shippingBreakdown: {
+        weightGrams: cartWeightGrams,
+        postage: slPostCalc.postageFee,
+        moCommission: slPostCalc.moneyOrderCommission,
+        serviceCharge: slPostCalc.serviceCharge,
+        isCOD: paymentMethod === 'cod',
+        totalShippingFee: shippingFee,
+      },
       paymentMethod:
         paymentMethod === 'cod'
           ? 'Cash on Delivery (COD)'
           : paymentMethod === 'card'
           ? 'Credit / Debit Card (Visa/Mastercard)'
-          : paymentMethod === 'koko'
-          ? 'Koko / Mintpay (3x Installments)'
           : 'Direct Bank Deposit',
+      paymentStatus:
+        paymentMethod === 'card'
+          ? 'paid'
+          : paymentMethod === 'bank'
+          ? 'pending_bank'
+          : 'pending_cod',
+      status: paymentMethod === 'bank' ? 'pending' : 'confirmed',
+      bankTransferDetails:
+        paymentMethod === 'bank' && chosenBank
+          ? {
+              bankId: chosenBank.id,
+              bankName: chosenBank.bankName,
+              accountNumber: chosenBank.accountNumber,
+              accountName: chosenBank.accountName,
+              branchName: chosenBank.branchName,
+              bankLogo: chosenBank.bankLogo,
+              swiftCode: chosenBank.swiftCode,
+            }
+          : undefined,
       placedAt: new Date().toISOString(),
     };
 
@@ -283,8 +403,9 @@ export default function Checkout() {
           orderId: generatedOrderId,
           itemsName: items.map((i) => `${i.name} (${i.size || 'M'})`).join(', '),
           amount: finalTotal,
+          currency: 'LKR',
           firstName: nameParts[0] || fullName,
-          lastName: nameParts.slice(1).join(' ') || 'Patron',
+          lastName: nameParts.slice(1).join(' ') || 'Customer',
           email,
           phone,
           address,
@@ -299,20 +420,21 @@ export default function Checkout() {
         () => {
           setIsSubmitting(false);
         },
-        // PayHere Error Handler
+        // PayHere Error Handler - DO NOT mark as paid on error
         (err) => {
-          alert(`Payment Error: ${err}. Placing order with pending verification.`);
-          finalizeOrderPlacement(orderData);
+          setIsSubmitting(false);
+          alert(`Online payment was not completed: ${err || 'Transaction was cancelled or declined'}. Please try again or select Cash on Delivery / Direct Bank Deposit.`);
         }
       );
     } else {
-      // COD, Bank Deposit, Koko
+      // COD, Bank Deposit
       finalizeOrderPlacement(orderData);
     }
   };
 
   return (
     <div className="min-h-screen bg-[#FCFBF8] pt-24 pb-20 text-[#110B0E]">
+      <SEOHead title="Secure Checkout" noindex={true} />
       <div className="max-w-7xl mx-auto px-4 sm:px-8">
         
         {/* Top Header */}
@@ -563,13 +685,34 @@ export default function Checkout() {
                         className="text-[#701626] focus:ring-[#701626]"
                       />
                       <div>
-                        <p className="text-xs font-bold text-[#110B0E]">Island-wide Standard Courier (PromptX / Koombiyo)</p>
-                        <p className="text-[11px] text-[#6D6268]">Delivered in 1–3 business days across Sri Lanka</p>
+                        <p className="text-xs font-bold text-[#110B0E] flex items-center gap-1.5">
+                          <span>Sri Lanka Post (Speed Post Courier)</span>
+                          <span className="text-[9.5px] font-bold text-[#701626] bg-[#701626]/10 px-2 py-0.5 rounded-full border border-[#C5A059]/30">
+                            Official Courier
+                          </span>
+                        </p>
+                        <p className="text-[11px] text-[#6D6268]">
+                          {isWithinZone ? '24-hour delivery (Western Province)' : '48-hour delivery (Island-wide 25 Districts)'} · Estimated parcel weight: {cartWeightGrams}g
+                        </p>
                       </div>
                     </div>
-                    <span className="text-xs font-bold text-[#701626]">
-                      {isFreeStandard ? 'FREE' : 'LKR 450'}
-                    </span>
+                    <div className="text-right">
+                      <span className="text-xs font-bold text-[#701626] block">
+                        {shippingFee === 0 ? (
+                          <span className="text-emerald-700 font-bold uppercase tracking-wider text-[11px]">Free</span>
+                        ) : (
+                          `LKR ${shippingFee.toLocaleString()}`
+                        )}
+                      </span>
+                      {isFreeDeliveryEligible && paymentMethod !== 'cod' && (
+                        <span className="text-[9.5px] text-emerald-700 font-semibold block">Free Shipping</span>
+                      )}
+                      {paymentMethod === 'cod' && (
+                        <span className="text-[9.5px] text-[#6D6268] block">
+                          {isFreeDeliveryEligible ? 'MO & handling only' : 'includes COD & MO'}
+                        </span>
+                      )}
+                    </div>
                   </label>
 
                   <label className={`flex items-center justify-between p-4 rounded-2xl border cursor-pointer transition-all ${
@@ -590,7 +733,9 @@ export default function Checkout() {
                         <p className="text-[11px] text-[#6D6268]">Same-day or next morning delivery for Colombo 01-15</p>
                       </div>
                     </div>
-                    <span className="text-xs font-bold text-[#701626]">LKR 850</span>
+                    <span className="text-xs font-bold text-[#701626]">
+                      LKR {(settings.expressShippingFee || 850).toLocaleString()}
+                    </span>
                   </label>
                 </div>
               </div>
@@ -607,7 +752,7 @@ export default function Checkout() {
                   {/* COD (with live admin settings toggle & ceiling limit) */}
                   {settings.enableCOD ? (
                     <label className={`p-4 rounded-2xl border cursor-pointer transition-all flex flex-col justify-between space-y-2 ${
-                      finalTotal > settings.maxCODAmount
+                      finalTotal > maxAllowedCOD
                         ? 'opacity-50 cursor-not-allowed bg-gray-50 border-gray-200'
                         : paymentMethod === 'cod'
                         ? 'border-[#701626] bg-[#701626]/5 ring-1 ring-[#701626]'
@@ -621,16 +766,16 @@ export default function Checkout() {
                         <input
                           type="radio"
                           name="payment"
-                          disabled={finalTotal > settings.maxCODAmount}
-                          checked={paymentMethod === 'cod' && finalTotal <= settings.maxCODAmount}
+                          disabled={finalTotal > maxAllowedCOD}
+                          checked={paymentMethod === 'cod' && finalTotal <= maxAllowedCOD}
                           onChange={() => setPaymentMethod('cod')}
                           className="text-[#701626]"
                         />
                       </div>
                       <p className="text-[11px] text-[#6D6268]">
-                        {finalTotal > settings.maxCODAmount
-                          ? `COD limited to orders up to LKR ${settings.maxCODAmount.toLocaleString()}. Please use Card/Bank.`
-                          : 'Pay with cash to courier upon doorstep parcel handover across Sri Lanka.'}
+                        {finalTotal > maxAllowedCOD
+                          ? `COD limited to orders up to LKR ${maxAllowedCOD.toLocaleString()} (Sri Lanka Post max limit). Please use Card/Bank.`
+                          : 'Official SL Post COD. Delivering post office phones you prior to delivery so cash can be ready.'}
                       </p>
                     </label>
                   ) : (
@@ -667,30 +812,6 @@ export default function Checkout() {
                     <p className="text-[11px] text-[#6D6268]">Secure PayHere gateway for all Sri Lankan & international cards.</p>
                   </label>
 
-                  {/* Koko / MintPay */}
-                  <label className={`p-4 rounded-2xl border cursor-pointer transition-all flex flex-col justify-between space-y-2 ${
-                    paymentMethod === 'koko'
-                      ? 'border-[#701626] bg-[#701626]/5 ring-1 ring-[#701626]'
-                      : 'border-[#C5A059]/30 bg-[#FCFBF8] hover:border-[#C5A059]'
-                  }`}>
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <Sparkles className="w-4 h-4 text-[#C5A059]" />
-                        <span className="text-xs font-bold text-[#110B0E]">Koko (Pay in 3x)</span>
-                      </div>
-                      <input
-                        type="radio"
-                        name="payment"
-                        checked={paymentMethod === 'koko'}
-                        onChange={() => setPaymentMethod('koko')}
-                        className="text-[#701626]"
-                      />
-                    </div>
-                    <p className="text-[11px] text-[#6D6268]">
-                      Pay <strong>3x LKR {Math.round(finalTotal / 3).toLocaleString('en-US')}</strong> interest-free with Koko.
-                    </p>
-                  </label>
-
                   {/* Direct Bank Deposit */}
                   <label className={`p-4 rounded-2xl border cursor-pointer transition-all flex flex-col justify-between space-y-2 ${
                     paymentMethod === 'bank'
@@ -700,7 +821,7 @@ export default function Checkout() {
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <Building2 className="w-4 h-4 text-[#701626]" />
-                        <span className="text-xs font-bold text-[#110B0E]">Bank Transfer</span>
+                        <span className="text-xs font-bold text-[#110B0E]">Direct Bank Transfer</span>
                       </div>
                       <input
                         type="radio"
@@ -710,10 +831,145 @@ export default function Checkout() {
                         className="text-[#701626]"
                       />
                     </div>
-                    <p className="text-[11px] text-[#6D6268]">Commercial Bank of Ceylon / HNB online deposit.</p>
+                    <p className="text-[11px] text-[#6D6268]">
+                      Direct online transfer / CDM deposit across Sri Lankan banks.
+                    </p>
                   </label>
 
                 </div>
+
+                {/* Expandable Bank Transfer Selection & Details */}
+                {paymentMethod === 'bank' && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="p-5 sm:p-6 rounded-2xl bg-[#FCFBF8] border border-[#C5A059]/40 space-y-4"
+                  >
+                    <div className="flex items-center justify-between border-b border-[#C5A059]/20 pb-3">
+                      <div className="flex items-center gap-2">
+                        <Building2 className="w-4 h-4 text-[#701626]" />
+                        <h4 className="text-xs font-bold text-[#110B0E] uppercase tracking-wider">
+                          Select Boutique Deposit Bank
+                        </h4>
+                      </div>
+                      <span className="text-[10px] text-[#701626] font-bold bg-[#701626]/8 px-2.5 py-0.5 rounded-full">
+                        {activeBankAccounts.length} Official Accounts
+                      </span>
+                    </div>
+
+                    {activeBankAccounts.length > 0 ? (
+                      <div className="space-y-4">
+                        {/* Bank Option Chips */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                          {activeBankAccounts.map((b) => (
+                            <button
+                              key={b.id}
+                              type="button"
+                              onClick={() => setSelectedBankId(b.id)}
+                              className={`p-3 rounded-xl border text-left transition-all flex items-center gap-3 cursor-pointer ${
+                                chosenBank?.id === b.id
+                                  ? 'border-[#701626] bg-white ring-1 ring-[#701626] shadow-xs'
+                                  : 'border-[#C5A059]/25 bg-white/70 hover:border-[#701626]/40'
+                              }`}
+                            >
+                              <BankBadge bankName={b.bankName} bankLogo={b.bankLogo} size="sm" />
+                              <div className="min-w-0 flex-1">
+                                <p className="text-xs font-bold text-[#110B0E] truncate">{b.bankName}</p>
+                                <p className="text-[10px] text-[#6D6268] truncate">{b.branchName}</p>
+                              </div>
+                              <div className={`w-4 h-4 rounded-full border flex items-center justify-center shrink-0 ${
+                                chosenBank?.id === b.id
+                                  ? 'border-[#701626] bg-[#701626]'
+                                  : 'border-gray-300 bg-white'
+                              }`}>
+                                {chosenBank?.id === b.id && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+
+                        {/* Selected Account Full Breakdown */}
+                        {chosenBank && (
+                          <div className="p-4 sm:p-5 rounded-xl bg-white border border-[#DFBF77] shadow-xs space-y-3">
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-gray-100">
+                              <div className="flex items-center gap-2.5">
+                                <BankBadge bankName={chosenBank.bankName} bankLogo={chosenBank.bankLogo} size="md" />
+                                <div>
+                                  <p className="text-xs font-bold text-[#110B0E]">{chosenBank.bankName}</p>
+                                  <p className="text-[10.5px] text-[#6D6268]">{chosenBank.branchName}</p>
+                                </div>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => handleCopyAccount(chosenBank.accountNumber)}
+                                className="px-3 py-1.5 rounded-xl bg-[#701626]/8 hover:bg-[#701626]/15 text-[#701626] text-xs font-bold flex items-center gap-1.5 transition-colors self-start sm:self-auto cursor-pointer"
+                              >
+                                {copiedBankAcc ? (
+                                  <>
+                                    <Check className="w-3.5 h-3.5 text-emerald-600" />
+                                    <span className="text-emerald-700">Copied to Clipboard!</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <Copy className="w-3.5 h-3.5" />
+                                    <span>Copy Account #</span>
+                                  </>
+                                )}
+                              </button>
+                            </div>
+
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                              <div>
+                                <span className="text-[10px] text-[#6D6268] uppercase font-bold tracking-wider block">
+                                  Account Number
+                                </span>
+                                <span className="font-mono text-base font-bold text-[#701626] tracking-wider block">
+                                  {chosenBank.accountNumber}
+                                </span>
+                              </div>
+                              <div>
+                                <span className="text-[10px] text-[#6D6268] uppercase font-bold tracking-wider block">
+                                  Beneficiary Name
+                                </span>
+                                <span className="font-bold text-[#110B0E] block text-xs">
+                                  {chosenBank.accountName}
+                                </span>
+                              </div>
+                            </div>
+
+                            {chosenBank.swiftCode && (
+                              <p className="text-[10.5px] font-mono text-gray-500">
+                                SWIFT / BIC Code: <strong className="text-gray-700">{chosenBank.swiftCode}</strong>
+                              </p>
+                            )}
+
+                            {chosenBank.instructions && (
+                              <p className="text-[11px] text-[#6D6268] italic bg-[#FCFBF8] p-2.5 rounded-xl border border-[#C5A059]/25">
+                                ℹ️ {chosenBank.instructions}
+                              </p>
+                            )}
+
+                            <div className="p-3.5 rounded-xl bg-amber-50/80 border border-amber-200 text-[11px] text-amber-900 space-y-1.5">
+                              <p className="font-bold flex items-center gap-1.5 text-amber-950">
+                                <Sparkles className="w-3.5 h-3.5 text-amber-600" />
+                                <span>Order Reservation & Deposit Steps:</span>
+                              </p>
+                              <ol className="list-decimal list-inside space-y-1 text-amber-900 leading-relaxed text-[11px]">
+                                <li>Click <strong>"Place Order"</strong> below to reserve your creations.</li>
+                                <li>Transfer <strong>LKR {finalTotal.toLocaleString('en-US')}</strong> to the account above quoting your name or order code.</li>
+                                <li>Upload your receipt slip on the confirmation screen or WhatsApp it directly to Preethi for instant clearance.</li>
+                              </ol>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <p className="text-xs text-[#6D6268] text-center py-2">
+                        Bank details will be displayed upon order confirmation.
+                      </p>
+                    )}
+                  </motion.div>
+                )}
               </div>
 
               {/* Submit Button */}
@@ -730,7 +986,11 @@ export default function Checkout() {
                     <span>Processing Your Order...</span>
                   </span>
                 ) : (
-                  <span>Place Order · LKR {finalTotal.toLocaleString('en-US')}</span>
+                  <span>
+                    {paymentMethod === 'bank'
+                      ? `Place Order & Transfer · LKR ${finalTotal.toLocaleString('en-US')}`
+                      : `Place Order · LKR ${finalTotal.toLocaleString('en-US')}`}
+                  </span>
                 )}
               </motion.button>
 
@@ -802,11 +1062,38 @@ export default function Checkout() {
                   </div>
                 )}
 
-                <div className="flex justify-between text-[#6D6268]">
-                  <span>Delivery ({deliveryMethod === 'express' ? 'Colombo Express' : 'Island-wide'})</span>
-                  <span className="text-[#701626] font-semibold">
-                    {shippingFee === 0 ? 'FREE' : `LKR ${shippingFee}`}
-                  </span>
+                <div className="space-y-1">
+                  <div className="flex justify-between text-[#6D6268]">
+                    <span>
+                      {deliveryMethod === 'express'
+                        ? 'Colombo Express Priority'
+                        : paymentMethod === 'cod'
+                        ? `SL Post Speed Post COD (${cartWeightGrams}g)`
+                        : `SL Post Speed Post (${cartWeightGrams}g)`}
+                    </span>
+                    <span className="text-[#701626] font-semibold">
+                      {shippingFee === 0 ? (
+                        <span className="text-emerald-700 font-bold uppercase tracking-wider text-[11px]">Free</span>
+                      ) : (
+                        `LKR ${shippingFee.toLocaleString('en-US')}`
+                      )}
+                    </span>
+                  </div>
+                  {deliveryMethod === 'standard' && isFreeDeliveryEligible && (
+                    <p className="text-[10px] text-emerald-700 text-right font-medium">
+                      ✨ Complimentary Island-wide Delivery (Orders over LKR {(settings.freeShippingThreshold || 15000).toLocaleString()})
+                    </p>
+                  )}
+                  {deliveryMethod === 'standard' && !isFreeDeliveryEligible && paymentMethod === 'cod' && (
+                    <p className="text-[10px] text-[#6D6268]/80 text-right">
+                      Postage LKR {slPostCalc.postageFee} + Money Order LKR {slPostCalc.moneyOrderCommission} + Fee LKR 50
+                    </p>
+                  )}
+                  {deliveryMethod === 'standard' && !isFreeDeliveryEligible && paymentMethod !== 'cod' && (
+                    <p className="text-[10px] text-emerald-700 text-right font-medium">
+                      Exact weight-based SL Post Courier postage
+                    </p>
+                  )}
                 </div>
 
                 <div className="flex justify-between items-baseline pt-3 border-t border-[#C5A059]/30">

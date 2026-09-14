@@ -1,11 +1,11 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { User as UserIcon, Mail, Phone, Calendar, Check, Sparkles, ShieldCheck } from 'lucide-react';
+import { User as UserIcon, Mail, Phone, Calendar, Check, Sparkles, ShieldCheck, Crown, Award, Gift } from 'lucide-react';
 import { useAuthStore } from '@/store/auth';
 import { validatePhone } from '@/lib/auth-utils';
 
 export default function Profile() {
-  const { user, updateProfile } = useAuthStore();
+  const { user, updateProfile, orders } = useAuthStore();
 
   const [fullName, setFullName] = useState(user?.fullName || '');
   const [phone, setPhone] = useState(user?.phone || '');
@@ -14,7 +14,26 @@ export default function Profile() {
   const [savedMessage, setSavedMessage] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  useEffect(() => {
+    if (user) {
+      setFullName(user.fullName);
+      setPhone(user.phone || '');
+      setDob(user.dob || '');
+      setNewsletter(user.preferences.newsletter ?? true);
+    }
+  }, [user]);
+
   if (!user) return null;
+
+  // Calculate Patron VIP Loyalty Tier
+  const totalSpent = orders.reduce((sum, o) => {
+    const amt = typeof o.total === 'number' ? o.total : 0;
+    return sum + amt;
+  }, 0);
+
+  const vipTier = totalSpent >= 60000 ? 'Gold Patron' : totalSpent >= 25000 ? 'Silver Patron' : 'Standard Patron';
+  const nextTierTarget = totalSpent >= 60000 ? 60000 : totalSpent >= 25000 ? 60000 : 25000;
+  const progressPercent = Math.min(100, Math.round((totalSpent / nextTierTarget) * 100));
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -65,8 +84,14 @@ export default function Profile() {
               <h2 className="font-display text-2xl sm:text-3xl font-bold text-[#110B0E]">
                 {user.fullName}
               </h2>
-              <span className="bg-[#C5A059]/20 text-[#701626] text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full border border-[#C5A059]/30">
-                VIP Patron
+              <span className={`text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full border ${
+                vipTier === 'Gold Patron'
+                  ? 'bg-[#701626] text-[#DFBF77] border-[#C5A059]/40'
+                  : vipTier === 'Silver Patron'
+                  ? 'bg-[#F7F4EE] text-[#701626] border-[#C5A059]/30'
+                  : 'bg-gray-100 text-gray-700 border-gray-200'
+              }`}>
+                {vipTier}
               </span>
             </div>
             <p className="text-xs text-[#6D6268] font-light">{user.email}</p>
@@ -80,6 +105,58 @@ export default function Profile() {
           <ShieldCheck className="w-4 h-4 text-emerald-600" />
           <span>Verified Boutique Member</span>
         </div>
+      </div>
+
+      {/* ── PATRON VIP LOYALTY JOURNEY CARD ── */}
+      <div className="bg-gradient-to-br from-[#110B0E] to-[#2B0810] text-white rounded-3xl p-6 sm:p-8 border border-[#C5A059]/40 shadow-xl space-y-5">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-white/10">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-[#701626] border border-[#DFBF77]/40 flex items-center justify-center text-[#DFBF77]">
+              {vipTier === 'Gold Patron' ? <Crown className="w-5 h-5" /> : <Award className="w-5 h-5" />}
+            </div>
+            <div>
+              <span className="text-[9px] uppercase tracking-[0.25em] text-[#DFBF77] font-bold">
+                Azhai Atelier Privileges
+              </span>
+              <h3 className="font-display text-xl font-bold text-white">
+                {vipTier} Status
+              </h3>
+            </div>
+          </div>
+
+          <div className="text-left sm:text-right">
+            <span className="text-[10px] text-white/60 block">Lifetime Wardrobe Value</span>
+            <span className="font-display text-lg font-bold text-[#DFBF77]">
+              LKR {totalSpent.toLocaleString('en-US')}
+            </span>
+          </div>
+        </div>
+
+        {/* Progress Bar towards Next Tier */}
+        {vipTier !== 'Gold Patron' ? (
+          <div className="space-y-2">
+            <div className="flex justify-between text-xs font-medium text-white/80">
+              <span>Progress to {vipTier === 'Standard Patron' ? 'Silver Patron (LKR 25,000)' : 'Gold Patron (LKR 60,000)'}</span>
+              <span className="text-[#DFBF77] font-bold">{progressPercent}%</span>
+            </div>
+            <div className="w-full h-2.5 rounded-full bg-white/10 overflow-hidden p-0.5 border border-white/10">
+              <div
+                className="h-full rounded-full bg-gradient-to-r from-[#C5A059] to-[#DFBF77] transition-all duration-700"
+                style={{ width: `${progressPercent}%` }}
+              />
+            </div>
+            <p className="text-[10.5px] text-white/60 pt-1">
+              Add LKR {(nextTierTarget - totalSpent).toLocaleString('en-US')} more to unlock {vipTier === 'Standard Patron' ? 'Free Express Delivery across Sri Lanka' : '48-hr Early Festive Access & VIP WhatsApp Stylist'}.
+            </p>
+          </div>
+        ) : (
+          <div className="p-3.5 bg-white/5 rounded-2xl border border-[#DFBF77]/30 flex items-center gap-3">
+            <Sparkles className="w-5 h-5 text-[#DFBF77] shrink-0" />
+            <p className="text-xs text-white/90">
+              <strong>Supreme Gold Tier Achieved!</strong> You enjoy Unlimited Free Island-Wide Delivery, Early Lookbook Drops, and Dedicated Master Tailor Fittings.
+            </p>
+          </div>
+        )}
       </div>
 
       {/* Edit Form Card */}

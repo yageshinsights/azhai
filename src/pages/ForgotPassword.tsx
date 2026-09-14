@@ -5,6 +5,7 @@ import { Mail, KeyRound, ArrowLeft, Sparkles, CheckCircle2, ShieldCheck } from '
 import { useAuthStore } from '@/store/auth';
 import { validateEmail } from '@/lib/auth-utils';
 import { sendBrevoEmail, buildPasswordResetEmailHtml } from '@/lib/brevo';
+import SEOHead from '@/components/SEOHead';
 
 export default function ForgotPassword() {
   const [email, setEmail] = useState('');
@@ -52,6 +53,7 @@ export default function ForgotPassword() {
 
   return (
     <div className="min-h-screen pt-28 pb-16 px-4 sm:px-6 flex items-center justify-center relative overflow-hidden bg-[#FCFBF8]">
+      <SEOHead title="Account Recovery | Azhai Boutique Colombo" noindex={true} />
       {/* Background Decorative Gradient Orbs */}
       <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[550px] h-[550px] bg-gradient-to-br from-[#701626]/10 via-[#C5A059]/10 to-transparent rounded-full blur-3xl pointer-events-none" />
 

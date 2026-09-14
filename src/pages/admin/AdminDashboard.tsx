@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { 
@@ -38,13 +38,74 @@ export default function AdminDashboard() {
 
   const averageOrderValue = orders.length > 0 ? Math.round(grossRevenue / orders.length) : 0;
 
-  // Category sales breakdown simulation
-  const categorySales = [
-    { name: 'Kurties', count: 18, revenue: 261000, percent: 45, color: 'bg-[#701626]' },
-    { name: 'Sarees', count: 8, revenue: 360000, percent: 62, color: 'bg-[#C5A059]' },
-    { name: 'Shawls', count: 12, revenue: 222000, percent: 38, color: 'bg-rose-700' },
-    { name: 'Tops', count: 15, revenue: 142500, percent: 25, color: 'bg-amber-600' },
-  ];
+  // Category sales breakdown computed dynamically from actual orders
+  const categorySales = useMemo(() => {
+    const categoryTotals: Record<string, { count: number; revenue: number }> = {
+      Kurties: { count: 0, revenue: 0 },
+      Sarees: { count: 0, revenue: 0 },
+      Shawls: { count: 0, revenue: 0 },
+      Tops: { count: 0, revenue: 0 },
+    };
+
+    orders
+      .filter((o) => o.status !== 'cancelled')
+      .forEach((order) => {
+        order.items?.forEach((item) => {
+          const matchedProd = products.find(
+            (p) => String(p.id) === String(item.id) || p.name.toLowerCase() === item.name.toLowerCase()
+          );
+          let catName = matchedProd?.categories?.[0]?.name;
+          if (!catName) {
+            const lowerName = item.name.toLowerCase();
+            if (lowerName.includes('kurti')) catName = 'Kurties';
+            else if (lowerName.includes('saree')) catName = 'Sarees';
+            else if (lowerName.includes('shawl') || lowerName.includes('stole') || lowerName.includes('pashmina')) catName = 'Shawls';
+            else if (lowerName.includes('top')) catName = 'Tops';
+            else if (lowerName.includes('tailor') || lowerName.includes('bespoke')) catName = 'Bespoke Tailoring';
+            else catName = 'Other Handlooms';
+          }
+
+          if (!categoryTotals[catName]) {
+            categoryTotals[catName] = { count: 0, revenue: 0 };
+          }
+
+          const unitPrice = typeof item.price === 'number' 
+            ? item.price 
+            : Number(String(item.price).replace(/[^0-9.]/g, '')) || 0;
+          const qty = item.quantity || 1;
+
+          categoryTotals[catName].count += qty;
+          categoryTotals[catName].revenue += unitPrice * qty;
+        });
+      });
+
+    const totalRev = Object.values(categoryTotals).reduce((sum, c) => sum + c.revenue, 0) || 1;
+    const colorPalette = ['bg-[#701626]', 'bg-[#C5A059]', 'bg-rose-700', 'bg-amber-600', 'bg-emerald-700', 'bg-purple-700'];
+
+    return Object.entries(categoryTotals)
+      .map(([name, data], idx) => ({
+        name,
+        count: data.count,
+        revenue: data.revenue,
+        percent: Math.min(100, Math.round((data.revenue / totalRev) * 100)),
+        color: colorPalette[idx % colorPalette.length],
+      }))
+      .sort((a, b) => b.revenue - a.revenue);
+  }, [orders, products]);
+
+  // Dynamic Low Stock alerts (stock <= 5)
+  const lowStockProducts = useMemo(() => {
+    return products
+      .filter((p) => {
+        const qty = p.stockQuantity ?? p.quantity ?? 15;
+        return qty <= 5;
+      })
+      .sort((a, b) => (a.stockQuantity ?? a.quantity ?? 0) - (b.stockQuantity ?? b.quantity ?? 0));
+  }, [products]);
+
+  const currentMonthYear = useMemo(() => {
+    return new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+  }, []);
 
   return (
     <AdminLayout>
@@ -163,9 +224,11 @@ export default function AdminDashboard() {
             <div className="flex items-center justify-between">
               <div>
                 <h3 className="font-display text-xl font-bold text-[#110B0E]">Category Revenue Breakdown</h3>
-                <p className="text-xs text-[#6D6268] font-light">Performance across the 4 core edits.</p>
+                <p className="text-xs text-[#6D6268] font-light">Performance across core atelier edits.</p>
               </div>
-              <span className="text-xs font-bold text-[#701626]">August 2026</span>
+              <span className="text-xs font-bold text-[#701626] bg-[#701626]/5 px-3 py-1 rounded-full border border-[#701626]/10">
+                {currentMonthYear}
+              </span>
             </div>
 
             <div className="space-y-4 pt-2">
@@ -190,44 +253,48 @@ export default function AdminDashboard() {
 
           {/* Quick Stock & Low Inventory (1 col) */}
           <div className="bg-white rounded-3xl p-6 sm:p-8 border border-[#C5A059]/30 shadow-sm space-y-4">
-            <div className="flex items-center gap-2 text-rose-700">
-              <AlertTriangle className="w-5 h-5" />
-              <h3 className="font-display text-lg font-bold text-[#110B0E]">Low Stock Alerts</h3>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 text-rose-700">
+                <AlertTriangle className="w-5 h-5" />
+                <h3 className="font-display text-lg font-bold text-[#110B0E]">Low Stock Alerts</h3>
+              </div>
+              <span className="text-[11px] font-bold text-[#6D6268]">
+                {lowStockProducts.length} alert{lowStockProducts.length === 1 ? '' : 's'}
+              </span>
             </div>
             <p className="text-xs text-[#6D6268] font-light">
               Pieces with limited handloom meterage remaining in studio:
             </p>
 
-            <div className="divide-y divide-[#C5A059]/15 pt-1">
-              <div className="py-2.5 flex items-center justify-between text-xs">
-                <div>
-                  <p className="font-bold text-[#110B0E]">Maroon Corset Kurti</p>
-                  <p className="text-[10.5px] text-[#6D6268]">Size: M · Kurties</p>
+            <div className="divide-y divide-[#C5A059]/15 pt-1 max-h-[220px] overflow-y-auto">
+              {lowStockProducts.length === 0 ? (
+                <div className="py-6 text-center space-y-2">
+                  <CheckCircle2 className="w-8 h-8 text-emerald-600 mx-auto opacity-70" />
+                  <p className="text-xs text-[#6D6268] font-medium">All atelier pieces currently have healthy inventory levels.</p>
                 </div>
-                <span className="text-[10px] bg-rose-50 text-rose-700 font-bold px-2 py-0.5 rounded-full border border-rose-200">
-                  2 left
-                </span>
-              </div>
-
-              <div className="py-2.5 flex items-center justify-between text-xs">
-                <div>
-                  <p className="font-bold text-[#110B0E]">Cashmere Pashmina Stole</p>
-                  <p className="text-[10.5px] text-[#6D6268]">Free Size · Shawls</p>
-                </div>
-                <span className="text-[10px] bg-rose-50 text-rose-700 font-bold px-2 py-0.5 rounded-full border border-rose-200">
-                  1 left
-                </span>
-              </div>
-
-              <div className="py-2.5 flex items-center justify-between text-xs">
-                <div>
-                  <p className="font-bold text-[#110B0E]">Kalamkari Silk Crop Top</p>
-                  <p className="text-[10.5px] text-[#6D6268]">Size: S · Tops</p>
-                </div>
-                <span className="text-[10px] bg-amber-50 text-amber-700 font-bold px-2 py-0.5 rounded-full border border-amber-200">
-                  3 left
-                </span>
-              </div>
+              ) : (
+                lowStockProducts.slice(0, 5).map((prod) => {
+                  const qty = prod.stockQuantity ?? prod.quantity ?? 0;
+                  const catLabel = prod.categories?.[0]?.name || prod.occasion || 'Handloom Edit';
+                  return (
+                    <div key={prod.id} className="py-2.5 flex items-center justify-between text-xs">
+                      <div className="pr-2 truncate">
+                        <p className="font-bold text-[#110B0E] truncate">{prod.name}</p>
+                        <p className="text-[10.5px] text-[#6D6268]">{catLabel}</p>
+                      </div>
+                      <span
+                        className={`text-[10px] font-bold px-2 py-0.5 rounded-full border whitespace-nowrap ${
+                          qty <= 1
+                            ? 'bg-rose-50 text-rose-700 border-rose-200'
+                            : 'bg-amber-50 text-amber-700 border-amber-200'
+                        }`}
+                      >
+                        {qty} left
+                      </span>
+                    </div>
+                  );
+                })
+              )}
             </div>
 
             <Link
@@ -268,7 +335,14 @@ export default function AdminDashboard() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#C5A059]/15">
-                {orders.slice(0, 5).map((order, idx) => (
+                {orders.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="p-8 text-center text-xs text-[#6D6268]">
+                      No orders placed yet. Fresh boutique orders will appear here automatically.
+                    </td>
+                  </tr>
+                ) : (
+                  orders.slice(0, 5).map((order, idx) => (
                   <tr
                     key={order.orderId}
                     className={`hover:bg-[#F7F4EE]/50 transition-colors ${
@@ -321,7 +395,7 @@ export default function AdminDashboard() {
                       </button>
                     </td>
                   </tr>
-                ))}
+                )))}
               </tbody>
             </table>
           </div>

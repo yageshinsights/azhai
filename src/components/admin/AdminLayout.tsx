@@ -23,6 +23,7 @@ import {
   Scissors
 } from 'lucide-react';
 import { useAdminStore } from '@/store/admin';
+import SEOHead from '@/components/SEOHead';
 
 interface AdminLayoutProps {
   children: ReactNode;
@@ -57,6 +58,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
 
   return (
     <div className="min-h-screen bg-[#F7F4EE]/60 text-[#110B0E] flex flex-col lg:flex-row">
+      <SEOHead title="Atelier Admin Portal" noindex={true} />
       {/* ── DESKTOP SIDEBAR ── */}
       <aside className="hidden lg:flex w-72 bg-[#110B0E] text-white flex-col justify-between p-6 border-r border-[#C5A059]/30 fixed inset-y-0 left-0 z-30 shadow-2xl">
         <div className="space-y-6">

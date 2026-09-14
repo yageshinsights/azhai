@@ -15,17 +15,19 @@ import {
   Scissors,
   Truck,
   ShieldCheck,
-  HelpCircle
+  HelpCircle,
+  Scale
 } from 'lucide-react';
 import { useAdminStore } from '@/store/admin';
 import type { Product } from '@/lib/data';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import { compressToWebP } from '@/lib/image-compressor';
+import { calculateSLPostPostage } from '@/lib/slpost-calculator';
 
 interface ProductModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (productData: any) => void;
+  onSave: (product: Omit<Product, 'id'>) => void;
   initialProduct?: Product | null;
 }
 
@@ -36,7 +38,7 @@ interface ImageItem {
 }
 
 export default function ProductModal({ isOpen, onClose, onSave, initialProduct }: ProductModalProps) {
-  const { categories, tags, products } = useAdminStore();
+  const { categories, tags, products: allExistingProducts } = useAdminStore();
 
   // Tab Navigation within Modal
   const [activeTab, setActiveTab] = useState<'details' | 'media' | 'specs' | 'seo'>('details');
@@ -46,6 +48,8 @@ export default function ProductModal({ isOpen, onClose, onSave, initialProduct }
   const [categorySlug, setCategorySlug] = useState('kurties');
   const [priceLKR, setPriceLKR] = useState('14500');
   const [regularPriceLKR, setRegularPriceLKR] = useState('16500');
+  const [stockQuantity, setStockQuantity] = useState<string>('15');
+  const [weightGrams, setWeightGrams] = useState<string>('400');
   const [tag, setTag] = useState('New Festive Drop');
   const [sizes, setSizes] = useState<string[]>(['XS', 'S', 'M', 'L', 'XL']);
 
@@ -77,6 +81,8 @@ export default function ProductModal({ isOpen, onClose, onSave, initialProduct }
       setCategorySlug(initialProduct.categories[0]?.slug || 'kurties');
       setPriceLKR(initialProduct.price.replace(/[^0-9]/g, ''));
       setRegularPriceLKR(initialProduct.regularPrice.replace(/[^0-9]/g, ''));
+      setStockQuantity(String(initialProduct.stockQuantity ?? initialProduct.quantity ?? 15));
+      setWeightGrams(String(initialProduct.weightGrams ?? 400));
       setTag(initialProduct.tag || '');
       setSizes(initialProduct.attributes[0]?.options || ['XS', 'S', 'M', 'L', 'XL']);
 
@@ -95,7 +101,7 @@ export default function ProductModal({ isOpen, onClose, onSave, initialProduct }
       );
       setShippingNote(
         initialProduct.shippingNote ||
-          '• Dispatched within 24–48 business hours.\n• Free Island-wide delivery across Sri Lanka for orders over LKR 15,000 (PromptX / Koombiyo).\n• Express Same-Day delivery available within Colombo 01–15.\n• 14-Day hassle-free exchanges with doorstep courier pickup.'
+          '• Dispatched within 24–48 business hours via Sri Lanka Post Speed Post.\n• Official weight-based postage & island-wide COD.\n• 14-Day doorstep exchange permitted.'
       );
       setPairingProductIds(initialProduct.pairingProductIds || []);
 
@@ -119,6 +125,7 @@ export default function ProductModal({ isOpen, onClose, onSave, initialProduct }
       setCategorySlug('kurties');
       setPriceLKR('15500');
       setRegularPriceLKR('17500');
+      setStockQuantity('15');
       setTag('New Festive Drop');
       setSizes(['XS', 'S', 'M', 'L', 'XL']);
 
@@ -129,7 +136,7 @@ export default function ProductModal({ isOpen, onClose, onSave, initialProduct }
       setFabricYarn('100% Handloom Mulberry Silk & Zari');
       setCraftedFor('Festive Celebrations, Sangeet Nights & Receptions');
       setCareGuide('• Dry clean recommended to preserve handloom natural dyes & zari brilliance.\n• Store folded in a breathable cotton muslin bag.');
-      setShippingNote('• Dispatched within 24–48 business hours via PromptX.\n• 14-Day doorstep exchange with courier pickup.');
+      setShippingNote('• Dispatched within 24–48 business hours via Sri Lanka Post Speed Post.\n• Island-wide COD & 14-day doorstep exchange.');
       setPairingProductIds([]);
 
       setMetaTitle('');
@@ -281,6 +288,9 @@ export default function ProductModal({ isOpen, onClose, onSave, initialProduct }
         parseInt(priceLKR, 10) < parseInt(regularPriceLKR || priceLKR, 10)
           ? `LKR ${parseInt(priceLKR, 10).toLocaleString()}`
           : undefined,
+      stockQuantity: Math.max(0, parseInt(stockQuantity, 10) || 0),
+      quantity: Math.max(0, parseInt(stockQuantity, 10) || 0),
+      weightGrams: Math.max(50, parseInt(weightGrams, 10) || 400),
       description: description.trim() || 'Handcrafted silk creation from Azhai atelier.',
       shortDescription: shortDescription.trim() || 'Handcrafted pure mulberry silk silhouette.',
       stylingTip: stylingTip.trim(),
@@ -432,6 +442,162 @@ export default function ProductModal({ isOpen, onClose, onSave, initialProduct }
                       placeholder="e.g. Viral on Reels ✨"
                       className="w-full px-3.5 py-2.5 rounded-xl bg-[#F7F4EE]/70 border border-[#C5A059]/30 text-xs focus:border-[#701626] focus:bg-white focus:outline-none"
                     />
+                  </div>
+                </div>
+
+                {/* Atelier Inventory & Stock Quantity Section */}
+                <div className="p-4 rounded-2xl bg-[#F7F4EE]/70 border border-[#C5A059]/35 space-y-2.5">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5">
+                    <div>
+                      <label className="block text-xs font-bold text-[#110B0E] uppercase tracking-wider">
+                        Atelier Stock Quantity (Available Pieces) *
+                      </label>
+                      <p className="text-[11px] text-[#6D6268]">
+                        Units physically crafted or ready in atelier. Set to 0 to trigger "Out of Stock".
+                      </p>
+                    </div>
+                    <span className={`self-start sm:self-auto px-2.5 py-1 rounded-full text-[10.5px] font-bold border transition-colors ${
+                      Number(stockQuantity) === 0
+                        ? 'bg-rose-100 text-rose-800 border-rose-200'
+                        : Number(stockQuantity) <= 3
+                        ? 'bg-amber-100 text-amber-800 border-amber-200'
+                        : 'bg-emerald-100 text-emerald-800 border-emerald-200'
+                    }`}>
+                      {Number(stockQuantity) === 0
+                        ? 'Out of Stock'
+                        : Number(stockQuantity) <= 3
+                        ? `Low Stock (${stockQuantity} Left)`
+                        : `${stockQuantity} In Stock`}
+                    </span>
+                  </div>
+
+                  <div className="flex flex-wrap sm:flex-nowrap items-center gap-2 pt-0.5">
+                    <div className="relative flex-1 min-w-[120px]">
+                      <input
+                        type="number"
+                        min="0"
+                        value={stockQuantity}
+                        onChange={(e) => setStockQuantity(e.target.value)}
+                        placeholder="15"
+                        required
+                        className="w-full px-3.5 py-2 rounded-xl bg-white border border-[#C5A059]/40 text-xs font-bold text-[#110B0E] focus:border-[#701626] focus:outline-none"
+                      />
+                    </div>
+
+                    {/* Quick Stepper Buttons */}
+                    <div className="flex items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() => setStockQuantity(String(Math.max(0, (Number(stockQuantity) || 0) - 1)))}
+                        className="px-2.5 py-2 rounded-xl bg-white hover:bg-gray-100 border border-[#C5A059]/30 text-xs font-bold text-[#110B0E] cursor-pointer"
+                        title="Minus 1 Piece"
+                      >
+                        -1
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setStockQuantity(String((Number(stockQuantity) || 0) + 1))}
+                        className="px-2.5 py-2 rounded-xl bg-white hover:bg-gray-100 border border-[#C5A059]/30 text-xs font-bold text-[#110B0E] cursor-pointer"
+                        title="Add 1 Piece"
+                      >
+                        +1
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setStockQuantity(String((Number(stockQuantity) || 0) + 5))}
+                        className="px-2.5 py-2 rounded-xl bg-white hover:bg-gray-100 border border-[#C5A059]/30 text-xs font-bold text-[#110B0E] cursor-pointer"
+                        title="Add 5 Pieces"
+                      >
+                        +5
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setStockQuantity('0')}
+                        className="px-2.5 py-2 rounded-xl bg-white hover:bg-rose-50 border border-rose-200 text-xs font-bold text-rose-700 cursor-pointer"
+                        title="Mark Out of Stock"
+                      >
+                        0 (Sold Out)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setStockQuantity('15')}
+                        className="px-2.5 py-2 rounded-xl bg-white hover:bg-[#701626]/10 border border-[#C5A059]/30 text-xs font-bold text-[#701626] cursor-pointer"
+                        title="Reset to 15"
+                      >
+                        15
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Product Shipping Weight (Grams / SL Post Speed Post) */}
+                <div className="p-4 rounded-2xl bg-[#FCFBF8] border border-[#C5A059]/35 space-y-2.5">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5">
+                    <div className="flex items-center gap-2">
+                      <Scale className="w-4 h-4 text-[#701626]" />
+                      <div>
+                        <label className="block text-xs font-bold text-[#110B0E] uppercase tracking-wider">
+                          Product Weight (Grams) *
+                        </label>
+                        <p className="text-[11px] text-[#6D6268]">
+                          Used for exact Sri Lanka Post Speed Post &amp; COD postage calculation.
+                        </p>
+                      </div>
+                    </div>
+                    <span className="self-start sm:self-auto px-2.5 py-1 rounded-full text-[10.5px] font-bold bg-[#701626]/10 text-[#701626] border border-[#C5A059]/30">
+                      {((Number(weightGrams) || 400) / 1000).toFixed(2)} kg ({(Number(weightGrams) || 400)} g)
+                    </span>
+                  </div>
+
+                  <div className="flex flex-wrap sm:flex-nowrap items-center gap-2 pt-0.5">
+                    <div className="relative flex-1 min-w-[140px]">
+                      <input
+                        type="number"
+                        min="50"
+                        max="40000"
+                        step="10"
+                        value={weightGrams}
+                        onChange={(e) => setWeightGrams(e.target.value)}
+                        placeholder="400"
+                        required
+                        className="w-full px-3.5 py-2 rounded-xl bg-white border border-[#C5A059]/40 text-xs font-bold text-[#110B0E] focus:border-[#701626] focus:outline-none"
+                      />
+                      <span className="absolute right-3 top-2 text-xs text-[#6D6268] font-bold">grams</span>
+                    </div>
+
+                    {/* Weight Quick Presets */}
+                    <div className="flex flex-wrap items-center gap-1">
+                      {[
+                        { label: 'Kurti', g: 350 },
+                        { label: 'Saree', g: 850 },
+                        { label: 'Lehenga', g: 2200 },
+                        { label: 'Blouse', g: 250 },
+                        { label: 'Shawl', g: 280 },
+                      ].map((preset) => (
+                        <button
+                          key={preset.label}
+                          type="button"
+                          onClick={() => setWeightGrams(String(preset.g))}
+                          className={`px-2 py-1.5 rounded-xl border text-[10.5px] font-bold transition-all cursor-pointer ${
+                            Number(weightGrams) === preset.g
+                              ? 'bg-[#701626] text-white border-[#701626]'
+                              : 'bg-white hover:bg-[#701626]/5 border-[#C5A059]/30 text-[#110B0E]'
+                          }`}
+                        >
+                          {preset.label} ({preset.g}g)
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Live SL Post Postage Estimation Pill */}
+                  <div className="pt-1 text-[11px] text-[#6D6268] flex items-center justify-between border-t border-[#C5A059]/15">
+                    <span>
+                      📮 <strong>SL Post Speed Post Rate:</strong> LKR {calculateSLPostPostage(Number(weightGrams) || 400).fee.toLocaleString()} (per item)
+                    </span>
+                    <span className="text-[10px] text-emerald-700 font-bold">
+                      Max Limit: 40 kg
+                    </span>
                   </div>
                 </div>
 
@@ -668,7 +834,7 @@ export default function ProductModal({ isOpen, onClose, onSave, initialProduct }
                   <textarea
                     value={shippingNote}
                     onChange={(e) => setShippingNote(e.target.value)}
-                    placeholder="• Dispatched within 24–48 business hours via PromptX / Koombiyo..."
+                    placeholder="• Dispatched within 24–48 business hours via Sri Lanka Post Speed Post..."
                     rows={2}
                     className="w-full px-3.5 py-2.5 rounded-xl bg-[#F7F4EE]/70 border border-[#C5A059]/30 text-xs focus:border-[#701626] focus:bg-white focus:outline-none"
                   />
@@ -706,9 +872,9 @@ export default function ProductModal({ isOpen, onClose, onSave, initialProduct }
 
                   {/* Horizontal product selector cards */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 max-h-52 overflow-y-auto p-1">
-                    {products
-                      .filter((p) => p.id !== initialProduct?.id)
-                      .map((p) => {
+                    {(allExistingProducts || [])
+                      .filter((p: Product) => p.id !== initialProduct?.id)
+                      .map((p: Product) => {
                         const isSelected = pairingProductIds.includes(p.id);
 
                         return (

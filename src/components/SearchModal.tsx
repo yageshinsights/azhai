@@ -23,7 +23,7 @@ export default function SearchModal({ isOpen, onClose }: SearchModalProps) {
   const [query, setQuery] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
   const storeProducts = useAdminStore((state) => state.products);
-  const allProducts = storeProducts.length > 0 ? storeProducts : PRODUCTS;
+  const allProducts = Array.isArray(storeProducts) ? storeProducts : PRODUCTS;
 
   useEffect(() => {
     if (isOpen) {
@@ -35,9 +35,9 @@ export default function SearchModal({ isOpen, onClose }: SearchModalProps) {
 
   const results = query.trim()
     ? allProducts.filter(p => 
-        p.name.toLowerCase().includes(query.toLowerCase()) ||
-        p.shortDescription.toLowerCase().includes(query.toLowerCase()) ||
-        p.categories.some(c => c.name.toLowerCase().includes(query.toLowerCase())) ||
+        p.name?.toLowerCase().includes(query.toLowerCase()) ||
+        p.shortDescription?.toLowerCase().includes(query.toLowerCase()) ||
+        p.categories?.some(c => c.name?.toLowerCase().includes(query.toLowerCase())) ||
         p.occasion?.toLowerCase().includes(query.toLowerCase()) ||
         p.tag?.toLowerCase().includes(query.toLowerCase())
       )

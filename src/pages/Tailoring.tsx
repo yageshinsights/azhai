@@ -1,11 +1,50 @@
-import { motion } from 'framer-motion';
-import { Scissors, Sparkles, Clock, Award } from 'lucide-react';
+import { useState, useMemo } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Scissors, Sparkles, Clock, Award, Palette, Shirt } from 'lucide-react';
 import TailoringStudio from '@/components/TailoringStudio';
+import BlouseCustomizer from '@/components/BlouseCustomizer';
 import { LiyawelDivider } from '@/components/CulturalPatterns';
+import SEOHead from '@/components/SEOHead';
 
 export default function Tailoring() {
+  const [activeMode, setActiveMode] = useState<'apparel' | 'blouse'>('apparel');
+
+  const tailoringSchema = useMemo(() => ({
+    '@context': 'https://schema.org',
+    '@type': 'Service',
+    serviceType: 'Bespoke Custom Tailoring & Saree Blouse Crafting',
+    provider: {
+      '@type': 'ClothingStore',
+      name: 'Azhai Clothing by Preethi',
+      url: 'https://azhaiclothing.lk',
+      address: {
+        '@type': 'PostalAddress',
+        addressLocality: 'Colombo',
+        addressCountry: 'LK',
+      },
+    },
+    areaServed: {
+      '@type': 'Country',
+      name: 'Sri Lanka',
+    },
+    description: 'Custom bespoke handloom kurti sets, tailored saree blouses, 2D neckline customizer, and personalized measurements in Colombo, Sri Lanka.',
+    offers: {
+      '@type': 'Offer',
+      priceCurrency: 'LKR',
+      price: '4500',
+      priceValidUntil: '2027-12-31',
+    },
+  }), []);
+
   return (
     <div className="min-h-screen bg-[#FCFBF8] pt-24 sm:pt-32 pb-20">
+      <SEOHead
+        title="Custom Tailoring Studio & 2D Saree Blouse Customizer"
+        description="Design your custom saree blouse or bespoke handloom outfit with Azhai. Real-time 2D neckline & sleeve customizer, fitting vault, and express island-wide delivery."
+        canonicalUrl="https://azhaiclothing.lk/tailoring"
+        url="https://azhaiclothing.lk/tailoring"
+        schema={tailoringSchema}
+      />
       
       {/* ── Page Hero Header ── */}
       <section className="px-4 sm:px-8 max-w-7xl mx-auto text-center space-y-4 mb-8">
@@ -37,6 +76,38 @@ export default function Tailoring() {
         >
           Handcrafted luxury apparel tailored exactly to your unique silhouette. Choose your silhouette, select your premium handloom or silk fabric, and configure your bespoke fit.
         </motion.p>
+
+        {/* ── ATELIER MODE TOGGLE BAR ── */}
+        <div className="pt-4 flex justify-center">
+          <div className="inline-flex p-1.5 rounded-2xl bg-white border border-[#C5A059]/40 shadow-md">
+            <button
+              onClick={() => setActiveMode('apparel')}
+              className={`px-5 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider flex items-center gap-2 transition-all cursor-pointer ${
+                activeMode === 'apparel'
+                  ? 'bg-[#701626] text-white shadow-md'
+                  : 'text-[#6D6268] hover:text-[#701626]'
+              }`}
+            >
+              <Shirt className="w-4 h-4" />
+              <span>Full Bespoke Outfits</span>
+            </button>
+
+            <button
+              onClick={() => setActiveMode('blouse')}
+              className={`px-5 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider flex items-center gap-2 transition-all cursor-pointer ${
+                activeMode === 'blouse'
+                  ? 'bg-[#701626] text-white shadow-md'
+                  : 'text-[#6D6268] hover:text-[#701626]'
+              }`}
+            >
+              <Palette className="w-4 h-4 text-[#C5A059]" />
+              <span>2D Blouse & Neckline Studio</span>
+              <span className="text-[9px] bg-[#C5A059] text-white font-bold px-1.5 py-0.2 rounded-full">
+                Interactive
+              </span>
+            </button>
+          </div>
+        </div>
       </section>
 
       {/* ── 3 Atelier Guarantees ── */}
@@ -72,8 +143,30 @@ export default function Tailoring() {
         </div>
       </div>
 
-      {/* ── Bespoke Configurator Studio ── */}
-      <TailoringStudio />
+      {/* ── Active Atelier Studio Mode ── */}
+      <AnimatePresence mode="wait">
+        {activeMode === 'apparel' ? (
+          <motion.div
+            key="apparel"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+          >
+            <TailoringStudio />
+          </motion.div>
+        ) : (
+          <motion.div
+            key="blouse"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+          >
+            <BlouseCustomizer />
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Cultural Divider */}
       <div className="max-w-4xl mx-auto px-5 my-12">

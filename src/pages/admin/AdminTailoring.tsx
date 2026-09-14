@@ -61,8 +61,8 @@ export default function AdminTailoring() {
           </div>
         </div>
 
-        {/* Tabs */}
-        <div className="flex flex-wrap gap-2 border-b border-[#C5A059]/20 pb-px">
+        {/* Tabs (Horizontally Scrollable on Mobile) */}
+        <div className="flex items-center gap-2 border-b border-[#C5A059]/20 pb-2 overflow-x-auto scrollbar-none -mx-3 px-3 sm:mx-0 sm:px-0">
           {[
             { id: 'dressTypes', label: 'Dress Types', icon: Ruler },
             { id: 'fabrics', label: 'Fabrics Inventory', icon: Palette },
@@ -75,7 +75,7 @@ export default function AdminTailoring() {
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id as any)}
-                className={`px-4 py-2.5 text-xs font-bold uppercase tracking-wider flex items-center gap-2 border-b-2 transition-all ${
+                className={`px-4 py-2.5 text-xs font-bold uppercase tracking-wider flex items-center gap-2 border-b-2 transition-all shrink-0 whitespace-nowrap cursor-pointer ${
                   isActive ? 'border-[#701626] text-[#701626]' : 'border-transparent text-[#6D6268] hover:text-[#110B0E]'
                 }`}
               >

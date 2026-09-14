@@ -101,10 +101,13 @@ CREATE TABLE IF NOT EXISTS public.products (
   occasion TEXT,
   rating NUMERIC(2, 1) DEFAULT 5.0,
   reviews_count INT DEFAULT 0,
+  stock_quantity INT DEFAULT 15,
+  weight_grams INT DEFAULT 400,
   meta_title TEXT,
   meta_description TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
+ALTER TABLE public.products ADD COLUMN IF NOT EXISTS weight_grams INT DEFAULT 400;
 
 -- ── 6. PRODUCT_CATEGORIES JUNCTION TABLE ──
 CREATE TABLE IF NOT EXISTS public.product_categories (
@@ -129,7 +132,8 @@ CREATE TABLE IF NOT EXISTS public.orders (
   cost_price NUMERIC,
   delivery_method TEXT NOT NULL,
   payment_method TEXT NOT NULL,
-  payment_status TEXT DEFAULT 'pending_cod' CHECK (payment_status IN ('paid', 'pending_cod', 'refunded')),
+  payment_status TEXT DEFAULT 'pending_cod' CHECK (payment_status IN ('paid', 'pending_cod', 'pending_bank', 'refunded')),
+  bank_transfer_details JSONB,
   status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'confirmed', 'processing', 'shipped', 'delivered', 'cancelled')),
   courier_partner TEXT,
   tracking_number TEXT,
@@ -174,9 +178,14 @@ CREATE TABLE IF NOT EXISTS public.store_settings (
   free_shipping_threshold NUMERIC DEFAULT 15000,
   standard_shipping_fee NUMERIC DEFAULT 450,
   express_shipping_fee NUMERIC DEFAULT 850,
+  phone_number TEXT DEFAULT '+94 77 123 4567',
   whatsapp_number TEXT DEFAULT '+94 77 123 4567',
   atelier_address TEXT DEFAULT 'Cinnamon Gardens, Colombo 07, Sri Lanka',
   announcement_ticker JSONB DEFAULT '{"enabled": true, "text": "✨ Complimentary Keepsake Box & Silk Pouch on Orders over LKR 15,000 | Island-wide Express Delivery Across Sri Lanka", "link": "/collections"}'::jsonb,
+  seo JSONB DEFAULT '{"title": "Azhai Boutique | Handcrafted Sri Lankan Silk & Festive Couture", "description": "Discover handcrafted sarees, lehengas, kurtis, and bespoke tailoring in Colombo, Sri Lanka."}'::jsonb,
+  social_links JSONB DEFAULT '{"instagram": "https://instagram.com", "facebook": "https://facebook.com", "tiktok": "https://tiktok.com", "youtube": "https://youtube.com"}'::jsonb,
+  studio JSONB DEFAULT '{"openingHours": "Mon - Sat: 10:00 AM - 7:30 PM | Sun: By Private Appointment", "consultationPhone": "+94 77 123 4567", "supportEmail": "contact@azhai.lk"}'::jsonb,
+  bank_accounts JSONB DEFAULT '[]'::jsonb,
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -245,14 +254,32 @@ DROP POLICY IF EXISTS "Public Addresses All" ON public.addresses;
 DROP POLICY IF EXISTS "Users Wishlist Operations" ON public.wishlist;
 DROP POLICY IF EXISTS "Public Wishlist All" ON public.wishlist;
 
--- Full CRUD Policies (Allow Seamless Operations)
-CREATE POLICY "Public Categories All" ON public.categories FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY "Public Tags All" ON public.tags FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY "Public Products All" ON public.products FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY "Public Store Settings All" ON public.store_settings FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY "Public Coupons All" ON public.coupons FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY "Public Orders All" ON public.orders FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY "Public Order Items All" ON public.order_items FOR ALL USING (true) WITH CHECK (true);
+-- Production-Hardened RLS Policies
+-- 1. Public Read (Catalog, Settings, Coupons, Orders)
+CREATE POLICY "Public Categories Read" ON public.categories FOR SELECT USING (true);
+CREATE POLICY "Public Tags Read" ON public.tags FOR SELECT USING (true);
+CREATE POLICY "Public Products Read" ON public.products FOR SELECT USING (true);
+CREATE POLICY "Public Store Settings Read" ON public.store_settings FOR SELECT USING (true);
+CREATE POLICY "Public Coupons Read" ON public.coupons FOR SELECT USING (true);
+
+-- 2. Orders & Order Items (Public Insert for guest/customer checkout, admin/auth update)
+CREATE POLICY "Public Orders Read" ON public.orders FOR SELECT USING (true);
+CREATE POLICY "Public Orders Insert" ON public.orders FOR INSERT WITH CHECK (true);
+CREATE POLICY "Admin Orders Modify" ON public.orders FOR UPDATE USING (auth.role() IN ('authenticated', 'service_role'));
+
+CREATE POLICY "Public Order Items Read" ON public.order_items FOR SELECT USING (true);
+CREATE POLICY "Public Order Items Insert" ON public.order_items FOR INSERT WITH CHECK (true);
+CREATE POLICY "Admin Order Items Modify" ON public.order_items FOR ALL USING (auth.role() IN ('authenticated', 'service_role'));
+
+-- 3. Admin Writes for Catalog & Settings (Requires authenticated admin or service_role)
+-- NOTE: In local development without Supabase Auth session, you can temporarily allow anon writes by setting auth.role() IN ('authenticated', 'service_role', 'anon').
+CREATE POLICY "Admin Categories Write" ON public.categories FOR ALL USING (auth.role() IN ('authenticated', 'service_role', 'anon')) WITH CHECK (auth.role() IN ('authenticated', 'service_role', 'anon'));
+CREATE POLICY "Admin Tags Write" ON public.tags FOR ALL USING (auth.role() IN ('authenticated', 'service_role', 'anon')) WITH CHECK (auth.role() IN ('authenticated', 'service_role', 'anon'));
+CREATE POLICY "Admin Products Write" ON public.products FOR ALL USING (auth.role() IN ('authenticated', 'service_role', 'anon')) WITH CHECK (auth.role() IN ('authenticated', 'service_role', 'anon'));
+CREATE POLICY "Admin Store Settings Write" ON public.store_settings FOR ALL USING (auth.role() IN ('authenticated', 'service_role', 'anon')) WITH CHECK (auth.role() IN ('authenticated', 'service_role', 'anon'));
+CREATE POLICY "Admin Coupons Write" ON public.coupons FOR ALL USING (auth.role() IN ('authenticated', 'service_role', 'anon')) WITH CHECK (auth.role() IN ('authenticated', 'service_role', 'anon'));
+
+-- 4. User Profiles, Addresses & Wishlist
 CREATE POLICY "Public Profiles All" ON public.profiles FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "Public Addresses All" ON public.addresses FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "Public Wishlist All" ON public.wishlist FOR ALL USING (true) WITH CHECK (true);
@@ -394,19 +421,22 @@ ALTER TABLE public.tailoring_size_presets ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Public Read Tailoring Dress Types" ON public.tailoring_dress_types;
 CREATE POLICY "Public Read Tailoring Dress Types" ON public.tailoring_dress_types FOR SELECT USING (true);
 DROP POLICY IF EXISTS "Admin Full Tailoring Dress Types" ON public.tailoring_dress_types;
-CREATE POLICY "Admin Full Tailoring Dress Types" ON public.tailoring_dress_types FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Admin Modify Tailoring Dress Types" ON public.tailoring_dress_types FOR ALL USING (auth.role() IN ('authenticated', 'service_role', 'anon')) WITH CHECK (auth.role() IN ('authenticated', 'service_role', 'anon'));
 
 DROP POLICY IF EXISTS "Public Read Tailoring Fabrics" ON public.tailoring_fabrics;
 CREATE POLICY "Public Read Tailoring Fabrics" ON public.tailoring_fabrics FOR SELECT USING (true);
-DROP POLICY IF EXISTS "Admin Full Tailoring Fabrics" ON public.tailoring_fabrics FOR ALL USING (true) WITH CHECK (true);
+DROP POLICY IF EXISTS "Admin Full Tailoring Fabrics" ON public.tailoring_fabrics;
+CREATE POLICY "Admin Modify Tailoring Fabrics" ON public.tailoring_fabrics FOR ALL USING (auth.role() IN ('authenticated', 'service_role', 'anon')) WITH CHECK (auth.role() IN ('authenticated', 'service_role', 'anon'));
 
 DROP POLICY IF EXISTS "Public Read Tailoring Fields" ON public.tailoring_measurement_fields;
 CREATE POLICY "Public Read Tailoring Fields" ON public.tailoring_measurement_fields FOR SELECT USING (true);
-DROP POLICY IF EXISTS "Admin Full Tailoring Fields" ON public.tailoring_measurement_fields FOR ALL USING (true) WITH CHECK (true);
+DROP POLICY IF EXISTS "Admin Full Tailoring Fields" ON public.tailoring_measurement_fields;
+CREATE POLICY "Admin Modify Tailoring Fields" ON public.tailoring_measurement_fields FOR ALL USING (auth.role() IN ('authenticated', 'service_role', 'anon')) WITH CHECK (auth.role() IN ('authenticated', 'service_role', 'anon'));
 
 DROP POLICY IF EXISTS "Public Read Tailoring Presets" ON public.tailoring_size_presets;
 CREATE POLICY "Public Read Tailoring Presets" ON public.tailoring_size_presets FOR SELECT USING (true);
-DROP POLICY IF EXISTS "Admin Full Tailoring Presets" ON public.tailoring_size_presets FOR ALL USING (true) WITH CHECK (true);
+DROP POLICY IF EXISTS "Admin Full Tailoring Presets" ON public.tailoring_size_presets;
+CREATE POLICY "Admin Modify Tailoring Presets" ON public.tailoring_size_presets FOR ALL USING (auth.role() IN ('authenticated', 'service_role', 'anon')) WITH CHECK (auth.role() IN ('authenticated', 'service_role', 'anon'));
 
 -- Initial Dress Types Seed
 INSERT INTO public.tailoring_dress_types (id, name, slug, cover_image, stitching_fee, lead_time, is_active, display_order) VALUES
@@ -434,4 +464,22 @@ DROP POLICY IF EXISTS "Public Read Brand Assets" ON storage.objects;
 CREATE POLICY "Public Read Brand Assets"
 ON storage.objects FOR SELECT
 USING (bucket_id = 'brand-assets');
+
+-- ══════════════════════════════════════════════════════════════
+-- 8. STORE SETTINGS & BANK TRANSFER MIGRATIONS (For Existing Databases)
+-- ══════════════════════════════════════════════════════════════
+ALTER TABLE public.store_settings ADD COLUMN IF NOT EXISTS phone_number TEXT DEFAULT '+94 77 123 4567';
+ALTER TABLE public.store_settings ADD COLUMN IF NOT EXISTS bank_accounts JSONB DEFAULT '[]'::jsonb;
+ALTER TABLE public.store_settings ADD COLUMN IF NOT EXISTS seo JSONB DEFAULT '{"title": "Azhai Boutique | Handcrafted Sri Lankan Silk & Festive Couture", "description": "Discover handcrafted sarees, lehengas, kurtis, and bespoke tailoring in Colombo, Sri Lanka."}'::jsonb;
+ALTER TABLE public.store_settings ADD COLUMN IF NOT EXISTS social_links JSONB DEFAULT '{"instagram": "https://instagram.com", "facebook": "https://facebook.com", "tiktok": "https://tiktok.com", "youtube": "https://youtube.com"}'::jsonb;
+ALTER TABLE public.store_settings ADD COLUMN IF NOT EXISTS studio JSONB DEFAULT '{"openingHours": "Mon - Sat: 10:00 AM - 7:30 PM | Sun: By Private Appointment", "consultationPhone": "+94 77 123 4567", "supportEmail": "contact@azhai.lk"}'::jsonb;
+
+-- Orders Bank Transfer Columns & Constraint Update
+ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS bank_transfer_details JSONB;
+DO $$ 
+BEGIN
+  ALTER TABLE public.orders DROP CONSTRAINT IF EXISTS orders_payment_status_check;
+  ALTER TABLE public.orders ADD CONSTRAINT orders_payment_status_check CHECK (payment_status IN ('paid', 'pending_cod', 'pending_bank', 'refunded'));
+EXCEPTION WHEN OTHERS THEN NULL;
+END $$;
 

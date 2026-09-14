@@ -16,8 +16,11 @@ import {
 } from 'lucide-react';
 import { useCartStore } from '@/store/cart';
 import { useAuthStore } from '@/store/auth';
+import { useAdminStore, cleanWhatsAppDigits } from '@/store/admin';
+import { PRODUCTS } from '@/lib/data';
 import SearchModal from '@/components/SearchModal';
 import AccountDropdown from '@/components/AccountDropdown';
+import { STORE_PHONE, STORE_ADDRESS_FULL, getWhatsAppUrl } from '@/lib/constants';
 
 export default function Navbar() {
   const [scrolled, setScrolled] = useState(false);
@@ -27,6 +30,18 @@ export default function Navbar() {
 
   const { totalItems, toggleCart } = useCartStore();
   const { user, isAuthenticated, logout, wishlist, orders } = useAuthStore();
+  const adminProducts = useAdminStore((s) => s.products);
+  const adminCategories = useAdminStore((s) => s.categories);
+  const settings = useAdminStore((s) => s.settings);
+
+  const activePhone = settings?.phoneNumber || STORE_PHONE;
+  const activeWhatsApp = settings?.whatsappNumber || STORE_PHONE;
+  const activeWhatsAppDigits = cleanWhatsAppDigits(activeWhatsApp);
+  const activeAddress = settings?.atelierAddress || STORE_ADDRESS_FULL;
+  const ticker = settings?.announcementTicker;
+
+  const allProducts = Array.isArray(adminProducts) ? adminProducts : PRODUCTS;
+  const validWishlistCount = wishlist.filter((slug) => allProducts.some((p) => p.slug === slug)).length;
   const count = totalItems();
   const location = useLocation();
   const navigate = useNavigate();
@@ -60,10 +75,37 @@ export default function Navbar() {
         animate={{ y: 0 }}
         transition={{ duration: 0.6, ease: [0.25, 0.46, 0.45, 0.94] }}
       >
-        <div className="max-w-7xl mx-auto px-4 sm:px-8 h-18 sm:h-24 flex items-center justify-between">
+        {/* Top Atelier Bar: Dynamic Announcement + Direct Hotline & WhatsApp */}
+        <div className="bg-[#701626] text-[#F3E8CE] text-[10.5px] py-1 px-4 sm:px-6 lg:px-8 border-b border-[#C5A059]/30 tracking-wider">
+          <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
+            <div className="flex items-center gap-2 truncate">
+              <Sparkles className="w-3 h-3 text-[#DFBF77] shrink-0" />
+              <span className="truncate font-medium">
+                {ticker?.enabled && ticker?.text ? ticker.text : '✨ Bespoke Handloom Silks & Bridal Tailoring Colombo · Express Island-wide Courier'}
+              </span>
+            </div>
+            <div className="hidden md:flex items-center gap-4 shrink-0 text-[10.5px]">
+              <a href={`tel:${activePhone.replace(/[^0-9+]/g, '')}`} className="hover:text-white transition-colors flex items-center gap-1 font-medium">
+                <span>Hotline:</span> <strong className="text-white">{activePhone}</strong>
+              </a>
+              <span className="text-[#C5A059]/50">|</span>
+              <a
+                href={`https://wa.me/${activeWhatsAppDigits}?text=${encodeURIComponent('Hi Preethi, I would like styling advice on Azhai Clothing.')}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hover:text-white transition-colors flex items-center gap-1 font-medium"
+              >
+                <MessageCircle className="w-3.5 h-3.5 text-[#25D366]" />
+                <span>WhatsApp:</span> <strong className="text-[#25D366]">{activeWhatsApp}</strong>
+              </a>
+            </div>
+          </div>
+        </div>
+
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-18 sm:h-20 xl:h-24 flex items-center justify-between">
           
           {/* ── Left Side: Elevated Grand Brand Logo ── */}
-          <div className="flex items-center gap-10 lg:gap-14">
+          <div className="flex items-center gap-6 lg:gap-8 xl:gap-12 min-w-0">
             <Link to="/" className="flex items-center group shrink-0">
               <motion.div
                 className="py-1 transition-all duration-300"
@@ -73,66 +115,44 @@ export default function Navbar() {
                 <img
                   src="/logo-light.png"
                   alt="Azhai Clothing by Preethi"
-                  className="h-11 sm:h-16 w-auto object-contain drop-shadow-sm"
+                  className="h-10 sm:h-12 xl:h-14 w-auto object-contain drop-shadow-sm"
                 />
               </motion.div>
             </Link>
 
             {/* Desktop Navigation Links */}
-            <nav className="hidden lg:flex items-center gap-8">
-              
-              {/* 1. Kurties */}
-              <Link
-                to="/collections/kurties"
-                className={`text-xs font-semibold uppercase tracking-[0.22em] transition-all py-1.5 ${
-                  location.pathname === '/collections/kurties' 
-                    ? 'text-[#701626] font-bold border-b-2 border-[#701626]' 
-                    : 'text-[#110B0E]/80 hover:text-[#701626]'
-                }`}
-              >
-                Kurties
-              </Link>
-
-              {/* 2. Sarees */}
-              <Link
-                to="/collections/sarees"
-                className={`text-xs font-semibold uppercase tracking-[0.22em] transition-all py-1.5 ${
-                  location.pathname === '/collections/sarees' 
-                    ? 'text-[#701626] font-bold border-b-2 border-[#701626]' 
-                    : 'text-[#110B0E]/80 hover:text-[#701626]'
-                }`}
-              >
-                Sarees
-              </Link>
-
-              {/* 3. Shawls */}
-              <Link
-                to="/collections/shawls"
-                className={`text-xs font-semibold uppercase tracking-[0.22em] transition-all py-1.5 ${
-                  location.pathname === '/collections/shawls' 
-                    ? 'text-[#701626] font-bold border-b-2 border-[#701626]' 
-                    : 'text-[#110B0E]/80 hover:text-[#701626]'
-                }`}
-              >
-                Shawls
-              </Link>
-
-              {/* 4. Tops */}
-              <Link
-                to="/collections/tops"
-                className={`text-xs font-semibold uppercase tracking-[0.22em] transition-all py-1.5 ${
-                  location.pathname === '/collections/tops' 
-                    ? 'text-[#701626] font-bold border-b-2 border-[#701626]' 
-                    : 'text-[#110B0E]/80 hover:text-[#701626]'
-                }`}
-              >
-                Tops
-              </Link>
+            <nav className="hidden lg:flex items-center gap-3.5 xl:gap-7 shrink-0">
+              {adminCategories && adminCategories.length > 0 ? (
+                adminCategories.slice(0, 4).map((cat) => (
+                  <Link
+                    key={cat.id || cat.slug}
+                    to={`/collections/${cat.slug}`}
+                    className={`text-[11px] xl:text-xs font-semibold uppercase tracking-[0.14em] xl:tracking-[0.22em] transition-all py-1.5 ${
+                      location.pathname === `/collections/${cat.slug}`
+                        ? 'text-[#701626] font-bold border-b-2 border-[#701626]'
+                        : 'text-[#110B0E]/80 hover:text-[#701626]'
+                    }`}
+                  >
+                    {cat.name}
+                  </Link>
+                ))
+              ) : (
+                <Link
+                  to="/collections"
+                  className={`text-[11px] xl:text-xs font-semibold uppercase tracking-[0.14em] xl:tracking-[0.22em] transition-all py-1.5 ${
+                    location.pathname === '/collections'
+                      ? 'text-[#701626] font-bold border-b-2 border-[#701626]'
+                      : 'text-[#110B0E]/80 hover:text-[#701626]'
+                  }`}
+                >
+                  Collections
+                </Link>
+              )}
 
               {/* 5. Custom Tailoring */}
               <Link
                 to="/tailoring"
-                className={`text-xs font-semibold uppercase tracking-[0.22em] transition-all py-1.5 flex items-center gap-1.5 ${
+                className={`text-[11px] xl:text-xs font-semibold uppercase tracking-[0.14em] xl:tracking-[0.22em] transition-all py-1.5 flex items-center gap-1 ${
                   location.pathname === '/tailoring' 
                     ? 'text-[#701626] font-bold border-b-2 border-[#701626]' 
                     : 'text-[#701626] hover:text-[#8E1E34]'
@@ -145,7 +165,7 @@ export default function Navbar() {
               {/* 6. Our Story */}
               <Link
                 to="/story"
-                className={`text-xs font-semibold uppercase tracking-[0.22em] transition-all py-1.5 ${
+                className={`text-[11px] xl:text-xs font-semibold uppercase tracking-[0.14em] xl:tracking-[0.22em] transition-all py-1.5 ${
                   location.pathname === '/story' 
                     ? 'text-[#701626] font-bold border-b-2 border-[#701626]' 
                     : 'text-[#110B0E]/80 hover:text-[#701626]'
@@ -158,13 +178,14 @@ export default function Navbar() {
           </div>
 
           {/* ── Right Navigation Utilities ── */}
-          <div className="flex items-center gap-2 sm:gap-4">
+          <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
             
             {/* Search Button Trigger */}
             <button
               onClick={() => setSearchOpen(true)}
-              className="p-2.5 text-[#110B0E]/80 hover:text-[#701626] transition-colors rounded-full hover:bg-black/5"
+              className="p-2 text-[#110B0E]/80 hover:text-[#701626] transition-colors rounded-full hover:bg-black/5 cursor-pointer"
               title="Search Catalog"
+              aria-label="Search Catalog"
             >
               <Search className="w-4 h-4 stroke-[1.8]" />
             </button>
@@ -173,16 +194,19 @@ export default function Navbar() {
             <div className="relative">
               <button
                 onClick={() => setAccountDropdownOpen(!accountDropdownOpen)}
-                className={`p-2.5 transition-all rounded-full flex items-center gap-1.5 ${
+                className={`p-2 transition-all rounded-full flex items-center gap-1.5 cursor-pointer ${
                   isAuthenticated
-                    ? 'bg-[#701626]/10 text-[#701626] hover:bg-[#701626]/20 border border-[#C5A059]/30'
+                    ? 'bg-[#701626]/10 text-[#701626] hover:bg-[#701626]/20 border border-[#C5A059]/30 px-2.5'
                     : 'text-[#110B0E]/80 hover:text-[#701626] hover:bg-black/5'
                 }`}
                 title={isAuthenticated ? `Account: ${user?.fullName}` : 'Sign In / Account'}
+                aria-label={isAuthenticated ? `Account: ${user?.fullName}` : 'Sign In / Account'}
+                aria-haspopup="true"
+                aria-expanded={accountDropdownOpen}
               >
                 <UserIcon className="w-4 h-4 stroke-[1.8]" />
                 {isAuthenticated && user && (
-                  <span className="hidden xl:inline text-[11px] font-bold max-w-[90px] truncate">
+                  <span className="hidden 2xl:inline text-[11px] font-bold max-w-[80px] truncate">
                     {user.fullName.split(' ')[0]}
                   </span>
                 )}
@@ -195,13 +219,14 @@ export default function Navbar() {
               />
             </div>
 
-            {/* WhatsApp Stylist Help */}
+            {/* WhatsApp Stylist Help (Visible on XL+) */}
             <a
-              href="https://wa.me/?text=Hi%20Preethi%2C%20I%20would%20like%20styling%20advice%20on%20Azhai%20Clothing%20pieces."
+              href={`https://wa.me/${activeWhatsAppDigits}?text=${encodeURIComponent('Hi Preethi, I would like styling advice on Azhai Clothing pieces.')}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="hidden sm:inline-flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.2em] text-[#701626] bg-[#701626]/8 border border-[#C5A059]/30 px-4 py-2 rounded-full hover:bg-[#701626]/12 transition-colors shadow-sm"
-              title="Speak with Preethi / Sizing Advice"
+              className="hidden xl:inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.18em] text-[#701626] bg-[#701626]/8 border border-[#C5A059]/30 px-3.5 py-1.5 rounded-full hover:bg-[#701626]/12 transition-colors shadow-sm"
+              title={`Speak with Preethi (${activeWhatsApp})`}
+              aria-label="Speak with Preethi on WhatsApp"
             >
               <MessageCircle className="w-3.5 h-3.5 text-[#701626]" />
               <span>Styling Help</span>
@@ -210,9 +235,10 @@ export default function Navbar() {
             {/* Shopping Bag Button */}
             <motion.button
               onClick={toggleCart}
-              className="relative p-2.5 text-[#110B0E]/80 hover:text-[#701626] transition-colors rounded-full hover:bg-black/5"
+              className="relative p-2.5 text-[#110B0E]/80 hover:text-[#701626] transition-colors rounded-full hover:bg-black/5 cursor-pointer"
               whileTap={{ scale: 0.92 }}
               title="View Shopping Bag"
+              aria-label="View Shopping Bag"
             >
               <ShoppingBag className="w-5 h-5 stroke-[1.8]" />
               <AnimatePresence>
@@ -232,8 +258,10 @@ export default function Navbar() {
 
             {/* Mobile Menu Hamburger */}
             <button
-              className="lg:hidden p-2 text-[#110B0E]/80 hover:text-[#701626] transition-colors"
+              className="lg:hidden p-2 text-[#110B0E]/80 hover:text-[#701626] transition-colors cursor-pointer"
               onClick={() => setMobileOpen(!mobileOpen)}
+              aria-label={mobileOpen ? 'Close Menu' : 'Open Menu'}
+              aria-expanded={mobileOpen}
             >
               {mobileOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
             </button>
@@ -305,7 +333,7 @@ export default function Navbar() {
                         onClick={() => setMobileOpen(false)}
                         className="p-2 bg-[#F7F4EE] rounded-xl text-[11px] font-bold text-[#110B0E] flex items-center gap-1.5 justify-center"
                       >
-                        <Heart className="w-3.5 h-3.5 text-[#701626]" /> Wishlist ({wishlist.length})
+                        <Heart className="w-3.5 h-3.5 text-[#701626]" /> Wishlist ({validWishlistCount})
                       </Link>
                     </div>
 
@@ -356,27 +384,45 @@ export default function Navbar() {
                   className="w-full flex items-center gap-3 p-3 bg-[#F7F4EE] rounded-xl border border-[#C5A059]/30 text-xs text-[#6D6268] text-left"
                 >
                   <Search className="w-4 h-4 text-[#701626]" />
-                  <span>Search kurties, sarees, shawls, tops...</span>
+                  <span>Search handcrafted pieces, silk, fabrics...</span>
                 </button>
 
                 {/* Simple Menu List */}
                 <div className="space-y-3 divide-y divide-[#C5A059]/20">
                   
-                  {/* The 4 Core Categories */}
+                  {/* Collections */}
                   <div className="pt-2 space-y-3">
-                    <p className="text-[10px] uppercase tracking-[0.25em] text-[#701626] font-bold">The Collections</p>
-                    <Link to="/collections/kurties" className="block text-lg font-display font-bold text-[#110B0E] hover:text-[#701626]">
-                      👗 Kurties
-                    </Link>
-                    <Link to="/collections/sarees" className="block text-lg font-display font-bold text-[#110B0E] hover:text-[#701626]">
-                      🥻 Sarees
-                    </Link>
-                    <Link to="/collections/shawls" className="block text-lg font-display font-bold text-[#110B0E] hover:text-[#701626]">
-                      🧣 Shawls
-                    </Link>
-                    <Link to="/collections/tops" className="block text-lg font-display font-bold text-[#110B0E] hover:text-[#701626]">
-                      🌸 Tops
-                    </Link>
+                    <div className="flex items-center justify-between">
+                      <p className="text-[10px] uppercase tracking-[0.25em] text-[#701626] font-bold">The Collections</p>
+                      <Link
+                        to="/collections"
+                        onClick={() => setMobileOpen(false)}
+                        className="text-[11px] text-[#C5A059] font-medium hover:underline"
+                      >
+                        View All
+                      </Link>
+                    </div>
+
+                    {adminCategories && adminCategories.length > 0 ? (
+                      adminCategories.slice(0, 6).map((cat) => (
+                        <Link
+                          key={cat.id || cat.slug}
+                          to={`/collections/${cat.slug}`}
+                          onClick={() => setMobileOpen(false)}
+                          className="block text-lg font-display font-bold text-[#110B0E] hover:text-[#701626]"
+                        >
+                          {cat.name}
+                        </Link>
+                      ))
+                    ) : (
+                      <Link
+                        to="/collections"
+                        onClick={() => setMobileOpen(false)}
+                        className="block text-lg font-display font-bold text-[#110B0E] hover:text-[#701626]"
+                      >
+                        Explore All Collections
+                      </Link>
+                    )}
                   </div>
 
                   {/* Bespoke Custom Tailoring */}
@@ -414,17 +460,23 @@ export default function Navbar() {
               </div>
 
               {/* Bottom Drawer Footer */}
-              <div className="p-6 border-t border-[#C5A059]/30 bg-[#F7F4EE] space-y-3">
+              <div className="p-6 border-t border-[#C5A059]/30 bg-[#F7F4EE] space-y-2.5">
                 <a
-                  href="https://wa.me/?text=Hi%20Preethi%2C%20I%20would%20like%20styling%20advice%20on%20Azhai%20Clothing."
+                  href={`https://wa.me/${activeWhatsAppDigits}?text=${encodeURIComponent('Hi Preethi, I would like styling advice on Azhai Clothing.')}`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="w-full py-3 bg-[#701626] text-white text-xs uppercase tracking-[0.2em] font-bold rounded-xl flex items-center justify-center gap-2 shadow-md"
+                  className="w-full py-3 bg-[#25D366] hover:bg-[#20bd5a] text-white text-xs uppercase tracking-[0.2em] font-bold rounded-xl flex items-center justify-center gap-2 shadow-md transition-colors"
                 >
                   <MessageCircle className="w-4 h-4" />
-                  <span>WhatsApp Stylist</span>
+                  <span>WhatsApp: {activeWhatsApp}</span>
                 </a>
-                <p className="text-[10px] text-center text-[#6D6268]">Use Code <strong>AZHAI10</strong> for 10% Off</p>
+                <a
+                  href={`tel:${activePhone.replace(/[^0-9+]/g, '')}`}
+                  className="w-full py-2.5 bg-white border border-[#C5A059]/40 text-[#110B0E] text-xs font-bold rounded-xl flex items-center justify-center gap-2 hover:bg-gray-50 transition-colors"
+                >
+                  <span>Studio Call: {activePhone}</span>
+                </a>
+                <p className="text-[10px] text-center text-[#6D6268]">Atelier: {activeAddress}</p>
               </div>
 
             </motion.div>

@@ -41,14 +41,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
 
     // Listen to real-time auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       setSession(session);
       setSupabaseUser(session?.user ?? null);
 
       if (session?.user) {
         syncProfileToStore(session.user);
-      } else {
-        // Reset auth store on logout
+      } else if (event === 'SIGNED_OUT') {
+        // Only reset auth store on an explicit sign out event
         useAuthStore.getState().logout();
       }
       setLoading(false);

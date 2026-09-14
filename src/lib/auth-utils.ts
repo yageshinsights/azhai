@@ -43,9 +43,15 @@ export function getPasswordStrength(password: string): {
 }
 
 export function generateSessionToken(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return 'azh_ses_' + crypto.randomUUID().replace(/-/g, '');
+  }
   return 'azh_ses_' + Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
 }
 
 export function generateResetToken(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return 'azh_rst_' + crypto.randomUUID().replace(/-/g, '').substring(0, 16);
+  }
   return 'azh_rst_' + Math.random().toString(36).substring(2, 12);
 }

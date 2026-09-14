@@ -129,7 +129,7 @@ export default function ProductCard({ product, index = 0 }: { product: Product; 
               <div className="flex items-center gap-1.5 w-full">
                 <button
                   onClick={handleAddToCart}
-                  className={`flex-1 py-2.5 text-[10px] uppercase tracking-[0.16em] font-bold rounded-xl flex items-center justify-center gap-1.5 transition-all shadow-sm ${
+                  className={`flex-1 py-2.5 px-3 text-[10.5px] uppercase tracking-[0.14em] font-bold rounded-xl flex items-center justify-center gap-1.5 transition-all shadow-sm ${
                     justAdded 
                       ? 'bg-emerald-700 text-white' 
                       : 'bg-[#701626] hover:bg-[#8E1E34] text-white'
@@ -141,7 +141,10 @@ export default function ProductCard({ product, index = 0 }: { product: Product; 
                     </>
                   ) : (
                     <>
-                      <ShoppingBag className="w-3.5 h-3.5" /> Quick Add ({selectedSize})
+                      <ShoppingBag className="w-3.5 h-3.5 shrink-0" />
+                      <span className="truncate">
+                        {selectedSize.length <= 4 ? `Quick Add (${selectedSize})` : 'Quick Add to Bag'}
+                      </span>
                     </>
                   )}
                 </button>

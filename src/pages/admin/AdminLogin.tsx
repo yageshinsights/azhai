@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Lock, Mail, ShieldCheck, Sparkles, ArrowRight, KeyRound, Crown } from 'lucide-react';
 import { useAdminStore, type AdminRole } from '@/store/admin';
+import SEOHead from '@/components/SEOHead';
 
 export default function AdminLogin() {
   const [email, setEmail] = useState('');
@@ -11,11 +12,18 @@ export default function AdminLogin() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const { adminLogin } = useAdminStore();
+  const { adminLogin, isAdminAuthenticated, adminUser } = useAdminStore();
   const navigate = useNavigate();
   const location = useLocation();
 
   const from = (location.state as { from?: { pathname: string } })?.from?.pathname || '/admin';
+
+  // Auto-redirect if already logged in as admin
+  useEffect(() => {
+    if (isAdminAuthenticated && adminUser) {
+      navigate(from, { replace: true });
+    }
+  }, [isAdminAuthenticated, adminUser, navigate, from]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -32,15 +40,9 @@ export default function AdminLogin() {
     }
   };
 
-  const handleFillDemo = () => {
-    setEmail('admin@azhai.lk');
-    setPassword('AzhaiAdmin@2026');
-    setRole('owner');
-    setError(null);
-  };
-
   return (
     <div className="min-h-screen bg-[#110B0E] text-white flex items-center justify-center p-4 relative overflow-hidden">
+      <SEOHead title="Admin Atelier Portal" noindex={true} />
       {/* Background Decorative Glow */}
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-gradient-to-br from-[#701626]/40 via-[#C5A059]/20 to-transparent rounded-full blur-3xl pointer-events-none" />
 
@@ -143,20 +145,6 @@ export default function AdminLogin() {
             {loading ? 'Authenticating...' : 'Enter Admin Console'}
           </button>
         </form>
-
-        {/* Demo Fast Pill */}
-        <div className="p-3 bg-white/5 rounded-2xl border border-white/10 flex items-center justify-between gap-2">
-          <div className="text-[11px] text-white/70">
-            <span className="font-bold text-white">Demo:</span> admin@azhai.lk
-          </div>
-          <button
-            type="button"
-            onClick={handleFillDemo}
-            className="text-[10px] font-bold uppercase tracking-wider text-[#DFBF77] hover:underline px-2.5 py-1 rounded-lg bg-white/10 border border-white/20"
-          >
-            Fill Demo
-          </button>
-        </div>
 
         <div className="text-center pt-2">
           <Link

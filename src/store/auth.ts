@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import type { PlacedOrder } from './cart';
 import { hashPassword, generateSessionToken, generateResetToken } from '@/lib/auth-utils';
+import { useAdminStore } from './admin';
 
 export interface User {
   id: string;
@@ -30,6 +31,18 @@ export interface SavedAddress {
   isDefault: boolean;
 }
 
+export interface FamilyMeasurementProfile {
+  id: string;
+  name: string; // e.g. "My Silhouette", "Amma's Saree Blouse", "Sister Priya"
+  relationship: 'Self' | 'Mother' | 'Sister' | 'Daughter' | 'Friend' | 'Other';
+  unit: 'inches' | 'cm';
+  dressTypeSlug?: string;
+  measurements: Record<string, number>; // in inches (canonical)
+  notes?: string;
+  isDefault?: boolean;
+  updatedAt: string;
+}
+
 export interface StoredAccount {
   email: string;
   passwordHash: string;
@@ -37,6 +50,7 @@ export interface StoredAccount {
   addresses: SavedAddress[];
   orders: PlacedOrder[];
   wishlist: string[];
+  familyProfiles?: FamilyMeasurementProfile[];
 }
 
 export interface ResetTokenRecord {
@@ -51,6 +65,7 @@ interface AuthState {
   addresses: SavedAddress[];
   orders: PlacedOrder[];
   wishlist: string[];
+  familyProfiles: FamilyMeasurementProfile[];
   sessionToken: string | null;
   accounts: StoredAccount[]; // persistent simulated database of registered users
   resetTokens: ResetTokenRecord[];
@@ -73,6 +88,12 @@ interface AuthState {
   removeAddress: (id: string) => void;
   setDefaultAddress: (id: string) => void;
 
+  // Family Measurement Fitting Vault actions
+  addFamilyProfile: (profile: Omit<FamilyMeasurementProfile, 'id' | 'updatedAt'>) => void;
+  updateFamilyProfile: (id: string, updates: Partial<FamilyMeasurementProfile>) => void;
+  deleteFamilyProfile: (id: string) => void;
+  setDefaultFamilyProfile: (id: string) => void;
+
   // Order actions
   addOrder: (order: PlacedOrder) => void;
 
@@ -80,6 +101,7 @@ interface AuthState {
   toggleWishlist: (slug: string) => void;
   addToWishlist: (slug: string) => void;
   removeFromWishlist: (slug: string) => void;
+  cleanWishlist: (validSlugs: string[]) => void;
   isInWishlist: (slug: string) => boolean;
 }
 
@@ -90,93 +112,10 @@ export const useAuthStore = create<AuthState>()(
       isAuthenticated: false,
       addresses: [],
       orders: [],
-      wishlist: ['maroon-corset-kurti-set', 'crimson-bridal-kanchipuram'],
+      wishlist: [],
+      familyProfiles: [],
       sessionToken: null,
-      accounts: [
-        // Pre-seeded demo account for instant testing
-        {
-          email: 'preethi@azhai.lk',
-          passwordHash: 'e6c2789f2cf05d52cfc236f0ff64b63e9f45efd9ef4f1c97a5a8f4c2c5c67c51', // hashed 'Azhai@2026'
-          user: {
-            id: 'usr_demo_01',
-            fullName: 'Preethi',
-            email: 'preethi@azhai.lk',
-            phone: '+94 77 123 4567',
-            dob: '1995-10-18',
-            createdAt: '2025-11-12T10:00:00.000Z',
-            lastLoginAt: new Date().toISOString(),
-            preferences: {
-              newsletter: true,
-              smsAlerts: true,
-            },
-          },
-          addresses: [
-            {
-              id: 'addr_01',
-              label: 'Home',
-              fullName: 'Preethi',
-              phone: '+94 77 123 4567',
-              address: '42/A Temple Road, Kollupitiya',
-              city: 'Colombo 03',
-              district: 'Colombo',
-              postalCode: '00300',
-              isDefault: true,
-            },
-            {
-              id: 'addr_02',
-              label: 'Atelier Studio',
-              fullName: 'Preethi',
-              phone: '+94 77 987 6543',
-              address: '15 Ward Place, Cinnamon Gardens',
-              city: 'Colombo 07',
-              district: 'Colombo',
-              postalCode: '00700',
-              isDefault: false,
-            },
-          ],
-          orders: [
-            {
-              orderId: 'AZH-84291',
-              items: [
-                {
-                  id: 1,
-                  name: 'Maroon Corset Handloom Kurti Set',
-                  price: 'LKR 14,500',
-                  image: '/assets/kurti1.jpg',
-                  quantity: 1,
-                  size: 'M',
-                },
-                {
-                  id: 7,
-                  name: 'Pure Cashmere Pashmina Stole',
-                  price: 'LKR 18,500',
-                  image: '/assets/shawl1.jpg',
-                  quantity: 1,
-                  size: 'Free Size',
-                },
-              ],
-              subtotal: 33000,
-              discount: 3300,
-              shipping: 0,
-              total: 29700,
-              coupon: 'AZHAI10',
-              customer: {
-                fullName: 'Preethi',
-                email: 'preethi@azhai.lk',
-                phone: '+94 77 123 4567',
-                address: '42/A Temple Road, Kollupitiya',
-                city: 'Colombo 03',
-                district: 'Colombo',
-                postalCode: '00300',
-              },
-              deliveryMethod: 'Standard Island-wide Courier',
-              paymentMethod: 'Visa / Mastercard (PayHere)',
-              placedAt: '2026-08-19T14:32:00.000Z',
-            },
-          ],
-          wishlist: ['maroon-corset-kurti-set', 'crimson-bridal-kanchipuram', 'kalamkari-silk-crop-top'],
-        },
-      ],
+      accounts: [],
       resetTokens: [],
 
       login: async (email, password) => {
@@ -189,8 +128,7 @@ export const useAuthStore = create<AuthState>()(
         }
 
         const inputHash = await hashPassword(password);
-        // Fallback for pre-seeded account direct check if needed or hash check
-        if (account.passwordHash !== inputHash && password !== 'Azhai@2026') {
+        if (account.passwordHash !== inputHash) {
           return { success: false, error: 'Incorrect password. Please try again or reset.' };
         }
 
@@ -204,9 +142,10 @@ export const useAuthStore = create<AuthState>()(
         set({
           user: updatedUser,
           isAuthenticated: true,
-          addresses: account.addresses,
-          orders: account.orders,
-          wishlist: account.wishlist,
+          addresses: account.addresses || [],
+          orders: account.orders || [],
+          wishlist: account.wishlist || [],
+          familyProfiles: account.familyProfiles || [],
           sessionToken,
         });
 
@@ -242,6 +181,7 @@ export const useAuthStore = create<AuthState>()(
           addresses: [],
           orders: [],
           wishlist: get().wishlist,
+          familyProfiles: [],
         };
 
         const sessionToken = generateSessionToken();
@@ -252,8 +192,21 @@ export const useAuthStore = create<AuthState>()(
           isAuthenticated: true,
           addresses: [],
           orders: [],
+          familyProfiles: [],
           sessionToken,
         }));
+
+        // Auto-sync new patron account to Admin CRM Registry
+        try {
+          useAdminStore.getState().syncCustomerFromAuth({
+            fullName: newUser.fullName,
+            email: newUser.email,
+            phone: newUser.phone,
+            createdAt: newUser.createdAt,
+          });
+        } catch (crmErr) {
+          console.warn('[Admin CRM Sync Notice]:', crmErr);
+        }
 
         return { success: true };
       },
@@ -271,6 +224,7 @@ export const useAuthStore = create<AuthState>()(
                     addresses: state.addresses,
                     orders: state.orders,
                     wishlist: state.wishlist,
+                    familyProfiles: state.familyProfiles,
                   }
                 : acc
             ),
@@ -278,6 +232,8 @@ export const useAuthStore = create<AuthState>()(
             isAuthenticated: false,
             addresses: [],
             orders: [],
+            wishlist: [],
+            familyProfiles: [],
             sessionToken: null,
           }));
         } else {
@@ -286,6 +242,8 @@ export const useAuthStore = create<AuthState>()(
             isAuthenticated: false,
             addresses: [],
             orders: [],
+            wishlist: [],
+            familyProfiles: [],
             sessionToken: null,
           });
         }
@@ -347,6 +305,17 @@ export const useAuthStore = create<AuthState>()(
           ),
         }));
 
+        try {
+          useAdminStore.getState().syncCustomerFromAuth({
+            fullName: updatedUser.fullName,
+            email: updatedUser.email,
+            phone: updatedUser.phone,
+            createdAt: updatedUser.createdAt,
+          });
+        } catch (err) {
+          console.warn('[Admin CRM Profile Sync Warning]:', err);
+        }
+
         return { success: true };
       },
 
@@ -360,7 +329,7 @@ export const useAuthStore = create<AuthState>()(
         if (!account) return { success: false, error: 'Account record not found.' };
 
         const currentHash = await hashPassword(currentPassword);
-        if (account.passwordHash !== currentHash && currentPassword !== 'Azhai@2026') {
+        if (account.passwordHash !== currentHash) {
           return { success: false, error: 'Current password is incorrect.' };
         }
 
@@ -386,7 +355,7 @@ export const useAuthStore = create<AuthState>()(
         if (!account) return { success: false, error: 'Account not found.' };
 
         const currentHash = await hashPassword(password);
-        if (account.passwordHash !== currentHash && password !== 'Azhai@2026') {
+        if (account.passwordHash !== currentHash) {
           return { success: false, error: 'Incorrect password.' };
         }
 
@@ -415,7 +384,17 @@ export const useAuthStore = create<AuthState>()(
             ? state.addresses.map((a) => ({ ...a, isDefault: false })).concat(newAddr)
             : [...state.addresses, newAddr];
 
-          return { addresses: updatedAddresses };
+          const currentUser = state.user;
+          return { 
+            addresses: updatedAddresses,
+            accounts: currentUser
+              ? state.accounts.map((acc) =>
+                  acc.email.toLowerCase() === currentUser.email.toLowerCase()
+                    ? { ...acc, addresses: updatedAddresses }
+                    : acc
+                )
+              : state.accounts,
+          };
         });
       },
 
@@ -425,23 +404,140 @@ export const useAuthStore = create<AuthState>()(
           if (updates.isDefault) {
             updated = updated.map((a) => (a.id === id ? a : { ...a, isDefault: false }));
           }
-          return { addresses: updated };
+          const currentUser = state.user;
+          return { 
+            addresses: updated,
+            accounts: currentUser
+              ? state.accounts.map((acc) =>
+                  acc.email.toLowerCase() === currentUser.email.toLowerCase()
+                    ? { ...acc, addresses: updated }
+                    : acc
+                )
+              : state.accounts,
+          };
         });
       },
 
       removeAddress: (id) => {
-        set((state) => ({
-          addresses: state.addresses.filter((a) => a.id !== id),
-        }));
+        set((state) => {
+          const updated = state.addresses.filter((a) => a.id !== id);
+          const currentUser = state.user;
+          return {
+            addresses: updated,
+            accounts: currentUser
+              ? state.accounts.map((acc) =>
+                  acc.email.toLowerCase() === currentUser.email.toLowerCase()
+                    ? { ...acc, addresses: updated }
+                    : acc
+                )
+              : state.accounts,
+          };
+        });
       },
 
       setDefaultAddress: (id) => {
-        set((state) => ({
-          addresses: state.addresses.map((a) => ({
+        set((state) => {
+          const updated = state.addresses.map((a) => ({
             ...a,
             isDefault: a.id === id,
-          })),
-        }));
+          }));
+          const currentUser = state.user;
+          return {
+            addresses: updated,
+            accounts: currentUser
+              ? state.accounts.map((acc) =>
+                  acc.email.toLowerCase() === currentUser.email.toLowerCase()
+                    ? { ...acc, addresses: updated }
+                    : acc
+                )
+              : state.accounts,
+          };
+        });
+      },
+
+      addFamilyProfile: (profile) => {
+        const newProf: FamilyMeasurementProfile = {
+          ...profile,
+          id: 'prof_' + Math.random().toString(36).substring(2, 9),
+          updatedAt: new Date().toISOString(),
+        };
+
+        set((state) => {
+          const updatedProfiles: FamilyMeasurementProfile[] = profile.isDefault
+            ? [...state.familyProfiles.map((p) => ({ ...p, isDefault: false })), newProf]
+            : [...state.familyProfiles, newProf];
+
+          const currentUser = state.user;
+          return {
+            familyProfiles: updatedProfiles,
+            accounts: currentUser
+              ? state.accounts.map((acc) =>
+                  acc.email.toLowerCase() === currentUser.email.toLowerCase()
+                    ? { ...acc, familyProfiles: updatedProfiles }
+                    : acc
+                )
+              : state.accounts,
+          };
+        });
+      },
+
+      updateFamilyProfile: (id, updates) => {
+        set((state) => {
+          let updated = state.familyProfiles.map((p) =>
+            p.id === id ? { ...p, ...updates, updatedAt: new Date().toISOString() } : p
+          );
+          if (updates.isDefault) {
+            updated = updated.map((p) => (p.id === id ? p : { ...p, isDefault: false }));
+          }
+          const currentUser = state.user;
+          return {
+            familyProfiles: updated,
+            accounts: currentUser
+              ? state.accounts.map((acc) =>
+                  acc.email.toLowerCase() === currentUser.email.toLowerCase()
+                    ? { ...acc, familyProfiles: updated }
+                    : acc
+                )
+              : state.accounts,
+          };
+        });
+      },
+
+      deleteFamilyProfile: (id) => {
+        set((state) => {
+          const updated = state.familyProfiles.filter((p) => p.id !== id);
+          const currentUser = state.user;
+          return {
+            familyProfiles: updated,
+            accounts: currentUser
+              ? state.accounts.map((acc) =>
+                  acc.email.toLowerCase() === currentUser.email.toLowerCase()
+                    ? { ...acc, familyProfiles: updated }
+                    : acc
+                )
+              : state.accounts,
+          };
+        });
+      },
+
+      setDefaultFamilyProfile: (id) => {
+        set((state) => {
+          const updated = state.familyProfiles.map((p) => ({
+            ...p,
+            isDefault: p.id === id,
+          }));
+          const currentUser = state.user;
+          return {
+            familyProfiles: updated,
+            accounts: currentUser
+              ? state.accounts.map((acc) =>
+                  acc.email.toLowerCase() === currentUser.email.toLowerCase()
+                    ? { ...acc, familyProfiles: updated }
+                    : acc
+                )
+              : state.accounts,
+          };
+        });
       },
 
       addOrder: (order) => {
@@ -466,21 +562,70 @@ export const useAuthStore = create<AuthState>()(
         set((state) => {
           const exists = state.wishlist.includes(slug);
           const updated = exists ? state.wishlist.filter((s) => s !== slug) : [...state.wishlist, slug];
-          return { wishlist: updated };
+          const currentUser = state.user;
+          return { 
+            wishlist: updated,
+            accounts: currentUser
+              ? state.accounts.map((acc) =>
+                  acc.email.toLowerCase() === currentUser.email.toLowerCase()
+                    ? { ...acc, wishlist: updated }
+                    : acc
+                )
+              : state.accounts,
+          };
         });
       },
 
       addToWishlist: (slug) => {
         set((state) => {
           if (state.wishlist.includes(slug)) return state;
-          return { wishlist: [...state.wishlist, slug] };
+          const updated = [...state.wishlist, slug];
+          const currentUser = state.user;
+          return { 
+            wishlist: updated,
+            accounts: currentUser
+              ? state.accounts.map((acc) =>
+                  acc.email.toLowerCase() === currentUser.email.toLowerCase()
+                    ? { ...acc, wishlist: updated }
+                    : acc
+                )
+              : state.accounts,
+          };
         });
       },
 
       removeFromWishlist: (slug) => {
-        set((state) => ({
-          wishlist: state.wishlist.filter((s) => s !== slug),
-        }));
+        set((state) => {
+          const updated = state.wishlist.filter((s) => s !== slug);
+          const currentUser = state.user;
+          return { 
+            wishlist: updated,
+            accounts: currentUser
+              ? state.accounts.map((acc) =>
+                  acc.email.toLowerCase() === currentUser.email.toLowerCase()
+                    ? { ...acc, wishlist: updated }
+                    : acc
+                )
+              : state.accounts,
+          };
+        });
+      },
+
+      cleanWishlist: (validSlugs) => {
+        set((state) => {
+          const updated = state.wishlist.filter((s) => validSlugs.includes(s));
+          const currentUser = state.user;
+          return {
+            wishlist: updated,
+            accounts: currentUser
+              ? state.accounts.map((acc) =>
+                  acc.email.toLowerCase() === currentUser.email.toLowerCase()
+                    ? { ...acc, wishlist: updated }
+                    : acc
+                )
+              : state.accounts,
+          };
+        });
       },
 
       isInWishlist: (slug) => {
@@ -488,7 +633,7 @@ export const useAuthStore = create<AuthState>()(
       },
     }),
     {
-      name: 'azhai-auth-store',
+      name: 'azhai-auth-store-v2',
       storage: createJSONStorage(() => localStorage),
     }
   )

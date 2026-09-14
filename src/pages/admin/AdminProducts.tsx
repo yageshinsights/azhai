@@ -3,14 +3,15 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Sparkles, 
   Plus, 
+  Minus,
   Search, 
   Edit2, 
   Trash2, 
   Check, 
-  AlertTriangle, 
   Star,
   ExternalLink,
-  Eye
+  Eye,
+  Package
 } from 'lucide-react';
 import AdminLayout from '@/components/admin/AdminLayout';
 import { useAdminStore } from '@/store/admin';
@@ -19,7 +20,7 @@ import ProductModal from '@/components/admin/ProductModal';
 import { Link } from 'react-router-dom';
 
 export default function AdminProducts() {
-  const { products, categories, addProduct, updateProduct, deleteProduct } = useAdminStore();
+  const { products, categories, addProduct, updateProduct, updateProductStock, deleteProduct } = useAdminStore();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -134,6 +135,8 @@ export default function AdminProducts() {
                   <th className="p-4 whitespace-nowrap min-w-[220px]">Piece</th>
                   <th className="p-4 whitespace-nowrap min-w-[120px]">Category</th>
                   <th className="p-4 whitespace-nowrap min-w-[120px]">Price (LKR)</th>
+                  <th className="p-4 whitespace-nowrap min-w-[165px]">Atelier Stock</th>
+                  <th className="p-4 whitespace-nowrap min-w-[110px]">Weight (SL Post)</th>
                   <th className="p-4 whitespace-nowrap min-w-[160px]">Sizes Supported</th>
                   <th className="p-4 whitespace-nowrap min-w-[160px]">Tag / Badge</th>
                   <th className="p-4 whitespace-nowrap min-w-[90px]">Rating</th>
@@ -141,13 +144,45 @@ export default function AdminProducts() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#C5A059]/15">
-                {filteredProducts.map((p, idx) => (
-                  <tr
-                    key={p.id}
-                    className={`hover:bg-[#F7F4EE]/50 transition-colors ${
-                      idx % 2 === 0 ? 'bg-white' : 'bg-[#FCFBF8]'
-                    }`}
-                  >
+                {filteredProducts.length === 0 ? (
+                  <tr>
+                    <td colSpan={9} className="p-12 text-center">
+                      <div className="max-w-md mx-auto space-y-3">
+                        <div className="w-12 h-12 rounded-full bg-[#F7F4EE] border border-[#C5A059]/30 flex items-center justify-center mx-auto text-[#701626]">
+                          <Package className="w-6 h-6" />
+                        </div>
+                        <p className="font-display font-bold text-base text-[#110B0E]">No creations in catalog yet</p>
+                        <p className="text-xs text-[#6D6268]">
+                          {searchTerm || selectedCategory !== 'all' 
+                            ? 'No creations match your search or filter.' 
+                            : "Click 'Add New Creation' to publish your first piece to the online boutique."}
+                        </p>
+                        {searchTerm || selectedCategory !== 'all' ? (
+                          <button
+                            onClick={() => { setSearchTerm(''); setSelectedCategory('all'); }}
+                            className="text-xs font-bold text-[#701626] hover:underline cursor-pointer"
+                          >
+                            Clear filters
+                          </button>
+                        ) : (
+                          <button
+                            onClick={handleOpenAdd}
+                            className="inline-flex items-center gap-2 px-4 py-2 bg-[#701626] hover:bg-[#8E1E34] text-white text-xs font-bold rounded-xl transition-all shadow-sm cursor-pointer"
+                          >
+                            <Plus className="w-4 h-4" /> Add New Creation
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ) : (
+                  filteredProducts.map((p, idx) => (
+                    <tr
+                      key={p.id}
+                      className={`hover:bg-[#F7F4EE]/50 transition-colors ${
+                        idx % 2 === 0 ? 'bg-white' : 'bg-[#FCFBF8]'
+                      }`}
+                    >
                     <td className="p-4">
                       <div className="flex items-center gap-3 min-w-[200px]">
                         <img
@@ -172,6 +207,58 @@ export default function AdminProducts() {
 
                     <td className="p-4 font-display text-sm font-bold text-[#701626] whitespace-nowrap">
                       {p.price}
+                    </td>
+
+                    {/* Interactive Stock / Quantity Column */}
+                    <td className="p-4 whitespace-nowrap">
+                      {(() => {
+                        const qty = p.stockQuantity !== undefined ? p.stockQuantity : (p.quantity !== undefined ? p.quantity : 15);
+                        return (
+                          <div className="flex items-center gap-2">
+                            <div className="flex items-center bg-[#F7F4EE] rounded-xl border border-[#C5A059]/35 p-0.5 shadow-sm">
+                              <button
+                                onClick={() => updateProductStock(p.id, Math.max(0, qty - 1))}
+                                className="w-6 h-6 flex items-center justify-center rounded-lg hover:bg-white text-[#701626] transition-colors cursor-pointer"
+                                title="Decrease Stock by 1"
+                              >
+                                <Minus className="w-3 h-3" />
+                              </button>
+                              <span className="w-8 text-center font-bold font-mono text-xs text-[#110B0E]">
+                                {qty}
+                              </span>
+                              <button
+                                onClick={() => updateProductStock(p.id, qty + 1)}
+                                className="w-6 h-6 flex items-center justify-center rounded-lg hover:bg-white text-[#701626] transition-colors cursor-pointer"
+                                title="Increase Stock by 1"
+                              >
+                                <Plus className="w-3 h-3" />
+                              </button>
+                            </div>
+                            <span
+                              className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${
+                                qty === 0
+                                  ? 'bg-rose-100 text-rose-700 border-rose-200'
+                                  : qty <= 3
+                                  ? 'bg-amber-100 text-amber-800 border-amber-200'
+                                  : 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                              }`}
+                            >
+                              {qty === 0 ? 'Out of Stock' : qty <= 3 ? 'Low Stock' : 'In Stock'}
+                            </span>
+                          </div>
+                        );
+                      })()}
+                    </td>
+
+                    <td className="p-4 whitespace-nowrap">
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-mono text-xs font-bold text-[#110B0E]">
+                          {p.weightGrams || 400} g
+                        </span>
+                        <span className="text-[10px] text-[#6D6268]">
+                          ({((p.weightGrams || 400) / 1000).toFixed(2)} kg)
+                        </span>
+                      </div>
                     </td>
 
                     <td className="p-4 whitespace-nowrap">
@@ -231,7 +318,7 @@ export default function AdminProducts() {
                       </div>
                     </td>
                   </tr>
-                ))}
+                )))}
               </tbody>
             </table>
           </div>

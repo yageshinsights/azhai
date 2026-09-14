@@ -16,6 +16,7 @@ import ProductCard from '@/components/ProductCard';
 import TailoringStudio from '@/components/TailoringStudio';
 import StyleQuiz from '@/components/StyleQuiz';
 import AnimatedLogo from '@/components/AnimatedLogo';
+import SEOHead from '@/components/SEOHead';
 import { LiyawelDivider } from '@/components/CulturalPatterns';
 import { PRODUCTS, COLLECTIONS, type Collection } from '@/lib/data';
 import { useAdminStore } from '@/store/admin';
@@ -24,11 +25,26 @@ export default function Home() {
   const storeProducts = useAdminStore((s) => s.products);
   const storeCategories = useAdminStore((s) => s.categories);
 
-  const allProducts = storeProducts && storeProducts.length > 0 ? storeProducts : PRODUCTS;
-  const allCategories = storeCategories && storeCategories.length > 0 ? storeCategories : COLLECTIONS;
+  const allProducts = Array.isArray(storeProducts) ? storeProducts : PRODUCTS;
+  const allCategories = Array.isArray(storeCategories) && storeCategories.length > 0 ? storeCategories : COLLECTIONS;
 
-  // Filter collections featured in the Hero Carousel (fallback to first if none are featured)
+  // Filter collections featured in the Hero Carousel (fallback to brand card if none are featured or exist)
   const heroCategories = useMemo(() => {
+    if (!allCategories || allCategories.length === 0) {
+      return [
+        {
+          id: 0,
+          name: 'Handcrafted Silk Couture',
+          slug: 'all',
+          description: 'Timeless handloom silhouettes, artisanal embroidery, and bespoke bridal tailoring crafted in our Colombo atelier.',
+          heroImage: '/og-azhai.jpg',
+          count: 0,
+          season: 'Colombo Atelier',
+          tagline: 'Artisanal Festive Creations',
+          isFeatured: true,
+        },
+      ];
+    }
     const featured = allCategories.filter((c) => Boolean(c.isFeatured));
     return featured.length > 0 ? featured : allCategories.slice(0, 1);
   }, [allCategories]);
@@ -73,8 +89,35 @@ export default function Home() {
     return p.categories.some((c) => c.slug === selectedCategory);
   });
 
+  const organizationSchema = useMemo(() => ({
+    '@context': 'https://schema.org',
+    '@type': 'ClothingStore',
+    name: 'Azhai Clothing by Preethi',
+    url: 'https://azhaiclothing.lk',
+    logo: 'https://azhaiclothing.lk/logo-light.png',
+    description: 'Bespoke handloom kurti sets, lotus organza sarees, and tailored festive couture. Colombo, Sri Lanka.',
+    address: {
+      '@type': 'PostalAddress',
+      addressLocality: 'Colombo',
+      addressRegion: 'Western Province',
+      addressCountry: 'LK',
+    },
+    priceRange: 'LKR 8,500 - 32,000',
+  }), []);
+
   return (
     <div className="min-h-screen bg-[#FCFBF8] text-[#110B0E]">
+      <SEOHead
+        title="Handcrafted Sri Lankan Festive Couture & Handloom Silks"
+        description="Discover tailored corset handloom kurti sets, hand-painted lotus organza sarees, and bespoke Sri Lankan couture by Preethi."
+        canonicalUrl="https://azhaiclothing.lk"
+        schema={organizationSchema}
+      />
+      
+      {/* Permanent Brand Semantic H1 for SEO Crawlers */}
+      <h1 className="sr-only">
+        Azhai Clothing Colombo — Handcrafted Festive Silk Kurties, Sarees &amp; Bespoke Sri Lankan Couture by Preethi
+      </h1>
       
       {/* ── FIT-TO-SCREEN EDITORIAL CATEGORY HERO ── */}
       <section 
@@ -134,9 +177,9 @@ export default function Home() {
                 transition={{ duration: 0.5 }}
                 className="space-y-2"
               >
-                <h1 className="font-display text-4xl sm:text-6xl md:text-7xl font-bold text-white tracking-tight leading-[1.08] drop-shadow-md">
+                <h2 className="font-display text-4xl sm:text-6xl md:text-7xl font-bold text-white tracking-tight leading-[1.08] drop-shadow-md">
                   {currentCategory?.name}
-                </h1>
+                </h2>
                 <p className="text-sm sm:text-base text-white/85 font-light max-w-lg leading-relaxed drop-shadow">
                   {currentCategory?.description}
                 </p>
@@ -292,11 +335,20 @@ export default function Home() {
         </div>
 
         {/* Product Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {filteredProducts.map((prod, i) => (
-            <ProductCard key={prod.id} product={prod} index={i} />
-          ))}
-        </div>
+        {filteredProducts.length > 0 ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            {filteredProducts.map((prod, i) => (
+              <ProductCard key={prod.id} product={prod} index={i} />
+            ))}
+          </div>
+        ) : (
+          <div className="py-16 text-center space-y-3 bg-white rounded-3xl p-8 border border-[#C5A059]/30 max-w-lg mx-auto">
+            <p className="font-display text-xl font-bold text-[#110B0E]">No Pieces Currently Available</p>
+            <p className="text-xs text-[#6D6268]">
+              All items in this edit are currently being handcrafted in our atelier. New releases dropping soon.
+            </p>
+          </div>
+        )}
       </section>
 
       {/* Liyawel Cultural Vine Divider */}
@@ -325,70 +377,80 @@ export default function Home() {
         </div>
 
         {/* 2-Column Wide Landscape Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 sm:gap-8">
-          {allCategories.map((col, idx) => {
-            const count = allProducts.filter((p) =>
-              p.categories.some((c) => c.slug === col.slug)
-            ).length;
+        {allCategories.length > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 sm:gap-8">
+            {allCategories.map((col, idx) => {
+              const count = allProducts.filter((p) =>
+                p.categories.some((c) => c.slug === col.slug)
+              ).length;
 
-            return (
-              <Link
-                key={col.id || col.slug}
-                to={`/collections/${col.slug}`}
-                className="group block relative rounded-[2rem] overflow-hidden aspect-[16/10] sm:aspect-[16/9] bg-[#110B0E] border border-[#C5A059]/40 shadow-lg hover:shadow-2xl hover:border-[#C5A059] transition-all duration-500"
-              >
-                {/* Landscape Hero Image */}
-                <img
-                  src={col.heroImage}
-                  alt={col.name}
-                  className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-700 opacity-90 group-hover:opacity-100"
-                />
+              return (
+                <Link
+                  key={col.id || col.slug}
+                  to={`/collections/${col.slug}`}
+                  className="group block relative rounded-[2rem] overflow-hidden aspect-[16/10] sm:aspect-[16/9] bg-[#110B0E] border border-[#C5A059]/40 shadow-lg hover:shadow-2xl hover:border-[#C5A059] transition-all duration-500"
+                >
+                  {/* Landscape Hero Image */}
+                  <img
+                    src={col.heroImage}
+                    alt={col.name}
+                    className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-700 opacity-90 group-hover:opacity-100"
+                  />
 
-                {/* Atmospheric Gradient Overlays */}
-                <div className="absolute inset-0 bg-gradient-to-t from-[#110B0E] via-[#110B0E]/40 to-black/20" />
-                <div className="absolute inset-0 bg-gradient-to-r from-[#110B0E]/70 via-transparent to-transparent hidden sm:block" />
+                  {/* Atmospheric Gradient Overlays */}
+                  <div className="absolute inset-0 bg-gradient-to-t from-[#110B0E] via-[#110B0E]/40 to-black/20" />
+                  <div className="absolute inset-0 bg-gradient-to-r from-[#110B0E]/70 via-transparent to-transparent hidden sm:block" />
 
-                {/* Top Bar Badges */}
-                <div className="absolute top-4 left-4 right-4 flex items-center justify-between pointer-events-none">
-                  <span className="bg-[#701626]/90 backdrop-blur-md px-3 py-1 rounded-full text-[9px] text-[#DFBF77] font-bold uppercase tracking-[0.22em] border border-[#C5A059]/40 shadow-md">
-                    Edit 0{idx + 1}
-                  </span>
-                  <span className="bg-white/95 backdrop-blur-md px-3.5 py-1 rounded-full text-[8.5px] text-[#701626] font-bold uppercase tracking-[0.2em] shadow-md border border-[#C5A059]/40">
-                    {col.season || 'Curated Edit'}
-                  </span>
-                </div>
+                  {/* Top Bar Badges */}
+                  <div className="absolute top-4 left-4 right-4 flex items-center justify-between pointer-events-none">
+                    <span className="bg-[#701626]/90 backdrop-blur-md px-3 py-1 rounded-full text-[9px] text-[#DFBF77] font-bold uppercase tracking-[0.22em] border border-[#C5A059]/40 shadow-md">
+                      Edit 0{idx + 1}
+                    </span>
+                    <span className="bg-white/95 backdrop-blur-md px-3.5 py-1 rounded-full text-[8.5px] text-[#701626] font-bold uppercase tracking-[0.2em] shadow-md border border-[#C5A059]/40">
+                      {col.season || 'Curated Edit'}
+                    </span>
+                  </div>
 
-                {/* Bottom Content Area */}
-                <div className="absolute bottom-0 left-0 right-0 p-5 sm:p-7 space-y-2 text-white">
-                  <div className="flex items-center gap-2">
-                    <span className="w-1.5 h-1.5 rounded-full bg-[#C5A059]" />
-                    <p className="text-[10px] uppercase tracking-[0.25em] text-[#DFBF77] font-bold">
-                      {count > 0 ? `${count} Silhouettes Handcrafted` : 'Atelier Release'}
+                  {/* Bottom Content Area */}
+                  <div className="absolute bottom-0 left-0 right-0 p-5 sm:p-7 space-y-2 text-white">
+                    <div className="flex items-center gap-2">
+                      <span className="w-1.5 h-1.5 rounded-full bg-[#C5A059]" />
+                      <p className="text-[10px] uppercase tracking-[0.25em] text-[#DFBF77] font-bold">
+                        {count > 0 ? `${count} Silhouettes Handcrafted` : 'Atelier Release'}
+                      </p>
+                    </div>
+
+                    <h3 className="font-display text-2xl sm:text-3xl lg:text-4xl font-bold group-hover:text-[#DFBF77] transition-colors leading-tight">
+                      {col.name}
+                    </h3>
+
+                    <p className="text-xs sm:text-sm text-white/80 font-light line-clamp-2 max-w-lg leading-relaxed">
+                      {col.description}
                     </p>
+
+                    <div className="pt-2 flex items-center justify-between">
+                      <span className="inline-flex items-center gap-2 text-xs font-bold text-[#DFBF77] uppercase tracking-[0.18em] group-hover:translate-x-1 transition-transform">
+                        <span>Explore Lookbook</span>
+                        <ArrowRight className="w-3.5 h-3.5" />
+                      </span>
+                      <span className="text-[10px] text-white/50 font-mono tracking-wider">
+                        azhai.lk/{col.slug}
+                      </span>
+                    </div>
                   </div>
-
-                  <h3 className="font-display text-2xl sm:text-3xl lg:text-4xl font-bold group-hover:text-[#DFBF77] transition-colors leading-tight">
-                    {col.name}
-                  </h3>
-
-                  <p className="text-xs sm:text-sm text-white/80 font-light line-clamp-2 max-w-lg leading-relaxed">
-                    {col.description}
-                  </p>
-
-                  <div className="pt-2 flex items-center justify-between">
-                    <span className="inline-flex items-center gap-2 text-xs font-bold text-[#DFBF77] uppercase tracking-[0.18em] group-hover:translate-x-1 transition-transform">
-                      <span>Explore Lookbook</span>
-                      <ArrowRight className="w-3.5 h-3.5" />
-                    </span>
-                    <span className="text-[10px] text-white/50 font-mono tracking-wider">
-                      azhai.lk/{col.slug}
-                    </span>
-                  </div>
-                </div>
-              </Link>
-            );
-          })}
-        </div>
+                </Link>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="py-16 text-center space-y-3 bg-white rounded-3xl p-8 border border-[#C5A059]/30 max-w-lg mx-auto shadow-sm">
+            <Sparkles className="w-8 h-8 text-[#C5A059] mx-auto" />
+            <p className="font-display text-xl font-bold text-[#110B0E]">New Curations Unveiling Soon</p>
+            <p className="text-xs text-[#6D6268] leading-relaxed">
+              Our artisanal silk drops, handcrafted sarees, and festive silhouettes are being prepared in our Colombo atelier.
+            </p>
+          </div>
+        )}
       </section>
 
       {/* Liyawel Cultural Vine Divider */}

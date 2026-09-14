@@ -1,0 +1,21 @@
+{
+  "name": "Azhai Clothing by Preethi",
+  "short_name": "Azhai",
+  "description": "Luxury festive & bespoke bridal couture atelier in Colombo, Sri Lanka.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#FCFBF8",
+  "theme_color": "#701626",
+  "icons": [
+    {
+      "src": "/logo-gold.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/logo-gold.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

@@ -37,7 +37,7 @@ const INITIAL_REVIEWS: Review[] = [
     date: '1 month ago',
     title: 'Prompt delivery and heirloom packaging',
     comment:
-      'Arrived in Kandy within 48 hours via PromptX courier. The gold zari weaving is breathtaking and the fabric breathes beautifully in our climate.',
+      'Arrived in Kandy within 48 hours via Sri Lanka Post Speed Post. The gold zari weaving is breathtaking and the fabric breathes beautifully in our climate.',
     fit: 'True to Size',
     verified: true,
     likes: 8,

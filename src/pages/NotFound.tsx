@@ -1,10 +1,24 @@
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Compass, ArrowRight, Home, Sparkles } from 'lucide-react';
+import SEOHead from '@/components/SEOHead';
+
+import { useAdminStore } from '@/store/admin';
 
 export default function NotFound() {
+  const categories = useAdminStore((s) => s.categories);
+
+  const shortcuts = categories && categories.length > 0 
+    ? categories.slice(0, 4).map((c) => ({ label: c.name, to: `/collections/${c.slug}` }))
+    : [
+        { label: 'All Collections', to: '/collections' },
+        { label: 'Custom Tailoring', to: '/tailoring' },
+        { label: 'Our Story', to: '/story' },
+        { label: 'Contact Us', to: '/contact' },
+      ];
   return (
     <div className="min-h-screen bg-[#FCFBF8] pt-28 pb-20 px-4 sm:px-8 flex items-center justify-center text-center text-[#110B0E] relative overflow-hidden">
+      <SEOHead title="Page Not Found" noindex={true} />
       {/* Background Decorative Glow */}
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[550px] h-[550px] bg-gradient-to-br from-[#701626]/10 via-[#C5A059]/10 to-transparent rounded-full blur-3xl pointer-events-none" />
 
@@ -33,12 +47,7 @@ export default function NotFound() {
             Explore Handcrafted Collections:
           </p>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-            {[
-              { label: 'Kurties', to: '/collections/kurties' },
-              { label: 'Sarees', to: '/collections/sarees' },
-              { label: 'Shawls', to: '/collections/shawls' },
-              { label: 'Tops', to: '/collections/tops' },
-            ].map((col) => (
+            {shortcuts.map((col) => (
               <Link
                 key={col.label}
                 to={col.to}

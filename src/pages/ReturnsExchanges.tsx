@@ -1,9 +1,21 @@
 import { Link } from 'react-router-dom';
 import { RotateCcw, CheckCircle2, AlertCircle, ArrowLeft, MessageCircle, Truck } from 'lucide-react';
+import SEOHead from '@/components/SEOHead';
+import { useAdminStore, cleanWhatsAppDigits } from '@/store/admin';
+import { STORE_PHONE } from '@/lib/constants';
 
 export default function ReturnsExchanges() {
+  const settings = useAdminStore((s) => s.settings);
+  const activeWhatsApp = settings?.whatsappNumber || STORE_PHONE;
+  const activeWhatsAppDigits = cleanWhatsAppDigits(activeWhatsApp);
   return (
     <div className="min-h-screen bg-[#FCFBF8] pt-24 pb-20 text-[#110B0E]">
+      <SEOHead
+        title="14-Day Exchanges & Returns Policy — Azhai Guarantee"
+        description="Experience hassle-free sizing exchanges with Azhai. 14-day doorstep courier exchange service across Sri Lanka for unworn festive pieces."
+        canonicalUrl="https://azhaiclothing.lk/returns-exchanges"
+        url="https://azhaiclothing.lk/returns-exchanges"
+      />
       <div className="max-w-4xl mx-auto px-4 sm:px-8 py-10 space-y-10">
         
         {/* Back Link */}
@@ -82,12 +94,12 @@ export default function ReturnsExchanges() {
         {/* WhatsApp Button */}
         <div className="text-center pt-2">
           <a
-            href="https://wa.me/?text=Hi%20Preethi!%20I%20would%20like%20to%20request%20a%2014-day%20exchange%20for%20my%20order."
+            href={`https://wa.me/${activeWhatsAppDigits}?text=${encodeURIComponent('Hi Preethi! I would like to request a 14-day exchange for my order.')}`}
             target="_blank"
             rel="noreferrer"
             className="inline-flex items-center gap-2 px-8 py-4 bg-[#701626] hover:bg-[#8E1E34] text-white text-xs font-bold uppercase tracking-[0.2em] rounded-2xl shadow-lg transition-all"
           >
-            <MessageCircle className="w-4 h-4" /> Start Exchange on WhatsApp
+            <MessageCircle className="w-4 h-4" /> Start Exchange on WhatsApp ({activeWhatsApp})
           </a>
         </div>
 

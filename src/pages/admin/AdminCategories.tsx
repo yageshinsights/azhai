@@ -93,8 +93,25 @@ export default function AdminCategories() {
             </span>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-            {categories.map((cat) => {
+          {categories.length === 0 ? (
+            <div className="bg-white rounded-3xl border border-dashed border-[#C5A059]/40 p-12 text-center space-y-3">
+              <div className="w-12 h-12 rounded-full bg-[#F7F4EE] border border-[#C5A059]/30 flex items-center justify-center mx-auto text-[#701626]">
+                <FolderPlus className="w-6 h-6" />
+              </div>
+              <p className="font-display font-bold text-base text-[#110B0E]">No collections created yet</p>
+              <p className="text-xs text-[#6D6268] max-w-sm mx-auto">
+                Create your first boutique category or seasonal edit to organize your creations.
+              </p>
+              <button
+                onClick={handleOpenAddCat}
+                className="inline-flex items-center gap-2 px-4 py-2 bg-[#701626] hover:bg-[#8E1E34] text-white text-xs font-bold rounded-xl transition-all cursor-pointer shadow-sm"
+              >
+                <FolderPlus className="w-4 h-4" /> Add New Collection
+              </button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+              {categories.map((cat) => {
               const productCount = products.filter((p) =>
                 p.categories.some((c) => c.slug === cat.slug)
               ).length;
@@ -178,7 +195,8 @@ export default function AdminCategories() {
               );
             })}
           </div>
-        </div>
+        )}
+      </div>
 
         {/* ── 2. MARKETING TAGS & BADGES LIBRARY ── */}
         <div className="bg-white rounded-3xl p-6 sm:p-8 border border-[#C5A059]/30 shadow-sm space-y-5">

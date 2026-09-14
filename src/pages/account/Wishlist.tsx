@@ -1,17 +1,29 @@
 import { Link } from 'react-router-dom';
 import { Heart, ShoppingBag, Trash2, ArrowRight, Sparkles, Check } from 'lucide-react';
 import { useAuthStore } from '@/store/auth';
+import { useAdminStore } from '@/store/admin';
 import { useCartStore } from '@/store/cart';
 import { PRODUCTS } from '@/lib/data';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 export default function Wishlist() {
-  const { wishlist, removeFromWishlist } = useAuthStore();
+  const { wishlist, removeFromWishlist, cleanWishlist } = useAuthStore();
   const { addItem } = useCartStore();
+  const adminProducts = useAdminStore((s) => s.products);
+  const allProducts = Array.isArray(adminProducts) ? adminProducts : PRODUCTS;
   const [addedSlug, setAddedSlug] = useState<string | null>(null);
 
+  // Auto clean-up any orphaned or stale slugs from local storage
+  useEffect(() => {
+    const validSlugs = allProducts.map((p) => p.slug);
+    const hasOrphaned = wishlist.some((slug) => !validSlugs.includes(slug));
+    if (hasOrphaned) {
+      cleanWishlist(validSlugs);
+    }
+  }, [wishlist, allProducts, cleanWishlist]);
+
   // Match saved slugs to catalog products
-  const savedProducts = PRODUCTS.filter((p) => wishlist.includes(p.slug));
+  const savedProducts = allProducts.filter((p) => wishlist.includes(p.slug));
 
   const handleMoveToBag = (product: typeof PRODUCTS[0]) => {
     addItem({

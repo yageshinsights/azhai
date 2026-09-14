@@ -1,37 +1,126 @@
 import { useParams, Link } from 'react-router-dom';
-import { motion } from 'framer-motion';
-import { CheckCircle2, Truck, ArrowRight, Crown, UserPlus, FileText, Mail, Sparkles } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { 
+  CheckCircle2, Truck, ArrowRight, Crown, UserPlus, FileText, Mail, 
+  Sparkles, AlertCircle, Building2, Copy, Check, Upload, FileCheck, 
+  MessageCircle, ExternalLink, RefreshCw 
+} from 'lucide-react';
 import { useCartStore } from '@/store/cart';
 import { useAuthStore } from '@/store/auth';
+import { useAdminStore, cleanWhatsAppDigits } from '@/store/admin';
+import SEOHead from '@/components/SEOHead';
+import { STORE_PHONE } from '@/lib/constants';
+import BankBadge from '@/components/BankBadge';
+import { compressToWebP } from '@/lib/image-compressor';
+import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 
 export default function OrderSuccess() {
   const { orderId } = useParams<{ orderId: string }>();
   const { lastOrder } = useCartStore();
-  const { isAuthenticated } = useAuthStore();
+  const { isAuthenticated, orders: authOrders } = useAuthStore();
+  const adminOrders = useAdminStore((s) => s.orders);
+  const settings = useAdminStore((s) => s.settings);
+  const activeWhatsApp = settings?.whatsappNumber || STORE_PHONE;
+  const activeWhatsAppDigits = cleanWhatsAppDigits(activeWhatsApp);
 
-  const order = lastOrder || {
-    orderId: orderId || 'AZH-84291',
-    items: [],
-    subtotal: 14500,
-    discount: 0,
-    shipping: 0,
-    total: 14500,
-    customer: {
-      fullName: 'Valued Customer',
-      email: 'customer@example.com',
-      phone: '077 123 4567',
-      address: 'Colombo, Sri Lanka',
-      city: 'Colombo',
-      district: 'Colombo',
-      postalCode: '00700'
-    },
-    deliveryMethod: 'Island-wide Standard Courier (1-3 Days)',
-    paymentMethod: 'Cash on Delivery (COD)',
-    placedAt: new Date().toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' })
+  // Local state for slip upload and copy feedback
+  const [copiedField, setCopiedField] = useState<string | null>(null);
+  const [isUploadingSlip, setIsUploadingSlip] = useState(false);
+  const [slipUploadError, setSlipUploadError] = useState<string | null>(null);
+  const [localSlipUrl, setLocalSlipUrl] = useState<string | null>(null);
+  const [referenceInput, setReferenceInput] = useState('');
+  const [previewModalUrl, setPreviewModalUrl] = useState<string | null>(null);
+
+  const handleCopy = (text: string, field: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedField(field);
+    setTimeout(() => setCopiedField(null), 2000);
   };
+
+  // Multi-tier order lookup: lastOrder -> authOrders -> adminOrders
+  const order = useMemo(() => {
+    if (lastOrder && (!orderId || lastOrder.orderId === orderId)) {
+      return lastOrder;
+    }
+    const foundAuth = authOrders.find((o) => o.orderId === orderId);
+    if (foundAuth) return foundAuth;
+
+    const foundAdmin = adminOrders.find((o) => o.orderId === orderId);
+    if (foundAdmin) {
+      return {
+        orderId: foundAdmin.orderId,
+        items: (foundAdmin.items || []).map((it: any, idx: number) => ({
+          id: it.id || idx,
+          name: it.name,
+          price: it.price,
+          image: it.image,
+          quantity: it.quantity,
+          size: it.size,
+          tailoring: it.tailoring,
+        })),
+        subtotal: foundAdmin.subtotal,
+        discount: foundAdmin.discount,
+        shipping: foundAdmin.shipping,
+        total: foundAdmin.total,
+        customer: {
+          fullName: foundAdmin.customer?.fullName || 'Valued Patron',
+          email: foundAdmin.customer?.email || 'customer@azhaiclothing.lk',
+          phone: foundAdmin.customer?.phone || '',
+          address: foundAdmin.customer?.address || '',
+          city: foundAdmin.customer?.city || '',
+          district: foundAdmin.customer?.district || 'Colombo',
+          postalCode: foundAdmin.customer?.postalCode || '',
+        },
+        deliveryMethod: foundAdmin.deliveryMethod || 'Standard Courier',
+        paymentMethod: foundAdmin.paymentMethod || 'Confirmed Order',
+        placedAt: foundAdmin.placedAt || new Date().toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' }),
+        paymentStatus: foundAdmin.paymentStatus,
+        bankTransferDetails: foundAdmin.bankTransferDetails,
+      };
+    }
+
+    return lastOrder || null;
+  }, [orderId, lastOrder, authOrders, adminOrders]);
+
+  if (!order) {
+    return (
+      <div className="min-h-screen bg-[#FCFBF8] pt-28 pb-20 text-[#110B0E]">
+        <SEOHead title="Order Status" noindex={true} />
+        <div className="max-w-xl mx-auto px-4 text-center space-y-6">
+          <div className="w-16 h-16 rounded-full bg-amber-50 border border-amber-200 text-amber-600 flex items-center justify-center mx-auto">
+            <AlertCircle className="w-8 h-8" />
+          </div>
+          <div className="space-y-2">
+            <h1 className="font-display text-3xl font-bold text-[#110B0E]">Order Reference #{orderId || 'Not Found'}</h1>
+            <p className="text-xs text-[#6D6268] leading-relaxed">
+              We could not find active receipt details for this order code in your current browser session. If you placed this order recently, our atelier has already received your order record.
+            </p>
+          </div>
+          <div className="flex flex-col sm:flex-row gap-3 justify-center pt-2">
+            <Link
+              to={isAuthenticated ? "/account?tab=orders" : "/collections"}
+              className="px-6 py-3 bg-[#701626] hover:bg-[#8E1E34] text-white text-xs font-bold uppercase tracking-wider rounded-2xl"
+            >
+              {isAuthenticated ? 'View My Orders' : 'Explore Collections'}
+            </Link>
+            <a
+              href={`https://wa.me/${activeWhatsAppDigits}?text=${encodeURIComponent(`Hi Preethi, I placed an order (#${orderId || ''}) and would like to verify dispatch status.`)}`}
+              target="_blank"
+              rel="noreferrer"
+              className="px-6 py-3 bg-white hover:bg-gray-50 border border-[#C5A059]/40 text-[#110B0E] text-xs font-bold uppercase tracking-wider rounded-2xl flex items-center gap-1.5"
+            >
+              <span>Ask Concierge ({activeWhatsApp})</span>
+            </a>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#FCFBF8] pt-24 pb-20 text-[#110B0E]">
+      <SEOHead title="Order Confirmed" noindex={true} />
       <div className="max-w-3xl mx-auto px-4 sm:px-8">
         
         <motion.div
@@ -41,21 +130,74 @@ export default function OrderSuccess() {
           className="rounded-[2.5rem] bg-white border border-[#C5A059]/40 shadow-2xl p-6 sm:p-12 text-center space-y-8"
         >
           {/* Top Celebration Badge */}
-          <div className="space-y-3">
-            <div className="w-20 h-20 rounded-full bg-emerald-50 border border-emerald-200 flex items-center justify-center mx-auto shadow-sm">
-              <CheckCircle2 className="w-10 h-10 text-emerald-600" />
-            </div>
-            <span className="text-[10px] uppercase tracking-[0.3em] text-[#701626] font-bold bg-[#701626]/8 border border-[#C5A059]/30 px-4 py-1.5 rounded-full inline-flex items-center gap-1.5">
-              <Crown className="w-3.5 h-3.5 text-[#C5A059]" />
-              <span>Order Confirmed & Placed</span>
-            </span>
-            <h1 className="font-display text-4xl sm:text-5xl font-bold text-[#110B0E]">
-              Thank You, {order.customer.fullName.split(' ')[0]}!
-            </h1>
-            <p className="text-sm text-[#6D6268] max-w-md mx-auto font-light leading-relaxed">
-              Your order <strong className="text-[#701626] font-bold">#{order.orderId}</strong> has been received and is being prepared with dedication by our Colombo atelier.
-            </p>
-          </div>
+          {(() => {
+            const isBankTransfer = 
+              order.paymentStatus === 'pending_bank' ||
+              (order.paymentMethod && order.paymentMethod.toLowerCase().includes('bank')) ||
+              Boolean(order.bankTransferDetails);
+
+            const activeSlipUrl = localSlipUrl || order.bankTransferDetails?.slipUrl;
+
+            if (isBankTransfer) {
+              return (
+                <div className="space-y-3">
+                  <div className={`w-20 h-20 rounded-full flex items-center justify-center mx-auto shadow-sm ${
+                    activeSlipUrl ? 'bg-emerald-50 border border-emerald-200' : 'bg-amber-50 border border-amber-200'
+                  }`}>
+                    {activeSlipUrl ? (
+                      <FileCheck className="w-10 h-10 text-emerald-600" />
+                    ) : (
+                      <Building2 className="w-10 h-10 text-[#701626]" />
+                    )}
+                  </div>
+                  <span className={`text-[10px] uppercase tracking-[0.25em] font-bold px-4 py-1.5 rounded-full inline-flex items-center gap-1.5 ${
+                    activeSlipUrl 
+                      ? 'bg-emerald-50 text-emerald-800 border border-emerald-300'
+                      : 'bg-amber-50 text-amber-900 border border-amber-300'
+                  }`}>
+                    {activeSlipUrl ? (
+                      <>
+                        <Check className="w-3.5 h-3.5 text-emerald-600" />
+                        <span>Slip Submitted · Verification in Progress</span>
+                      </>
+                    ) : (
+                      <>
+                        <Crown className="w-3.5 h-3.5 text-[#C5A059]" />
+                        <span>Order Reserved · Awaiting Bank Deposit</span>
+                      </>
+                    )}
+                  </span>
+                  <h1 className="font-display text-4xl sm:text-5xl font-bold text-[#110B0E]">
+                    Thank You, {order.customer.fullName.split(' ')[0]}!
+                  </h1>
+                  <p className="text-sm text-[#6D6268] max-w-md mx-auto font-light leading-relaxed">
+                    Your order <strong className="text-[#701626] font-bold">#{order.orderId}</strong> is reserved.
+                    {activeSlipUrl 
+                      ? ' We have received your payment slip and our atelier team is verifying your deposit.'
+                      : ' Please complete the bank transfer using the account details below and submit your deposit slip.'}
+                  </p>
+                </div>
+              );
+            }
+
+            return (
+              <div className="space-y-3">
+                <div className="w-20 h-20 rounded-full bg-emerald-50 border border-emerald-200 flex items-center justify-center mx-auto shadow-sm">
+                  <CheckCircle2 className="w-10 h-10 text-emerald-600" />
+                </div>
+                <span className="text-[10px] uppercase tracking-[0.3em] text-[#701626] font-bold bg-[#701626]/8 border border-[#C5A059]/30 px-4 py-1.5 rounded-full inline-flex items-center gap-1.5">
+                  <Crown className="w-3.5 h-3.5 text-[#C5A059]" />
+                  <span>Order Confirmed &amp; Placed</span>
+                </span>
+                <h1 className="font-display text-4xl sm:text-5xl font-bold text-[#110B0E]">
+                  Thank You, {order.customer.fullName.split(' ')[0]}!
+                </h1>
+                <p className="text-sm text-[#6D6268] max-w-md mx-auto font-light leading-relaxed">
+                  Your order <strong className="text-[#701626] font-bold">#{order.orderId}</strong> has been received and is being prepared with dedication by our Colombo atelier.
+                </p>
+              </div>
+            );
+          })()}
 
           {/* Email Confirmation Alert Banner */}
           <motion.div 
@@ -73,10 +215,319 @@ export default function OrderSuccess() {
                 <Sparkles className="w-3 h-3 text-[#C5A059]" />
               </p>
               <p className="text-[11px] text-[#6D6268] truncate">
-                We sent your receipt, tailoring breakdown & tracking updates to <strong className="text-[#701626]">{order.customer.email}</strong>.
+                We sent your receipt, tailoring breakdown &amp; tracking updates to <strong className="text-[#701626]">{order.customer.email}</strong>.
               </p>
             </div>
           </motion.div>
+
+          {/* Dedicated Direct Bank Transfer Deposit Instructions & Slip Upload */}
+          {(() => {
+            const isBankTransfer = 
+              order.paymentStatus === 'pending_bank' ||
+              (order.paymentMethod && order.paymentMethod.toLowerCase().includes('bank')) ||
+              Boolean(order.bankTransferDetails);
+
+            if (!isBankTransfer) return null;
+
+            const bank: any = order.bankTransferDetails || 
+              settings?.bankAccounts?.find(b => b.isActive) || 
+              settings?.bankAccounts?.[0] || {
+                bankName: 'Commercial Bank of Ceylon',
+                accountName: 'Azhai Clothing (Pvt) Ltd',
+                accountNumber: '8009234567',
+                branchName: 'Colombo 07 Boutique Branch',
+                bankLogo: undefined,
+                swiftCode: 'CCEYLKLY',
+                customInstructions: 'Please state Order ID as the deposit reference.',
+              };
+
+            const activeSlipUrl = localSlipUrl || order.bankTransferDetails?.slipUrl;
+
+            const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+              const file = e.target.files?.[0];
+              if (!file) return;
+
+              setIsUploadingSlip(true);
+              setSlipUploadError(null);
+
+              try {
+                let uploadedUrl = '';
+                if (file.type.startsWith('image/')) {
+                  const webpFile = await compressToWebP(file, { maxWidth: 1400, maxHeight: 1400 });
+                  if (isSupabaseConfigured()) {
+                    const fileName = `order-slips/${order.orderId}-${Date.now()}-${webpFile.name}`;
+                    const { error } = await supabase.storage.from('product-images').upload(fileName, webpFile);
+                    if (!error) {
+                      const { data } = supabase.storage.from('product-images').getPublicUrl(fileName);
+                      uploadedUrl = data.publicUrl;
+                    }
+                  }
+                  if (!uploadedUrl) {
+                    uploadedUrl = await new Promise<string>((resolve) => {
+                      const r = new FileReader();
+                      r.onload = () => resolve(r.result as string);
+                      r.readAsDataURL(webpFile);
+                    });
+                  }
+                } else {
+                  uploadedUrl = await new Promise<string>((resolve) => {
+                    const r = new FileReader();
+                    r.onload = () => resolve(r.result as string);
+                    r.readAsDataURL(file);
+                  });
+                }
+
+                setLocalSlipUrl(uploadedUrl);
+                useAdminStore.getState().uploadOrderBankSlip(order.orderId, uploadedUrl, referenceInput.trim());
+
+                if (lastOrder && lastOrder.orderId === order.orderId) {
+                  useCartStore.getState().setLastOrder({
+                    ...lastOrder,
+                    bankTransferDetails: {
+                      ...(lastOrder.bankTransferDetails as any),
+                      slipUrl: uploadedUrl,
+                      referenceNumber: referenceInput.trim() || lastOrder.bankTransferDetails?.referenceNumber,
+                      submittedAt: new Date().toISOString(),
+                    },
+                  });
+                }
+              } catch (err: any) {
+                console.error('[Slip Upload Error]:', err);
+                setSlipUploadError('Failed to process slip image. Please try again or send via WhatsApp.');
+              } finally {
+                setIsUploadingSlip(false);
+              }
+            };
+
+            const waMsg = encodeURIComponent(
+              `Hello Preethi! I placed Order #${order.orderId} (LKR ${order.total.toLocaleString('en-US')}) via Direct Bank Transfer to ${bank.bankName}. Here is my transfer deposit slip:`
+            );
+
+            return (
+              <motion.div
+                initial={{ opacity: 0, y: 15 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.25 }}
+                className="p-5 sm:p-7 rounded-3xl bg-[#FCFBF8] border-2 border-[#DFBF77] text-left space-y-6 shadow-sm"
+              >
+                {/* Header */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-4 border-b border-[#C5A059]/20">
+                  <div>
+                    <span className="text-[10px] uppercase tracking-[0.25em] text-[#701626] font-bold">
+                      Payment Instructions
+                    </span>
+                    <h3 className="font-display text-lg sm:text-xl font-bold text-[#110B0E] flex items-center gap-2 pt-0.5">
+                      <Building2 className="w-5 h-5 text-[#701626]" />
+                      <span>Direct Bank Deposit Details</span>
+                    </h3>
+                  </div>
+
+                  <span className="self-start sm:self-auto text-xs px-3 py-1 rounded-full font-bold bg-[#701626]/10 text-[#701626] border border-[#701626]/20">
+                    Amount: LKR {order.total.toLocaleString('en-US')}
+                  </span>
+                </div>
+
+                {/* Bank Coordinates Grid */}
+                <div className="p-4 sm:p-5 rounded-2xl bg-white border border-[#C5A059]/30 space-y-3.5">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2.5">
+                      <BankBadge bankName={bank.bankName} logoUrl={bank.bankLogo} size="md" />
+                      <div>
+                        <p className="font-display text-sm sm:text-base font-bold text-[#110B0E]">{bank.bankName}</p>
+                        {bank.branchName && (
+                          <p className="text-[11px] text-[#6D6268]">Branch: {bank.branchName}</p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 text-xs border-t border-[#C5A059]/20">
+                    <div>
+                      <span className="text-[10px] text-[#6D6268] uppercase font-bold tracking-wider">Account Holder</span>
+                      <p className="font-bold text-[#110B0E] pt-0.5">{bank.accountName}</p>
+                    </div>
+
+                    <div>
+                      <span className="text-[10px] text-[#6D6268] uppercase font-bold tracking-wider">Account Number</span>
+                      <div className="flex items-center gap-2 pt-0.5">
+                        <span className="font-mono text-sm font-bold text-[#701626] tracking-wide">{bank.accountNumber}</span>
+                        <button
+                          type="button"
+                          onClick={() => handleCopy(bank.accountNumber, 'acc')}
+                          className="px-2 py-0.5 rounded-md bg-[#F7F4EE] hover:bg-[#DFBF77]/30 text-[#701626] text-[10px] font-bold border border-[#C5A059]/30 inline-flex items-center gap-1 transition-colors cursor-pointer"
+                        >
+                          {copiedField === 'acc' ? (
+                            <>
+                              <Check className="w-3 h-3 text-emerald-600" />
+                              <span className="text-emerald-700">Copied</span>
+                            </>
+                          ) : (
+                            <>
+                              <Copy className="w-3 h-3" />
+                              <span>Copy</span>
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    </div>
+
+                    {bank.swiftCode && (
+                      <div>
+                        <span className="text-[10px] text-[#6D6268] uppercase font-bold tracking-wider">SWIFT Code</span>
+                        <p className="font-mono font-bold text-[#110B0E] pt-0.5">{bank.swiftCode}</p>
+                      </div>
+                    )}
+
+                    <div>
+                      <span className="text-[10px] text-[#6D6268] uppercase font-bold tracking-wider">Transfer Reference</span>
+                      <div className="flex items-center gap-2 pt-0.5">
+                        <span className="font-mono text-sm font-bold text-[#110B0E]">#{order.orderId}</span>
+                        <button
+                          type="button"
+                          onClick={() => handleCopy(order.orderId, 'ref')}
+                          className="px-2 py-0.5 rounded-md bg-[#F7F4EE] hover:bg-[#DFBF77]/30 text-[#701626] text-[10px] font-bold border border-[#C5A059]/30 inline-flex items-center gap-1 transition-colors cursor-pointer"
+                        >
+                          {copiedField === 'ref' ? (
+                            <>
+                              <Check className="w-3 h-3 text-emerald-600" />
+                              <span className="text-emerald-700">Copied</span>
+                            </>
+                          ) : (
+                            <>
+                              <Copy className="w-3 h-3" />
+                              <span>Copy</span>
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  {(bank.customInstructions || bank.instructions) && (
+                    <div className="p-3 rounded-xl bg-[#F7F4EE]/80 border border-[#C5A059]/30 text-[11px] text-[#6D6268] italic">
+                      ℹ️ {bank.customInstructions || bank.instructions}
+                    </div>
+                  )}
+                </div>
+
+                {/* Slip Submission Actions */}
+                <div className="space-y-4 pt-2">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-[#110B0E] flex items-center gap-1.5">
+                      <Upload className="w-4 h-4 text-[#701626]" />
+                      <span>Submit Your Bank Deposit Slip</span>
+                    </h4>
+                    {activeSlipUrl && (
+                      <span className="text-[10px] text-emerald-700 font-bold bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200 flex items-center gap-1">
+                        <Check className="w-3 h-3 text-emerald-600" /> Attached
+                      </span>
+                    )}
+                  </div>
+
+                  {activeSlipUrl ? (
+                    <div className="p-4 rounded-2xl bg-emerald-50/60 border border-emerald-200 flex flex-col sm:flex-row items-center justify-between gap-4">
+                      <div className="flex items-center gap-3 w-full sm:w-auto">
+                        <div className="relative group cursor-pointer" onClick={() => setPreviewModalUrl(activeSlipUrl)}>
+                          <img
+                            src={activeSlipUrl}
+                            alt="Deposit Slip"
+                            className="w-16 h-16 object-cover rounded-xl border border-emerald-300 shadow-xs"
+                          />
+                          <div className="absolute inset-0 bg-black/30 rounded-xl opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity text-white">
+                            <ExternalLink className="w-4 h-4" />
+                          </div>
+                        </div>
+                        <div>
+                          <p className="text-xs font-bold text-emerald-900 flex items-center gap-1">
+                            <span>Payment Slip Uploaded</span>
+                            <Check className="w-3.5 h-3.5 text-emerald-600" />
+                          </p>
+                          <p className="text-[11px] text-emerald-700 font-light">
+                            Our team is verifying the transaction against bank records.
+                          </p>
+                          <button
+                            type="button"
+                            onClick={() => setPreviewModalUrl(activeSlipUrl)}
+                            className="text-[11px] font-bold text-[#701626] underline pt-0.5 hover:text-[#8E1E34]"
+                          >
+                            View Full Slip
+                          </button>
+                        </div>
+                      </div>
+
+                      <label className="px-4 py-2 bg-white hover:bg-gray-50 text-[#110B0E] text-xs font-bold rounded-xl border border-gray-300 cursor-pointer transition-colors shrink-0 flex items-center gap-1.5">
+                        <RefreshCw className="w-3.5 h-3.5 text-[#6D6268]" />
+                        <span>Replace Slip</span>
+                        <input
+                          type="file"
+                          accept="image/*,application/pdf"
+                          onChange={handleFileSelect}
+                          className="hidden"
+                          disabled={isUploadingSlip}
+                        />
+                      </label>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        <div className="sm:col-span-2">
+                          <label className="block text-[11px] font-bold text-[#6D6268] mb-1">
+                            Bank Reference / Transaction ID (Optional)
+                          </label>
+                          <input
+                            type="text"
+                            value={referenceInput}
+                            onChange={(e) => setReferenceInput(e.target.value)}
+                            placeholder="e.g. TXN-948291 / Cheque #"
+                            className="w-full px-3.5 py-2.5 rounded-xl bg-white border border-[#C5A059]/40 text-xs text-[#110B0E] placeholder:text-gray-400 focus:outline-none focus:border-[#701626]"
+                          />
+                        </div>
+
+                        <div className="flex items-end">
+                          <label className={`w-full py-2.5 px-4 rounded-xl text-xs font-bold uppercase tracking-wider text-center cursor-pointer transition-all flex items-center justify-center gap-2 ${
+                            isUploadingSlip
+                              ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                              : 'bg-[#701626] hover:bg-[#8E1E34] text-white shadow-sm'
+                          }`}>
+                            <Upload className="w-4 h-4" />
+                            <span>{isUploadingSlip ? 'Compressing...' : 'Upload Slip'}</span>
+                            <input
+                              type="file"
+                              accept="image/*,application/pdf"
+                              onChange={handleFileSelect}
+                              disabled={isUploadingSlip}
+                              className="hidden"
+                            />
+                          </label>
+                        </div>
+                      </div>
+
+                      {slipUploadError && (
+                        <p className="text-xs text-rose-600 font-medium">{slipUploadError}</p>
+                      )}
+
+                      <p className="text-[11px] text-[#6D6268] italic">
+                        Supports photo, screenshot, or PDF receipts (compressed automatically for fast mobile delivery).
+                      </p>
+                    </div>
+                  )}
+
+                  {/* 1-Click WhatsApp Instant Submission */}
+                  <div className="pt-2">
+                    <a
+                      href={`https://wa.me/${activeWhatsAppDigits}?text=${waMsg}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="w-full py-3 px-4 rounded-2xl bg-[#25D366] hover:bg-[#20bd5a] text-white text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2 shadow-sm transition-all"
+                    >
+                      <MessageCircle className="w-4 h-4" />
+                      <span>Send Deposit Slip via WhatsApp ({activeWhatsApp})</span>
+                    </a>
+                  </div>
+                </div>
+              </motion.div>
+            );
+          })()}
 
           {/* Quick Tracking Status */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-left p-5 rounded-2xl bg-[#F7F4EE] border border-[#C5A059]/30 text-xs">
@@ -88,8 +539,14 @@ export default function OrderSuccess() {
               </p>
             </div>
             <div className="space-y-1">
-              <span className="text-[10px] uppercase tracking-wider text-[#6D6268] font-bold">Payment Method</span>
-              <p className="font-bold text-[#701626]">{order.paymentMethod}</p>
+              <span className="text-[10px] uppercase tracking-wider text-[#6D6268] font-bold">Payment Status</span>
+              <p className="font-bold text-[#701626]">
+                {order.paymentStatus === 'paid' 
+                  ? 'Paid in Full' 
+                  : order.paymentStatus === 'pending_bank'
+                  ? 'Awaiting Bank Transfer Verification'
+                  : order.paymentMethod}
+              </p>
             </div>
           </div>
 
@@ -181,6 +638,51 @@ export default function OrderSuccess() {
           </div>
 
         </motion.div>
+
+        {/* Slip Full View Modal */}
+        <AnimatePresence>
+          {previewModalUrl && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+              <motion.div
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.9 }}
+                className="relative max-w-2xl w-full bg-white rounded-3xl p-4 sm:p-6 space-y-4 shadow-2xl border border-[#C5A059]/40"
+              >
+                <div className="flex items-center justify-between pb-2 border-b border-[#C5A059]/20">
+                  <h4 className="font-display text-base font-bold text-[#110B0E]">
+                    Bank Deposit Slip Preview
+                  </h4>
+                  <button
+                    type="button"
+                    onClick={() => setPreviewModalUrl(null)}
+                    className="p-1.5 rounded-full hover:bg-gray-100 text-gray-500 hover:text-gray-900 transition-colors font-bold cursor-pointer"
+                  >
+                    ✕
+                  </button>
+                </div>
+                <div className="max-h-[70vh] overflow-auto rounded-xl flex items-center justify-center bg-[#F7F4EE]">
+                  <img
+                    src={previewModalUrl}
+                    alt="Deposit Slip Full"
+                    className="max-h-[65vh] w-auto object-contain rounded-lg"
+                  />
+                </div>
+                <div className="flex justify-end pt-2">
+                  <a
+                    href={previewModalUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-4 py-2 bg-[#701626] text-white text-xs font-bold rounded-xl flex items-center gap-1.5"
+                  >
+                    <span>Open in New Window</span>
+                    <ExternalLink className="w-3.5 h-3.5" />
+                  </a>
+                </div>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>
 
       </div>
     </div>

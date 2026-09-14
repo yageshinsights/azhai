@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { 
   Users, 
@@ -15,12 +15,42 @@ import {
 } from 'lucide-react';
 import AdminLayout from '@/components/admin/AdminLayout';
 import { useAdminStore, type CustomerRecord } from '@/store/admin';
+import { useAuthStore } from '@/store/auth';
 
 export default function AdminCustomers() {
-  const { customers } = useAdminStore();
+  const { customers, syncCustomerFromAuth } = useAdminStore();
+  const authAccounts = useAuthStore((s) => s.accounts);
+  const currentAuthUser = useAuthStore((s) => s.user);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedVipTier, setSelectedVipTier] = useState<string>('all');
   const [selectedCustomer, setSelectedCustomer] = useState<CustomerRecord | null>(null);
+
+  // Auto-sync any registered online patron accounts to the Admin CRM Registry
+  useEffect(() => {
+    if (Array.isArray(authAccounts)) {
+      authAccounts.forEach((acc) => {
+        if (acc?.user?.email) {
+          syncCustomerFromAuth({
+            fullName: acc.user.fullName,
+            email: acc.user.email,
+            phone: acc.user.phone || '',
+            district: acc.addresses?.[0]?.district || 'Colombo',
+            city: acc.addresses?.[0]?.city || 'Colombo',
+            createdAt: acc.user.createdAt,
+          });
+        }
+      });
+    }
+
+    if (currentAuthUser?.email) {
+      syncCustomerFromAuth({
+        fullName: currentAuthUser.fullName,
+        email: currentAuthUser.email,
+        phone: currentAuthUser.phone || '',
+        createdAt: currentAuthUser.createdAt,
+      });
+    }
+  }, [authAccounts, currentAuthUser, syncCustomerFromAuth]);
 
   const filteredCustomers = customers.filter((c) => {
     const matchSearch =
@@ -119,7 +149,14 @@ export default function AdminCustomers() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#C5A059]/15">
-                {filteredCustomers.map((c, idx) => {
+                {filteredCustomers.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="p-12 text-center text-[#6D6268]">
+                      No patrons found. Registered customers will appear here automatically.
+                    </td>
+                  </tr>
+                ) : (
+                  filteredCustomers.map((c, idx) => {
                   const cleanPhone = c.phone.replace(/[^0-9]/g, '');
                   const waMsg = encodeURIComponent(`Vanakkam ${c.fullName}! Preethi here from Azhai Boutique. I wanted to share our exclusive new silk drop with you.`);
 
@@ -183,7 +220,7 @@ export default function AdminCustomers() {
                       </td>
                     </tr>
                   );
-                })}
+                }))}
               </tbody>
             </table>
           </div>

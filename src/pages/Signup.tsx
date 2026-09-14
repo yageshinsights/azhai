@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { User, Mail, Phone, Lock, Eye, EyeOff, UserPlus, Sparkles, ArrowRight, ShieldCheck, Check } from 'lucide-react';
 import { useAuthStore } from '@/store/auth';
 import { validateEmail, validatePhone, getPasswordStrength } from '@/lib/auth-utils';
 import { sendBrevoEmail, buildWelcomeEmailHtml } from '@/lib/brevo';
+import SEOHead from '@/components/SEOHead';
 
 export default function Signup() {
   const [fullName, setFullName] = useState('');
@@ -17,8 +18,15 @@ export default function Signup() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const { signup } = useAuthStore();
+  const { signup, isAuthenticated } = useAuthStore();
   const navigate = useNavigate();
+
+  // Auto-redirect if already logged in
+  useEffect(() => {
+    if (isAuthenticated) {
+      navigate('/account', { replace: true });
+    }
+  }, [isAuthenticated, navigate]);
 
   const strength = getPasswordStrength(password);
 
@@ -77,6 +85,7 @@ export default function Signup() {
 
   return (
     <div className="min-h-screen pt-28 pb-16 px-4 sm:px-6 flex items-center justify-center relative overflow-hidden bg-[#FCFBF8]">
+      <SEOHead title="Create Your Atelier Account | Azhai Boutique Colombo" description="Create an Azhai account to save bespoke measurements, manage couture orders, and explore festive collections." noindex={true} />
       {/* Background Decorative Gradient Orbs */}
       <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[550px] h-[550px] bg-gradient-to-br from-[#701626]/10 via-[#C5A059]/10 to-transparent rounded-full blur-3xl pointer-events-none" />
 

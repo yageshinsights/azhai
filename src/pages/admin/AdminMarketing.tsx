@@ -148,50 +148,51 @@ export default function AdminMarketing() {
     } else if (type === 'order') {
       subject = '✨ [TEST] Order Confirmed #AZH-84920';
       html = buildOrderConfirmationHtml({
-        orderId: 'AZH-84920',
         customerName: 'Preethi',
-        total: 18500,
-        items: [{ name: 'Ivory Hand-Painted Lotus Organza Saree', size: 'Free Size', quantity: 1, price: 'LKR 18,500' }],
-        deliveryMethod: 'Express Colombo Same-Day',
-        paymentMethod: 'Cash on Delivery (COD)',
+        orderId: 'AZH-84920',
+        items: [
+          { name: 'Maroon Corset Handloom Kurti Set', price: 'LKR 14,500', size: 'M', quantity: 1, image: 'https://images.unsplash.com/photo-1610030469983-98e550d6193c?auto=format&fit=crop&w=600&q=80' }
+        ],
+        total: 14500,
+        deliveryMethod: 'Sri Lanka Post Speed Post (Zone A)',
+        paymentMethod: 'PayHere (Online Visa/MasterCard)',
       });
     } else if (type === 'shipped') {
-      subject = '🚚 [TEST] Dispatched: Order #AZH-84920';
+      subject = '🚚 [TEST] Your Azhai Ensemble is on the Way (#AZH-84920)';
       html = buildOrderShippedHtml({
-        orderId: 'AZH-84920',
         customerName: 'Preethi',
-        courierName: 'PromptX Express Courier',
-        trackingNumber: 'PRX-928104LK',
+        orderId: 'AZH-84920',
+        courierName: 'Sri Lanka Post Speed Post',
+        trackingNumber: 'BA849201991LK',
         destinationCity: 'Colombo 07',
       });
-    } else if (type === 'abandoned') {
-      subject = '🛒 [TEST] You left something exquisite in your bag';
-      html = buildAbandonedCartEmailHtml({
+    } else if (type === 'delivered') {
+      subject = '✨ [TEST] Delivered: Azhai Atelier Order #AZH-84920';
+      html = buildOrderDeliveredHtml({
         customerName: 'Preethi',
-        items: [{ name: 'Sacred Crimson Kanjivaram Silk Saree', price: 'LKR 26,500', size: 'Free Size' }],
-        couponCode: 'ATELIER5',
+        orderId: 'AZH-84920',
       });
     } else if (type === 'feedback') {
-      subject = '⭐ [TEST] How was your Azhai fit?';
+      subject = '🌸 [TEST] How does your Azhai drape feel?';
       html = buildPostDeliveryFeedbackEmailHtml({
-        orderId: 'AZH-84920',
         customerName: 'Preethi',
+        orderId: 'AZH-84920',
       });
     }
 
     await sendBrevoEmail({
-      to: [{ email: testEmailAddress, name: 'Store Owner' }],
+      to: [{ email: testEmailAddress, name: 'Atelier Admin' }],
       subject,
       htmlContent: html,
     });
 
     setSendingTestType(null);
-    showToast(`Test "${type.toUpperCase()}" email sent to ${testEmailAddress}!`);
+    showToast(`Test ${type} email sent to ${testEmailAddress}!`);
   };
 
   return (
     <AdminLayout>
-      <div className="space-y-8 max-w-7xl">
+      <div className="space-y-6 max-w-7xl">
         
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -201,15 +202,15 @@ export default function AdminMarketing() {
                 Marketing & Growth Automation
               </span>
             </div>
-            <h1 className="font-display text-3xl font-bold text-[#110B0E] pt-1">
+            <h1 className="font-display text-2xl sm:text-3xl font-bold text-[#110B0E] pt-1">
               Promotions, Emails & Recovery
             </h1>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="w-full sm:w-auto">
             <button
               onClick={() => setIsCouponModalOpen(true)}
-              className="px-5 py-2.5 bg-[#701626] hover:bg-[#8E1E34] text-white text-xs font-bold uppercase tracking-wider rounded-2xl shadow-sm transition-all flex items-center gap-2 cursor-pointer"
+              className="w-full sm:w-auto justify-center px-5 py-2.5 bg-[#701626] hover:bg-[#8E1E34] text-white text-xs font-bold uppercase tracking-wider rounded-2xl shadow-sm transition-all flex items-center gap-2 cursor-pointer"
             >
               <Plus className="w-4 h-4" /> Create Promo Coupon
             </button>
@@ -227,11 +228,11 @@ export default function AdminMarketing() {
           </motion.div>
         )}
 
-        {/* ── 3 MARKETING TABS ── */}
-        <div className="flex items-center gap-2 border-b border-[#C5A059]/30 pb-3">
+        {/* ── 3 MARKETING TABS (HORIZONTALLY SCROLLABLE ON MOBILE) ── */}
+        <div className="flex items-center gap-2 border-b border-[#C5A059]/30 pb-3 overflow-x-auto scrollbar-none -mx-3 px-3 sm:mx-0 sm:px-0">
           <button
             onClick={() => setActiveTab('coupons')}
-            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2 ${
+            className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2 shrink-0 whitespace-nowrap ${
               activeTab === 'coupons'
                 ? 'bg-[#701626] text-white shadow-md'
                 : 'bg-white text-[#6D6268] border border-[#C5A059]/20 hover:border-[#701626]'
@@ -243,7 +244,7 @@ export default function AdminMarketing() {
 
           <button
             onClick={() => setActiveTab('abandoned')}
-            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2 ${
+            className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2 shrink-0 whitespace-nowrap ${
               activeTab === 'abandoned'
                 ? 'bg-[#701626] text-white shadow-md'
                 : 'bg-white text-[#6D6268] border border-[#C5A059]/20 hover:border-[#701626]'
@@ -255,7 +256,7 @@ export default function AdminMarketing() {
 
           <button
             onClick={() => setActiveTab('templates')}
-            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2 ${
+            className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2 shrink-0 whitespace-nowrap ${
               activeTab === 'templates'
                 ? 'bg-[#701626] text-white shadow-md'
                 : 'bg-white text-[#6D6268] border border-[#C5A059]/20 hover:border-[#701626]'
@@ -268,13 +269,13 @@ export default function AdminMarketing() {
 
         {/* TAB 1: COUPONS & BANNER */}
         {activeTab === 'coupons' && (
-          <div className="space-y-8">
+          <div className="space-y-6">
             {/* ── LIVE STOREFRONT ANNOUNCEMENT TICKER MANAGER ── */}
-            <div className="bg-white rounded-3xl p-6 sm:p-8 border border-[#C5A059]/30 shadow-sm space-y-4">
-              <div className="flex items-center justify-between">
+            <div className="bg-white rounded-3xl p-5 sm:p-8 border border-[#C5A059]/30 shadow-sm space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                 <div className="flex items-center gap-2 text-[#701626]">
                   <Megaphone className="w-5 h-5" />
-                  <h3 className="font-display text-xl font-bold text-[#110B0E]">
+                  <h3 className="font-display text-lg sm:text-xl font-bold text-[#110B0E]">
                     Header Announcement Banner
                   </h3>
                 </div>
@@ -284,7 +285,7 @@ export default function AdminMarketing() {
               </p>
 
               <form onSubmit={handleSaveTicker} className="space-y-4 pt-2">
-                <div className="flex items-center gap-3">
+                <div className="flex flex-wrap items-center gap-3">
                   <label className="text-xs font-bold text-[#110B0E]">Banner Status:</label>
                   <button
                     type="button"
@@ -297,7 +298,7 @@ export default function AdminMarketing() {
                   </button>
                 </div>
 
-                <div className="space-y-1">
+                <div className="space-y-1.5">
                   <label className="block text-xs font-bold text-[#110B0E] uppercase tracking-wider">
                     Announcement Message
                   </label>
@@ -310,16 +311,18 @@ export default function AdminMarketing() {
                   />
                 </div>
 
-                {/* Live Preview Box */}
-                <div className="p-3 rounded-xl bg-[#701626] text-[#F3E8CE] text-xs font-medium text-center truncate border border-[#C5A059]/40">
-                  <span className="text-[10px] uppercase tracking-wider text-[#DFBF77] font-bold pr-2">Live Preview:</span>
+                {/* Live Preview Box (Wraps Cleanly on Mobile) */}
+                <div className="p-3.5 rounded-xl bg-[#701626] text-[#F3E8CE] text-xs font-medium border border-[#C5A059]/40 break-words leading-relaxed text-left sm:text-center">
+                  <span className="text-[10px] uppercase tracking-wider text-[#DFBF77] font-bold block sm:inline sm:pr-2 mb-1 sm:mb-0">
+                    Live Preview:
+                  </span>
                   {tickerText}
                 </div>
 
-                <div className="flex justify-end">
+                <div className="flex justify-end pt-1">
                   <button
                     type="submit"
-                    className="px-6 py-2.5 bg-[#701626] hover:bg-[#8E1E34] text-white text-xs font-bold uppercase tracking-wider rounded-2xl shadow-sm transition-all flex items-center gap-1.5 cursor-pointer"
+                    className="w-full sm:w-auto justify-center px-6 py-2.5 bg-[#701626] hover:bg-[#8E1E34] text-white text-xs font-bold uppercase tracking-wider rounded-2xl shadow-sm transition-all flex items-center gap-1.5 cursor-pointer"
                   >
                     <Save className="w-3.5 h-3.5" /> Save Banner Updates
                   </button>
@@ -328,21 +331,21 @@ export default function AdminMarketing() {
             </div>
 
             {/* ── PROMOTIONAL COUPONS TABLE ── */}
-            <div className="bg-white rounded-3xl border border-[#C5A059]/30 shadow-sm overflow-hidden p-6 space-y-4">
+            <div className="bg-white rounded-3xl border border-[#C5A059]/30 shadow-sm overflow-hidden p-5 sm:p-6 space-y-4">
               <div className="flex items-center justify-between">
-                <h3 className="font-display text-xl font-bold text-[#110B0E]">
+                <h3 className="font-display text-lg sm:text-xl font-bold text-[#110B0E]">
                   Active Discount Coupons ({coupons.length})
                 </h3>
               </div>
 
-              <div className="overflow-x-auto rounded-2xl border border-[#C5A059]/25">
-                <table className="w-full text-xs text-left min-w-[700px]">
+              <div className="overflow-x-auto rounded-2xl border border-[#C5A059]/25 -mx-2 sm:mx-0">
+                <table className="w-full text-xs text-left min-w-[650px]">
                   <thead className="bg-[#701626] text-[#F3E8CE] uppercase tracking-wider text-[10px]">
                     <tr>
                       <th className="p-3.5 whitespace-nowrap min-w-[120px]">Coupon Code</th>
-                      <th className="p-3.5 whitespace-nowrap min-w-[150px]">Discount Benefit</th>
-                      <th className="p-3.5 whitespace-nowrap min-w-[110px]">Min Spend</th>
-                      <th className="p-3.5 whitespace-nowrap min-w-[110px]">Usage Count</th>
+                      <th className="p-3.5 whitespace-nowrap min-w-[140px]">Discount Benefit</th>
+                      <th className="p-3.5 whitespace-nowrap min-w-[100px]">Min Spend</th>
+                      <th className="p-3.5 whitespace-nowrap min-w-[100px]">Usage Count</th>
                       <th className="p-3.5 whitespace-nowrap min-w-[100px]">Expiry Date</th>
                       <th className="p-3.5 whitespace-nowrap min-w-[90px]">Status</th>
                       <th className="p-3.5 text-right whitespace-nowrap min-w-[80px]">Actions</th>
@@ -399,10 +402,10 @@ export default function AdminMarketing() {
         {/* TAB 2: ABANDONED CART RECOVERY */}
         {activeTab === 'abandoned' && (
           <div className="space-y-6">
-            <div className="bg-white rounded-3xl p-6 sm:p-8 border border-[#C5A059]/30 shadow-sm space-y-4">
+            <div className="bg-white rounded-3xl p-5 sm:p-8 border border-[#C5A059]/30 shadow-sm space-y-4">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
-                  <h3 className="font-display text-xl font-bold text-[#110B0E] flex items-center gap-2">
+                  <h3 className="font-display text-lg sm:text-xl font-bold text-[#110B0E] flex items-center gap-2">
                     <ShoppingCart className="w-5 h-5 text-[#701626]" />
                     <span>Unrecovered Bags & Direct Outreach ({abandonedCarts.length})</span>
                   </h3>
@@ -410,8 +413,8 @@ export default function AdminMarketing() {
                     Shoppers who left handcrafted items in their bag without completing payment.
                   </p>
                 </div>
-                <div className="text-xs bg-[#701626]/10 text-[#701626] font-bold px-3 py-1.5 rounded-xl">
-                  Total Recoverable Value: LKR {abandonedCarts.reduce((acc, c) => acc + c.totalValue, 0).toLocaleString()}
+                <div className="text-xs bg-[#701626]/10 text-[#701626] font-bold px-3 py-1.5 rounded-xl self-start sm:self-auto">
+                  Total Value: LKR {abandonedCarts.reduce((acc, c) => acc + c.totalValue, 0).toLocaleString()}
                 </div>
               </div>
 
@@ -419,12 +422,12 @@ export default function AdminMarketing() {
                 {abandonedCarts.map((cart) => (
                   <div
                     key={cart.id}
-                    className="p-5 rounded-2xl bg-[#FCFBF8] border border-[#DFBF77] flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-xs"
+                    className="p-4 sm:p-5 rounded-2xl bg-[#FCFBF8] border border-[#DFBF77] flex flex-col lg:flex-row lg:items-center justify-between gap-4 shadow-xs"
                   >
                     <div className="space-y-2">
-                      <div className="flex items-center gap-2">
+                      <div className="flex flex-wrap items-center gap-2">
                         <span className="font-bold text-sm text-[#110B0E]">{cart.customerName}</span>
-                        <span className="text-xs text-[#6D6268]">({cart.customerEmail})</span>
+                        <span className="text-xs text-[#6D6268] break-all">({cart.customerEmail})</span>
                         <span className="text-[10px] bg-amber-50 text-amber-800 border border-amber-200 px-2 py-0.5 rounded-full font-bold flex items-center gap-1">
                           <Clock className="w-3 h-3" /> {cart.abandonedAt}
                         </span>
@@ -434,16 +437,16 @@ export default function AdminMarketing() {
                       <div className="flex flex-wrap items-center gap-2">
                         {cart.items.map((it, idx) => (
                           <div key={idx} className="flex items-center gap-2 bg-white px-2.5 py-1.5 rounded-xl border border-[#C5A059]/30 text-xs">
-                            <img src={it.image} alt="" className="w-6 h-6 object-cover rounded-md" />
-                            <span className="font-medium text-[#110B0E] truncate max-w-[180px]">{it.name}</span>
-                            <span className="text-[#701626] font-bold">{it.price}</span>
+                            <img src={it.image} alt="" className="w-6 h-6 object-cover rounded-md shrink-0" />
+                            <span className="font-medium text-[#110B0E] truncate max-w-[150px] sm:max-w-[220px]">{it.name}</span>
+                            <span className="text-[#701626] font-bold shrink-0">{it.price}</span>
                           </div>
                         ))}
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-3 self-end sm:self-auto shrink-0">
-                      <div className="text-right">
+                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between lg:justify-end gap-3 pt-3 lg:pt-0 border-t border-[#C5A059]/20 lg:border-t-0 shrink-0">
+                      <div className="text-left sm:text-right">
                         <p className="text-[10px] uppercase text-[#6D6268] font-bold">Cart Total</p>
                         <p className="font-display text-base font-bold text-[#701626]">
                           LKR {cart.totalValue.toLocaleString()}
@@ -454,7 +457,7 @@ export default function AdminMarketing() {
                         type="button"
                         disabled={sendingCartId === cart.id || cart.emailSent}
                         onClick={() => handleSendRecoveryEmail(cart)}
-                        className={`px-4 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 transition-all cursor-pointer ${
+                        className={`w-full sm:w-auto px-4 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
                           cart.emailSent
                             ? 'bg-emerald-50 text-emerald-800 border border-emerald-200 cursor-default'
                             : 'bg-[#701626] hover:bg-[#8E1E34] text-white shadow-sm'
@@ -485,9 +488,9 @@ export default function AdminMarketing() {
         {/* TAB 3: EMAIL TEMPLATES & TEST-SEND STUDIO */}
         {activeTab === 'templates' && (
           <div className="space-y-6">
-            <div className="bg-white rounded-3xl p-6 sm:p-8 border border-[#C5A059]/30 shadow-sm space-y-6">
+            <div className="bg-white rounded-3xl p-5 sm:p-8 border border-[#C5A059]/30 shadow-sm space-y-6">
               <div>
-                <h3 className="font-display text-xl font-bold text-[#110B0E] flex items-center gap-2">
+                <h3 className="font-display text-lg sm:text-xl font-bold text-[#110B0E] flex items-center gap-2">
                   <Mail className="w-5 h-5 text-[#701626]" />
                   <span>Transactional & Lifecycle Email Templates (11 Active Flows)</span>
                 </h3>
@@ -522,14 +525,14 @@ export default function AdminMarketing() {
 
               {/* Test Sender Bar */}
               <div className="p-4 rounded-2xl bg-[#FCFBF8] border border-[#DFBF77] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <div className="space-y-0.5">
-                  <span className="text-[10px] font-bold text-[#701626] uppercase tracking-wider">Test Recipient Address:</span>
+                <div className="space-y-1 w-full sm:w-auto">
+                  <span className="text-[10px] font-bold text-[#701626] uppercase tracking-wider block">Test Recipient Address:</span>
                   <input
                     type="email"
                     value={testEmailAddress}
                     onChange={(e) => setTestEmailAddress(e.target.value)}
                     placeholder="preethi@azhai.lk"
-                    className="w-full sm:w-72 px-3 py-1.5 text-xs bg-white rounded-xl border border-[#C5A059]/40 font-semibold text-[#110B0E]"
+                    className="w-full sm:w-72 px-3 py-2 text-xs bg-white rounded-xl border border-[#C5A059]/40 font-semibold text-[#110B0E]"
                   />
                 </div>
                 <p className="text-[11px] text-[#6D6268]">
@@ -557,7 +560,7 @@ export default function AdminMarketing() {
                   {
                     type: 'shipped',
                     title: '3. Dispatched & In Transit',
-                    desc: 'Sent when admin inputs courier partner (PromptX/Koombiyo) and tracking number.',
+                    desc: 'Sent when admin inputs Sri Lanka Post Speed Post tracking number (BAxxxxxxxxxLK).',
                     tag: 'Fulfillment',
                     previewUrl: '/email-previews/order-shipped.html'
                   },
@@ -578,7 +581,7 @@ export default function AdminMarketing() {
                 ].map((tmpl) => (
                   <div
                     key={tmpl.type}
-                    className="p-5 rounded-2xl bg-[#FCFBF8] border border-[#C5A059]/30 flex flex-col justify-between space-y-3"
+                    className="p-4 sm:p-5 rounded-2xl bg-[#FCFBF8] border border-[#C5A059]/30 flex flex-col justify-between space-y-3"
                   >
                     <div className="space-y-1">
                       <div className="flex items-center justify-between">
@@ -590,12 +593,12 @@ export default function AdminMarketing() {
                       <p className="text-xs text-[#6D6268] leading-relaxed font-light">{tmpl.desc}</p>
                     </div>
 
-                    <div className="flex items-center justify-between pt-3 border-t border-[#C5A059]/20">
+                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 pt-3 border-t border-[#C5A059]/20">
                       <a
                         href={tmpl.previewUrl}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-xs text-[#701626] font-bold hover:underline flex items-center gap-1"
+                        className="text-xs text-[#701626] font-bold hover:underline flex items-center gap-1 justify-center sm:justify-start"
                       >
                         <Eye className="w-3.5 h-3.5" />
                         <span>Live Preview ↗</span>
@@ -605,7 +608,7 @@ export default function AdminMarketing() {
                         type="button"
                         disabled={sendingTestType === tmpl.type}
                         onClick={() => handleSendTestEmail(tmpl.type)}
-                        className="px-3.5 py-1.5 rounded-xl bg-[#701626] hover:bg-[#8E1E34] text-white text-[11px] font-bold flex items-center gap-1.5 cursor-pointer shadow-xs transition-colors"
+                        className="w-full sm:w-auto justify-center px-3.5 py-2 rounded-xl bg-[#701626] hover:bg-[#8E1E34] text-white text-[11px] font-bold flex items-center gap-1.5 cursor-pointer shadow-xs transition-colors"
                       >
                         {sendingTestType === tmpl.type ? (
                           <RefreshCw className="w-3.5 h-3.5 animate-spin" />

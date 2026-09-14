@@ -1,19 +1,24 @@
 import { useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { User, Package, MapPin, Heart, Settings as SettingsIcon, LogOut, Sparkles } from 'lucide-react';
+import { User, Package, MapPin, Heart, Settings as SettingsIcon, LogOut, Sparkles, Ruler } from 'lucide-react';
 import { useAuthStore } from '@/store/auth';
+import { useAdminStore } from '@/store/admin';
+import { PRODUCTS } from '@/lib/data';
 import Profile from './account/Profile';
 import Orders from './account/Orders';
 import Addresses from './account/Addresses';
 import Wishlist from './account/Wishlist';
 import Settings from './account/Settings';
+import FamilyMeasurements from './account/FamilyMeasurements';
+import SEOHead from '@/components/SEOHead';
 
-type TabKey = 'profile' | 'orders' | 'addresses' | 'wishlist' | 'settings';
+type TabKey = 'profile' | 'orders' | 'measurements' | 'addresses' | 'wishlist' | 'settings';
 
 const TABS: { key: TabKey; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
   { key: 'profile', label: 'My Profile', icon: User },
   { key: 'orders', label: 'My Orders', icon: Package },
+  { key: 'measurements', label: 'Fitting Vault', icon: Ruler },
   { key: 'addresses', label: 'Saved Addresses', icon: MapPin },
   { key: 'wishlist', label: 'Wishlist', icon: Heart },
   { key: 'settings', label: 'Settings', icon: SettingsIcon },
@@ -23,6 +28,9 @@ export default function Account() {
   const [searchParams, setSearchParams] = useSearchParams();
   const activeTab = (searchParams.get('tab') as TabKey) || 'profile';
   const { user, logout, orders, wishlist } = useAuthStore();
+  const adminProducts = useAdminStore((s) => s.products);
+  const allProducts = Array.isArray(adminProducts) ? adminProducts : PRODUCTS;
+  const validWishlistCount = wishlist.filter((slug) => allProducts.some((p) => p.slug === slug)).length;
   const navigate = useNavigate();
 
   // Scroll to top on tab change
@@ -43,6 +51,7 @@ export default function Account() {
 
   return (
     <div className="min-h-screen pt-24 pb-20 px-4 sm:px-8 max-w-7xl mx-auto relative z-10">
+      <SEOHead title="My Account" noindex={true} />
       {/* Top Header / Welcome */}
       <div className="mb-8 space-y-1">
         <div className="flex items-center gap-2">
@@ -65,7 +74,7 @@ export default function Account() {
           const Icon = tab.icon;
           const isActive = activeTab === tab.key;
           const badgeCount =
-            tab.key === 'orders' ? orders.length : tab.key === 'wishlist' ? wishlist.length : 0;
+            tab.key === 'orders' ? orders.length : tab.key === 'wishlist' ? validWishlistCount : 0;
 
           return (
             <button
@@ -120,7 +129,7 @@ export default function Account() {
                   tab.key === 'orders'
                     ? orders.length
                     : tab.key === 'wishlist'
-                    ? wishlist.length
+                    ? validWishlistCount
                     : 0;
 
                 return (
@@ -174,13 +183,14 @@ export default function Account() {
           <AnimatePresence mode="wait">
             <motion.div
               key={activeTab}
-              initial={{ opacity: 0, y: 12 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              transition={{ duration: 0.25 }}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
             >
               {activeTab === 'profile' && <Profile />}
               {activeTab === 'orders' && <Orders />}
+              {activeTab === 'measurements' && <FamilyMeasurements />}
               {activeTab === 'addresses' && <Addresses />}
               {activeTab === 'wishlist' && <Wishlist />}
               {activeTab === 'settings' && <Settings />}

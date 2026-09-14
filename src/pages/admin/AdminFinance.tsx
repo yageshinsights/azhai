@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { 
   DollarSign, 
@@ -30,6 +30,57 @@ export default function AdminFinance() {
 
   const onlinePaidOrders = orders.filter((o) => o.paymentStatus === 'paid');
   const onlinePaidAmount = onlinePaidOrders.reduce((acc, o) => acc + o.total, 0);
+
+  // Delivered/settled COD orders (remitted by post office)
+  const codRemittedOrders = orders.filter(
+    (o) =>
+      (o.paymentMethod.toLowerCase().includes('cod') || o.paymentMethod.toLowerCase().includes('cash')) &&
+      (o.status === 'delivered' || o.paymentStatus === 'paid')
+  );
+  const codRemittedAmount = codRemittedOrders.reduce((acc, o) => acc + o.total, 0);
+
+  // Dynamic Payment Channels Breakdown
+  const paymentChannels = useMemo(() => {
+    let cardTotal = 0;
+    let codTotal = 0;
+    let bankTotal = 0;
+
+    orders
+      .filter((o) => o.status !== 'cancelled')
+      .forEach((o) => {
+        const meth = (o.paymentMethod || '').toLowerCase();
+        if (meth.includes('card') || meth.includes('payhere') || meth.includes('visa')) {
+          cardTotal += o.total;
+        } else if (meth.includes('cod') || meth.includes('cash')) {
+          codTotal += o.total;
+        } else {
+          bankTotal += o.total;
+        }
+      });
+
+    const total = (cardTotal + codTotal + bankTotal) || 1;
+
+    return [
+      {
+        name: 'Visa & Mastercard (PayHere Online)',
+        amount: `LKR ${cardTotal.toLocaleString()}`,
+        percent: Math.round((cardTotal / total) * 100),
+        color: 'bg-emerald-700',
+      },
+      {
+        name: 'Cash on Delivery (Island-wide COD)',
+        amount: `LKR ${codTotal.toLocaleString()}`,
+        percent: Math.round((codTotal / total) * 100),
+        color: 'bg-amber-600',
+      },
+      {
+        name: 'Direct Bank Transfer / Deposit',
+        amount: `LKR ${bankTotal.toLocaleString()}`,
+        percent: Math.round((bankTotal / total) * 100),
+        color: 'bg-[#701626]',
+      },
+    ];
+  }, [orders]);
 
   // Approximate COGS / gross margin
   const estimatedCost = Math.round(grossSales * 0.42);
@@ -145,11 +196,7 @@ export default function AdminFinance() {
             </h3>
 
             <div className="space-y-3 pt-1">
-              {[
-                { name: 'Visa & Mastercard (PayHere Online)', percent: 52, color: 'bg-emerald-700', amount: 'LKR 47,700' },
-                { name: 'Cash on Delivery (Island-wide COD)', percent: 35, color: 'bg-amber-600', amount: 'LKR 45,000' },
-                { name: 'Direct Bank Transfer / Deposit', percent: 13, color: 'bg-[#701626]', amount: 'LKR 18,000' },
-              ].map((item) => (
+              {paymentChannels.map((item) => (
                 <div key={item.name} className="space-y-1 text-xs">
                   <div className="flex justify-between">
                     <span className="font-bold text-[#110B0E]">{item.name}</span>
@@ -172,19 +219,23 @@ export default function AdminFinance() {
               </h3>
             </div>
             <p className="text-xs text-[#6D6268] font-light leading-relaxed">
-              Track collected cash pending weekly bank remittance from PromptX and Koombiyo courier accounts:
+              Track collected cash pending post office Money Order remittance from Sri Lanka Post COD merchant accounts:
             </p>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
               <div className="p-4 rounded-2xl bg-white border border-[#C5A059]/25 text-xs space-y-1">
-                <span className="font-bold text-[#110B0E]">PromptX Courier</span>
-                <p className="text-base font-bold text-[#701626] font-display">LKR 29,700</p>
-                <p className="text-[10px] text-emerald-700 font-bold">1 parcel delivered</p>
+                <span className="font-bold text-[#110B0E]">Sri Lanka Post COD (Speed Post)</span>
+                <p className="text-base font-bold text-[#701626] font-display">LKR {codPendingAmount.toLocaleString()}</p>
+                <p className="text-[10px] text-amber-700 font-bold">
+                  {codPendingOrders.length} order{codPendingOrders.length === 1 ? '' : 's'} pending courier delivery & money order
+                </p>
               </div>
               <div className="p-4 rounded-2xl bg-white border border-[#C5A059]/25 text-xs space-y-1">
-                <span className="font-bold text-[#110B0E]">Atelier Rider</span>
-                <p className="text-base font-bold text-[#701626] font-display">LKR 45,000</p>
-                <p className="text-[10px] text-amber-700 font-bold">1 parcel in transit</p>
+                <span className="font-bold text-[#110B0E]">SL Post Remitted / Delivered</span>
+                <p className="text-base font-bold text-emerald-800 font-display">LKR {codRemittedAmount.toLocaleString()}</p>
+                <p className="text-[10px] text-emerald-700 font-bold">
+                  {codRemittedOrders.length} order{codRemittedOrders.length === 1 ? '' : 's'} successfully settled via Postal MO
+                </p>
               </div>
             </div>
           </div>

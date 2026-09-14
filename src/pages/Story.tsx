@@ -1,8 +1,9 @@
 import { motion, useScroll, useTransform } from 'framer-motion';
-import { useRef } from 'react';
+import { useRef, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowRight, Sparkles } from 'lucide-react';
 import AnimatedLogo from '@/components/AnimatedLogo';
+import SEOHead from '@/components/SEOHead';
 
 const chapters = [
   {
@@ -32,8 +33,28 @@ export default function Story() {
   const { scrollYProgress } = useScroll({ target: ref });
   const lineHeight = useTransform(scrollYProgress, [0, 1], ['0%', '100%']);
 
+  const storySchema = useMemo(() => ({
+    '@context': 'https://schema.org',
+    '@type': 'AboutPage',
+    name: 'The Story of Azhai — Handloom Heritage & Philosophy',
+    description: 'An invitation to inherent elegance crafted by Preethi. Discover Azhai’s journey from handloom textile traditions in Sri Lanka to modern festive couture.',
+    url: 'https://azhaiclothing.lk/story',
+    publisher: {
+      '@type': 'ClothingStore',
+      name: 'Azhai Clothing by Preethi',
+      logo: 'https://azhaiclothing.lk/logo-light.png',
+    },
+  }), []);
+
   return (
     <div className="min-h-screen bg-[#FCFBF8] pt-24 text-[#110B0E]">
+      <SEOHead
+        title="Our Story & Weaving Heritage — An Invitation by Preethi"
+        description="Discover the meaning behind Azhai: the unbroken thread of handloom silk tradition, the blooming lotus crown, and sacred ritual drapes."
+        canonicalUrl="https://azhaiclothing.lk/story"
+        url="https://azhaiclothing.lk/story"
+        schema={storySchema}
+      />
       
       {/* ── HERO SECTION WITH ANIMATED LOGO ── */}
       <section className="relative py-20 px-5 sm:px-8 text-center overflow-hidden">

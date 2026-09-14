@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Scissors, Ruler, Palette, ShoppingBag, ChevronRight, ChevronLeft, Check, Clock, Sparkles } from 'lucide-react';
 import { useAdminStore } from '@/store/admin';
+import { useAuthStore } from '@/store/auth';
 import { useCartStore } from '@/store/cart';
 import InteractiveMannequin from './InteractiveMannequin';
 import {
@@ -30,8 +31,9 @@ export default function TailoringStudio() {
   const measurementFields = storeFields && storeFields.length > 0 ? storeFields : DEFAULT_MEASUREMENT_FIELDS;
   const sizePresets = storePresets && storePresets.length > 0 ? storePresets : DEFAULT_SIZE_PRESETS;
 
-  // Cart Store
+  // Cart Store & Auth Store
   const addItem = useCartStore((s) => s.addItem);
+  const familyProfiles = useAuthStore((s) => s.familyProfiles) || [];
 
   // Component State
   const [step, setStep] = useState(1);
@@ -300,6 +302,45 @@ export default function TailoringStudio() {
                   <Clock className="w-3.5 h-3.5" /> {selectedDressType.leadTime}
                 </div>
               </div>
+
+              {/* Quick Load Saved Family Fitting Profile */}
+              {familyProfiles.length > 0 && (
+                <div className="p-4 bg-gradient-to-r from-[#F7F4EE] via-[#FCFBF8] to-[#F7F4EE] rounded-2xl border border-[#C5A059]/40 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-xl bg-[#701626]/10 text-[#701626] flex items-center justify-center shrink-0">
+                      <Sparkles className="w-4 h-4 text-[#C5A059]" />
+                    </div>
+                    <div>
+                      <span className="text-[9.5px] font-bold uppercase tracking-wider text-[#701626] block">
+                        Patron Fitting Vault
+                      </span>
+                      <p className="text-xs text-[#110B0E] font-medium">
+                        1-Click Auto-Fill from Saved Family Measurements
+                      </p>
+                    </div>
+                  </div>
+
+                  <select
+                    onChange={(e) => {
+                      const selected = familyProfiles.find((p) => p.id === e.target.value);
+                      if (selected) {
+                        setMeasurements({ ...selected.measurements });
+                        setSizeLabel('Custom');
+                        if (selected.unit) setUnit(selected.unit);
+                      }
+                    }}
+                    defaultValue=""
+                    className="px-4 py-2 rounded-xl bg-white border border-[#C5A059]/40 text-xs font-bold text-[#701626] focus:outline-none focus:ring-1 focus:ring-[#701626] cursor-pointer shadow-xs"
+                  >
+                    <option value="" disabled>✨ Load Saved Family Silhouette...</option>
+                    {familyProfiles.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name} ({p.relationship}){p.isDefault ? ' ⭐ Default' : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
 
               {/* Interactive Haute-Couture Fitting Studio */}
               <InteractiveMannequin

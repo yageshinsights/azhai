@@ -28,11 +28,12 @@ export type OrderStatus = 'pending' | 'confirmed' | 'processing' | 'shipped' | '
 
 export interface AdminOrder extends PlacedOrder {
   status: OrderStatus;
-  paymentStatus: 'paid' | 'pending_cod' | 'refunded';
-  courierPartner?: 'PromptX' | 'Koombiyo' | 'Citypak' | 'Domex' | 'Atelier Express';
+  paymentStatus: 'paid' | 'pending_cod' | 'pending_bank' | 'refunded';
+  courierPartner?: 'Sri Lanka Post' | 'PromptX' | 'Koombiyo' | 'Citypak' | 'Domex' | 'Atelier Express' | string;
   trackingNumber?: string;
   adminNotes?: string;
   costPrice?: number;
+  weightGrams?: number;
 }
 
 export interface Coupon {
@@ -57,9 +58,56 @@ export interface CustomerRecord {
   totalOrders: number;
   totalSpent: number;
   firstJoined: string;
-  lastOrderDate: string;
+  lastOrderDate?: string;
   vipTier: 'Gold Patron' | 'Silver Patron' | 'Standard';
   notes?: string;
+}
+
+/**
+ * Utility to convert any human-formatted phone number to clean international digits for wa.me/ links.
+ * e.g., '+94 77 123 4567' -> '94771234567', '0771234567' -> '94771234567'
+ */
+export function cleanWhatsAppDigits(phone?: string): string {
+  if (!phone) return '94771234567';
+  let digits = phone.replace(/[^0-9]/g, '');
+  if (digits.startsWith('0') && digits.length === 10) {
+    digits = '94' + digits.slice(1);
+  } else if (digits.length === 9 && (digits.startsWith('7') || digits.startsWith('1'))) {
+    digits = '94' + digits;
+  }
+  return digits || '94771234567';
+}
+
+export interface SEOSettings {
+  metaTitle: string;
+  metaDescription: string;
+  targetKeywords: string;
+}
+
+export interface SocialLinksSettings {
+  instagram: string;
+  facebook: string;
+  tiktok?: string;
+}
+
+export interface StudioSettings {
+  email: string;
+  supportEmail: string;
+  openingHours: string;
+  googleMapsUrl?: string;
+}
+
+export interface BankAccount {
+  id: string;
+  bankName: string;
+  accountNumber: string;
+  accountName: string;
+  branchName: string;
+  bankLogo?: string; // Image URL or preset identifier: 'combank' | 'hnb' | 'sampath' | 'boc' | 'ntb' | 'seylan' | 'peoples'
+  swiftCode?: string;
+  isActive: boolean;
+  instructions?: string;
+  displayOrder?: number;
 }
 
 export interface StoreSettings {
@@ -71,12 +119,17 @@ export interface StoreSettings {
   standardShippingFee: number;
   expressShippingFee: number;
   whatsappNumber: string;
+  phoneNumber: string;
   atelierAddress: string;
   announcementTicker: {
     enabled: boolean;
     text: string;
     link?: string;
   };
+  seo: SEOSettings;
+  socialLinks: SocialLinksSettings;
+  studio: StudioSettings;
+  bankAccounts?: BankAccount[];
 }
 
 interface AdminState {
@@ -108,8 +161,10 @@ interface AdminState {
     notes?: string
   ) => void;
   syncNewOrder: (placedOrder: PlacedOrder) => void;
+  syncCustomerFromAuth: (user: { fullName: string; email: string; phone?: string; district?: string; city?: string; createdAt?: string }) => void;
   addProduct: (product: Omit<Product, 'id'>) => void;
   updateProduct: (id: number, updates: Partial<Product>) => void;
+  updateProductStock: (id: number, stockQuantity: number) => void;
   deleteProduct: (id: number) => void;
   addCategory: (category: Omit<Collection, 'id' | 'count'>) => void;
   updateCategory: (id: number, updates: Partial<Collection>) => void;
@@ -122,6 +177,14 @@ interface AdminState {
   deleteCoupon: (id: string) => void;
   updateSettings: (settings: Partial<StoreSettings>) => void;
   toggleCOD: (enabled: boolean) => void;
+
+  // Bank Accounts & Direct Deposit Actions
+  addBankAccount: (account: Omit<BankAccount, 'id'>) => void;
+  updateBankAccount: (id: string, updates: Partial<BankAccount>) => void;
+  deleteBankAccount: (id: string) => void;
+  toggleBankAccountActive: (id: string) => void;
+  uploadOrderBankSlip: (orderId: string, slipUrl: string, reference?: string) => void;
+  verifyBankTransferPayment: (orderId: string, adminNotes?: string) => Promise<void>;
 
   // Tailoring Actions
   addDressType: (dt: Omit<DressType, 'id'>) => void;
@@ -158,7 +221,7 @@ const INITIAL_COUPONS: Coupon[] = [
     discountType: 'percentage',
     value: 10,
     minSpend: 10000,
-    usageCount: 42,
+    usageCount: 0,
     isActive: true,
     expiresAt: '2026-12-31',
   },
@@ -168,19 +231,9 @@ const INITIAL_COUPONS: Coupon[] = [
     discountType: 'fixed',
     value: 1000,
     minSpend: 15000,
-    usageCount: 19,
-    isActive: true,
-    expiresAt: '2026-10-31',
-  },
-  {
-    id: 'coup-3',
-    code: 'AVURUDU2026',
-    discountType: 'percentage',
-    value: 15,
-    minSpend: 25000,
     usageCount: 0,
     isActive: true,
-    expiresAt: '2026-04-30',
+    expiresAt: '2026-12-31',
   },
 ];
 
@@ -193,173 +246,74 @@ const INITIAL_SETTINGS: StoreSettings = {
   standardShippingFee: 450,
   expressShippingFee: 850,
   whatsappNumber: '+94 77 123 4567',
+  phoneNumber: '+94 77 123 4567',
   atelierAddress: '42/A Temple Road, Kollupitiya, Colombo 03, Sri Lanka',
   announcementTicker: {
     enabled: true,
     text: '✨ Festive Drop Live: Complimentary Island-wide Delivery on Orders over LKR 15,000 | Use Code AZHAI10',
     link: '/collections',
   },
+  seo: {
+    metaTitle: 'Azhai Clothing by Preethi | Handcrafted Luxury Silk Kurties & Sarees Sri Lanka',
+    metaDescription: 'Discover heirloom handloom kurti sets, cloud-light organza sarees, and tailored corset tops. Island-wide Sri Lanka delivery & bespoke sizing in Colombo.',
+    targetKeywords: 'silk kurties sri lanka, bridal saree colombo, handloom clothing boutique, preethi silk couture',
+  },
+  socialLinks: {
+    instagram: 'https://www.instagram.com/azhaiclothing',
+    facebook: 'https://www.facebook.com/azhaiclothing',
+    tiktok: 'https://www.tiktok.com/@azhaiclothing',
+  },
+  studio: {
+    email: 'orders@azhaiclothing.lk',
+    supportEmail: 'hello@azhaiclothing.lk',
+    openingHours: 'Mon – Sat: 10:00 AM – 7:00 PM (Closed on Poya)',
+    googleMapsUrl: 'https://maps.google.com/?q=Kollupitiya+Colombo+03',
+  },
+  bankAccounts: [
+    {
+      id: 'bank-1',
+      bankName: 'Commercial Bank of Ceylon',
+      accountNumber: '8001234567',
+      accountName: 'Azhai Clothing (Pvt) Ltd',
+      branchName: 'Kollupitiya Branch',
+      bankLogo: 'combank',
+      swiftCode: 'CCEYLKX',
+      isActive: true,
+      instructions: 'Please include your Order ID (#AZH-XXXXX) as the deposit remark/reference.',
+      displayOrder: 1,
+    },
+    {
+      id: 'bank-2',
+      bankName: 'Hatton National Bank (HNB)',
+      accountNumber: '023010098765',
+      accountName: 'Preethi Jayasinghe',
+      branchName: 'Cinnamon Gardens Branch',
+      bankLogo: 'hnb',
+      swiftCode: 'HBLILKLX',
+      isActive: true,
+      instructions: 'Online banking or CDM deposit accepted. Please send the transfer slip for fast dispatch.',
+      displayOrder: 2,
+    },
+  ],
 };
 
-const INITIAL_CUSTOMERS: CustomerRecord[] = [
-  {
-    id: 'cust-1',
-    fullName: 'Preethi',
-    email: 'preethi@azhai.lk',
-    phone: '+94 77 123 4567',
-    district: 'Colombo',
-    city: 'Colombo 03',
-    totalOrders: 3,
-    totalSpent: 84500,
-    firstJoined: '2025-11-12T10:00:00.000Z',
-    lastOrderDate: '2026-08-19T14:32:00.000Z',
-    vipTier: 'Gold Patron',
-    notes: 'Prefers same-day Colombo dispatch with gift wrapping.',
-  },
-  {
-    id: 'cust-2',
-    fullName: 'Ananya Senanayake',
-    email: 'ananya.s@outlook.com',
-    phone: '+94 71 889 2341',
-    district: 'Colombo',
-    city: 'Colombo 07',
-    totalOrders: 2,
-    totalSpent: 48000,
-    firstJoined: '2026-01-15T12:00:00.000Z',
-    lastOrderDate: '2026-08-14T09:15:00.000Z',
-    vipTier: 'Silver Patron',
-    notes: 'Bridal party client for October 2026 wedding.',
-  },
-  {
-    id: 'cust-3',
-    fullName: 'Tharushi Wickramasinghe',
-    email: 'tharushi.w@gmail.com',
-    phone: '+94 77 445 6789',
-    district: 'Kandy',
-    city: 'Kandy City',
-    totalOrders: 1,
-    totalSpent: 29500,
-    firstJoined: '2026-07-20T16:45:00.000Z',
-    lastOrderDate: '2026-07-20T16:45:00.000Z',
-    vipTier: 'Standard',
-  },
-];
+function getInitialSettings(): StoreSettings {
+  if (typeof window !== 'undefined') {
+    try {
+      const custom = localStorage.getItem('azhai_store_settings_custom');
+      if (custom) {
+        return { ...INITIAL_SETTINGS, ...JSON.parse(custom) };
+      }
+    } catch {
+      // fallback
+    }
+  }
+  return INITIAL_SETTINGS;
+}
 
-const INITIAL_ORDERS: AdminOrder[] = [
-  {
-    orderId: 'AZH-84291',
-    items: [
-      {
-        id: 101,
-        name: 'Maroon Corset Handloom Kurti Set',
-        price: 'LKR 14,500',
-        image: 'https://images.unsplash.com/photo-1610030469983-98e550d6193c?auto=format&fit=crop&w=800&q=90',
-        quantity: 1,
-        size: 'M',
-      },
-      {
-        id: 301,
-        name: 'Pure Cashmere Pashmina Stole',
-        price: 'LKR 18,500',
-        image: 'https://images.unsplash.com/photo-1617627143750-d86bc21e42bb?auto=format&fit=crop&w=800&q=90',
-        quantity: 1,
-        size: 'Free Size',
-      },
-    ],
-    subtotal: 33000,
-    discount: 3300,
-    shipping: 0,
-    total: 29700,
-    coupon: 'AZHAI10',
-    customer: {
-      fullName: 'Preethi',
-      email: 'preethi@azhai.lk',
-      phone: '+94 77 123 4567',
-      address: '42/A Temple Road, Kollupitiya',
-      city: 'Colombo 03',
-      district: 'Colombo',
-      postalCode: '00300',
-    },
-    deliveryMethod: 'Island-wide Standard Courier (1-3 Days)',
-    paymentMethod: 'Visa / Mastercard (PayHere)',
-    placedAt: '2026-08-19T14:32:00.000Z',
-    status: 'processing',
-    paymentStatus: 'paid',
-    courierPartner: 'PromptX',
-    trackingNumber: 'PRX-849201LK',
-    adminNotes: 'Packed in signature gold keepsake box.',
-    costPrice: 14500,
-  },
-  {
-    orderId: 'AZH-91823',
-    items: [
-      {
-        id: 201,
-        name: 'Crimson Bridal Kanchipuram Silk Saree',
-        price: 'LKR 45,000',
-        image: 'https://images.unsplash.com/photo-1583391733956-3750e0ff4e8b?auto=format&fit=crop&w=800&q=90',
-        quantity: 1,
-        size: 'Free Size',
-      },
-    ],
-    subtotal: 45000,
-    discount: 0,
-    shipping: 0,
-    total: 45000,
-    customer: {
-      fullName: 'Ananya Senanayake',
-      email: 'ananya.s@outlook.com',
-      phone: '+94 71 889 2341',
-      address: 'No. 18, Ward Place',
-      city: 'Colombo 07',
-      district: 'Colombo',
-      postalCode: '00700',
-    },
-    deliveryMethod: 'Express Same-Day Colombo',
-    paymentMethod: 'Cash on Delivery (COD)',
-    placedAt: '2026-08-21T11:20:00.000Z',
-    status: 'confirmed',
-    paymentStatus: 'pending_cod',
-    courierPartner: 'Atelier Express',
-    adminNotes: 'Customer requested 4:00 PM evening delivery window.',
-    costPrice: 22000,
-  },
-  {
-    orderId: 'AZH-77412',
-    items: [
-      {
-        id: 401,
-        name: 'Kalamkari Hand-Embroidered Silk Crop Top',
-        price: 'LKR 9,500',
-        image: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=800&q=90',
-        quantity: 2,
-        size: 'S',
-      },
-    ],
-    subtotal: 19000,
-    discount: 1000,
-    shipping: 0,
-    total: 18000,
-    coupon: 'CEYLON1000',
-    customer: {
-      fullName: 'Tharushi Wickramasinghe',
-      email: 'tharushi.w@gmail.com',
-      phone: '+94 77 445 6789',
-      address: '24 Hill Street',
-      city: 'Kandy',
-      district: 'Kandy',
-      postalCode: '20000',
-    },
-    deliveryMethod: 'Island-wide Standard Courier (1-3 Days)',
-    paymentMethod: 'Direct Bank Deposit',
-    placedAt: '2026-08-22T17:40:00.000Z',
-    status: 'shipped',
-    paymentStatus: 'paid',
-    courierPartner: 'Koombiyo',
-    trackingNumber: 'KMB-77412LK',
-    costPrice: 8200,
-  },
-];
+const INITIAL_CUSTOMERS: CustomerRecord[] = [];
+
+const INITIAL_ORDERS: AdminOrder[] = [];
 
 export const useAdminStore = create<AdminState>()(
   persist(
@@ -372,7 +326,7 @@ export const useAdminStore = create<AdminState>()(
       tags: INITIAL_TAGS,
       coupons: INITIAL_COUPONS,
       customers: INITIAL_CUSTOMERS,
-      settings: INITIAL_SETTINGS,
+      settings: getInitialSettings(),
 
       // Tailoring initial state
       dressTypes: DEFAULT_DRESS_TYPES,
@@ -434,7 +388,8 @@ export const useAdminStore = create<AdminState>()(
                 attributes: p.attributes || [],
                 isFeatured: p.is_featured,
                 tag: p.tag || undefined,
-                occasion: p.occasion || undefined,
+                stockQuantity: p.stock_quantity !== undefined && p.stock_quantity !== null ? Number(p.stock_quantity) : 15,
+                weightGrams: p.weight_grams !== undefined && p.weight_grams !== null ? Number(p.weight_grams) : 400,
                 rating: Number(p.rating) || 5.0,
                 reviewsCount: p.reviews_count || 0,
               })),
@@ -468,22 +423,35 @@ export const useAdminStore = create<AdminState>()(
           // 5. Fetch Store Settings
           const { data: dbSettings } = await supabase.from('store_settings').select('*').eq('id', 1).single();
           if (dbSettings) {
+            const current = get().settings;
+            let localCustom: Partial<StoreSettings> | null = null;
+            if (typeof window !== 'undefined') {
+              try {
+                const raw = localStorage.getItem('azhai_store_settings_custom');
+                if (raw) localCustom = JSON.parse(raw);
+              } catch {
+                // ignore
+              }
+            }
+
             set({
               settings: {
-                storeName: dbSettings.store_name,
-                tagline: dbSettings.tagline,
-                enableCOD: dbSettings.enable_cod,
-                maxCODAmount: Number(dbSettings.max_cod_amount),
-                freeShippingThreshold: Number(dbSettings.free_shipping_threshold),
-                standardShippingFee: Number(dbSettings.standard_shipping_fee),
-                expressShippingFee: Number(dbSettings.express_shipping_fee),
-                whatsappNumber: dbSettings.whatsapp_number,
-                atelierAddress: dbSettings.atelier_address,
-                announcementTicker: dbSettings.announcement_ticker || {
-                  enabled: true,
-                  text: '✨ Complimentary Keepsake Box & Silk Pouch on Orders over LKR 15,000 | Island-wide Express Delivery',
-                  link: '/collections',
-                },
+                ...current,
+                storeName: localCustom?.storeName || dbSettings.store_name || current.storeName,
+                tagline: localCustom?.tagline || dbSettings.tagline || current.tagline,
+                enableCOD: localCustom?.enableCOD ?? (dbSettings.enable_cod ?? current.enableCOD),
+                maxCODAmount: Number(localCustom?.maxCODAmount ?? (dbSettings.max_cod_amount ?? current.maxCODAmount)),
+                freeShippingThreshold: Number(localCustom?.freeShippingThreshold ?? (dbSettings.free_shipping_threshold ?? current.freeShippingThreshold)),
+                standardShippingFee: Number(localCustom?.standardShippingFee ?? (dbSettings.standard_shipping_fee ?? current.standardShippingFee)),
+                expressShippingFee: Number(localCustom?.expressShippingFee ?? (dbSettings.express_shipping_fee ?? current.expressShippingFee)),
+                whatsappNumber: localCustom?.whatsappNumber || dbSettings.whatsapp_number || current.whatsappNumber,
+                phoneNumber: localCustom?.phoneNumber || dbSettings.phone_number || current.phoneNumber,
+                atelierAddress: localCustom?.atelierAddress || dbSettings.atelier_address || current.atelierAddress,
+                announcementTicker: localCustom?.announcementTicker || dbSettings.announcement_ticker || current.announcementTicker,
+                seo: localCustom?.seo || dbSettings.seo || current.seo,
+                socialLinks: localCustom?.socialLinks || dbSettings.social_links || current.socialLinks,
+                studio: localCustom?.studio || dbSettings.studio || current.studio,
+                bankAccounts: localCustom?.bankAccounts || dbSettings.bank_accounts || current.bankAccounts || INITIAL_SETTINGS.bankAccounts,
               },
             });
           }
@@ -516,6 +484,7 @@ export const useAdminStore = create<AdminState>()(
               courierPartner: o.courier_partner || undefined,
               trackingNumber: o.tracking_number || undefined,
               adminNotes: o.admin_notes || undefined,
+              bankTransferDetails: o.bank_transfer_details || undefined,
               costPrice: o.cost_price ? Number(o.cost_price) : Math.round(Number(o.subtotal) * 0.45),
             }));
 
@@ -594,7 +563,9 @@ export const useAdminStore = create<AdminState>()(
 
       adminLogin: async (email, password, role = 'owner') => {
         const cleanEmail = email.trim().toLowerCase();
-        if (cleanEmail === 'admin@azhai.lk' && password === 'AzhaiAdmin@2026') {
+        const expectedEmail = (import.meta.env.VITE_ADMIN_EMAIL || 'admin@azhai.lk').trim().toLowerCase();
+        const expectedPassword = import.meta.env.VITE_ADMIN_PASSWORD || 'AzhaiAdmin@2026';
+        if (cleanEmail === expectedEmail && password === expectedPassword) {
           const user: AdminUser = {
             id: 'adm_01',
             name: role === 'owner' ? 'Preethi' : 'Atelier Manager',
@@ -604,7 +575,7 @@ export const useAdminStore = create<AdminState>()(
           set({ adminUser: user, isAdminAuthenticated: true });
           return { success: true };
         }
-        return { success: false, error: 'Invalid admin credentials. Please use admin@azhai.lk / AzhaiAdmin@2026' };
+        return { success: false, error: 'Invalid admin credentials. Please verify your email and password.' };
       },
 
       adminLogout: () => {
@@ -626,6 +597,51 @@ export const useAdminStore = create<AdminState>()(
           }),
         }));
 
+        // Synchronize updated order status, tracking, and notes to localStorage auth store
+        try {
+          const authKey = 'azhai-auth-store';
+          const storedAuth = localStorage.getItem(authKey);
+          if (storedAuth) {
+            const parsed = JSON.parse(storedAuth);
+            if (parsed?.state) {
+              if (Array.isArray(parsed.state.orders)) {
+                parsed.state.orders = parsed.state.orders.map((ord: any) => {
+                  if (ord.orderId !== orderId) return ord;
+                  return {
+                    ...ord,
+                    status,
+                    courierPartner: courierPartner || ord.courierPartner,
+                    trackingNumber: trackingNumber !== undefined ? trackingNumber : ord.trackingNumber,
+                    adminNotes: notes !== undefined ? notes : ord.adminNotes,
+                    paymentStatus: status === 'delivered' && ord.paymentStatus === 'pending_cod' ? 'paid' : ord.paymentStatus,
+                  };
+                });
+              }
+
+              if (Array.isArray(parsed.state.accounts)) {
+                parsed.state.accounts = parsed.state.accounts.map((acc: any) => ({
+                  ...acc,
+                  orders: (acc.orders || []).map((ord: any) => {
+                    if (ord.orderId !== orderId) return ord;
+                    return {
+                      ...ord,
+                      status,
+                      courierPartner: courierPartner || ord.courierPartner,
+                      trackingNumber: trackingNumber !== undefined ? trackingNumber : ord.trackingNumber,
+                      adminNotes: notes !== undefined ? notes : ord.adminNotes,
+                      paymentStatus: status === 'delivered' && ord.paymentStatus === 'pending_cod' ? 'paid' : ord.paymentStatus,
+                    };
+                  }),
+                }));
+              }
+
+              localStorage.setItem(authKey, JSON.stringify(parsed));
+            }
+          }
+        } catch (syncErr) {
+          console.warn('[Admin to Auth Order Sync Notice]:', syncErr);
+        }
+
         if (isSupabaseConfigured()) {
           try {
             await supabase
@@ -645,13 +661,52 @@ export const useAdminStore = create<AdminState>()(
         }
       },
 
+      syncCustomerFromAuth: (user) => {
+        set((state) => {
+          const emailLower = user.email.toLowerCase().trim();
+          const existingIndex = state.customers.findIndex((c) => c.email.toLowerCase().trim() === emailLower);
+          
+          if (existingIndex >= 0) {
+            const updated = [...state.customers];
+            updated[existingIndex] = {
+              ...updated[existingIndex],
+              fullName: user.fullName || updated[existingIndex].fullName,
+              phone: user.phone || updated[existingIndex].phone,
+              district: user.district || updated[existingIndex].district,
+              city: user.city || updated[existingIndex].city,
+            };
+            return { customers: updated };
+          }
+
+          const newCustomer: CustomerRecord = {
+            id: 'cust-' + Math.random().toString(36).substring(2, 8),
+            fullName: user.fullName,
+            email: emailLower,
+            phone: user.phone || '',
+            district: user.district || 'Colombo',
+            city: user.city || 'Colombo',
+            totalOrders: 0,
+            totalSpent: 0,
+            firstJoined: user.createdAt || new Date().toISOString(),
+            vipTier: 'Standard',
+            notes: 'Registered online patron account.',
+          };
+
+          return {
+            customers: [newCustomer, ...state.customers],
+          };
+        });
+      },
+
       syncNewOrder: (placedOrder) => {
         const isCOD = placedOrder.paymentMethod.toLowerCase().includes('cash on delivery') || placedOrder.paymentMethod.toLowerCase().includes('cod');
         const newAdminOrder: AdminOrder = {
           ...placedOrder,
           status: 'confirmed',
           paymentStatus: isCOD ? 'pending_cod' : 'paid',
-          courierPartner: 'PromptX',
+          courierPartner: placedOrder.courierPartner || 'Sri Lanka Post',
+          trackingNumber: placedOrder.trackingNumber,
+          weightGrams: placedOrder.weightGrams,
           costPrice: Math.round(placedOrder.subtotal * 0.45),
         };
 
@@ -700,8 +755,13 @@ export const useAdminStore = create<AdminState>()(
 
       addProduct: async (productData) => {
         const newId = Math.max(...get().products.map((p) => p.id), 100) + 1;
+        const initialStock = productData.stockQuantity !== undefined ? Number(productData.stockQuantity) : 15;
+        const initialWeight = productData.weightGrams !== undefined ? Number(productData.weightGrams) : 400;
         const newProduct: Product = {
           ...productData,
+          stockQuantity: initialStock,
+          quantity: initialStock,
+          weightGrams: initialWeight,
           id: newId,
         };
         set((state) => ({ products: [newProduct, ...state.products] }));
@@ -715,6 +775,8 @@ export const useAdminStore = create<AdminState>()(
               price: productData.price,
               regular_price: productData.regularPrice,
               sale_price: productData.salePrice || null,
+              stock_quantity: initialStock,
+              weight_grams: initialWeight,
               description: productData.description,
               short_description: productData.shortDescription,
               styling_tip: productData.stylingTip || null,
@@ -750,6 +812,8 @@ export const useAdminStore = create<AdminState>()(
             if (updates.price !== undefined) dbPayload.price = updates.price;
             if (updates.regularPrice !== undefined) dbPayload.regular_price = updates.regularPrice;
             if (updates.salePrice !== undefined) dbPayload.sale_price = updates.salePrice;
+            if (updates.stockQuantity !== undefined) dbPayload.stock_quantity = updates.stockQuantity;
+            if (updates.weightGrams !== undefined) dbPayload.weight_grams = updates.weightGrams;
             if (updates.description !== undefined) dbPayload.description = updates.description;
             if (updates.shortDescription !== undefined) dbPayload.short_description = updates.shortDescription;
             if (updates.stylingTip !== undefined) dbPayload.styling_tip = updates.stylingTip;
@@ -771,9 +835,16 @@ export const useAdminStore = create<AdminState>()(
         }
       },
 
+      updateProductStock: (id, stockQuantity) => {
+        const cleanQty = Math.max(0, Number(stockQuantity) || 0);
+        get().updateProduct(id, { stockQuantity: cleanQty, quantity: cleanQty });
+      },
+
       deleteProduct: async (id) => {
         set((state) => ({
-          products: state.products.filter((p) => p.id !== id),
+          products: state.products.filter(
+            (p) => Number(p.id) !== Number(id) && String(p.id) !== String(id)
+          ),
         }));
 
         if (isSupabaseConfigured()) {
@@ -960,9 +1031,19 @@ export const useAdminStore = create<AdminState>()(
       },
 
       updateSettings: async (newSettings) => {
-        set((state) => ({
-          settings: { ...state.settings, ...newSettings },
-        }));
+        let updated: StoreSettings;
+        set((state) => {
+          updated = { ...state.settings, ...newSettings };
+          if (typeof window !== 'undefined') {
+            try {
+              localStorage.setItem('azhai_store_settings_custom', JSON.stringify(updated));
+              window.dispatchEvent(new CustomEvent('azhai:settings-updated', { detail: updated }));
+            } catch (storageErr) {
+              console.warn('LocalStorage save error:', storageErr);
+            }
+          }
+          return { settings: updated };
+        });
 
         if (isSupabaseConfigured()) {
           try {
@@ -975,12 +1056,31 @@ export const useAdminStore = create<AdminState>()(
             if (newSettings.standardShippingFee !== undefined) dbPayload.standard_shipping_fee = newSettings.standardShippingFee;
             if (newSettings.expressShippingFee !== undefined) dbPayload.express_shipping_fee = newSettings.expressShippingFee;
             if (newSettings.whatsappNumber !== undefined) dbPayload.whatsapp_number = newSettings.whatsappNumber;
+            if (newSettings.phoneNumber !== undefined) dbPayload.phone_number = newSettings.phoneNumber;
             if (newSettings.atelierAddress !== undefined) dbPayload.atelier_address = newSettings.atelierAddress;
             if (newSettings.announcementTicker !== undefined) dbPayload.announcement_ticker = newSettings.announcementTicker;
+            if (newSettings.seo !== undefined) dbPayload.seo = newSettings.seo;
+            if (newSettings.socialLinks !== undefined) dbPayload.social_links = newSettings.socialLinks;
+            if (newSettings.studio !== undefined) dbPayload.studio = newSettings.studio;
+            if (newSettings.bankAccounts !== undefined) dbPayload.bank_accounts = newSettings.bankAccounts;
 
-            await supabase.from('store_settings').update(dbPayload).eq('id', 1);
+            const { error } = await supabase.from('store_settings').update(dbPayload).eq('id', 1);
+            if (error) {
+              // If unknown column in Supabase, update basic columns only
+              const basicPayload: any = {};
+              if (newSettings.storeName !== undefined) basicPayload.store_name = newSettings.storeName;
+              if (newSettings.tagline !== undefined) basicPayload.tagline = newSettings.tagline;
+              if (newSettings.enableCOD !== undefined) basicPayload.enable_cod = newSettings.enableCOD;
+              if (newSettings.maxCODAmount !== undefined) basicPayload.max_cod_amount = newSettings.maxCODAmount;
+              if (newSettings.freeShippingThreshold !== undefined) basicPayload.free_shipping_threshold = newSettings.freeShippingThreshold;
+              if (newSettings.standardShippingFee !== undefined) basicPayload.standard_shipping_fee = newSettings.standardShippingFee;
+              if (newSettings.expressShippingFee !== undefined) basicPayload.express_shipping_fee = newSettings.expressShippingFee;
+              if (newSettings.whatsappNumber !== undefined) basicPayload.whatsapp_number = newSettings.whatsappNumber;
+              if (newSettings.atelierAddress !== undefined) basicPayload.atelier_address = newSettings.atelierAddress;
+              await supabase.from('store_settings').update(basicPayload).eq('id', 1);
+            }
           } catch (err) {
-            console.error('[Supabase Settings Update Error]:', err);
+            console.warn('[Supabase Settings Update]: Local store updated successfully', err);
           }
         }
       },
@@ -1009,7 +1109,7 @@ export const useAdminStore = create<AdminState>()(
 
         if (isSupabaseConfigured()) {
           try {
-            await supabase.from('tailoring_dress_types').insert({
+            const { data } = await supabase.from('tailoring_dress_types').insert({
               name: dt.name,
               slug: dt.slug,
               cover_image: dt.coverImage,
@@ -1017,7 +1117,13 @@ export const useAdminStore = create<AdminState>()(
               lead_time: dt.leadTime,
               is_active: dt.isActive,
               display_order: dt.displayOrder,
-            });
+            }).select().single();
+
+            if (data?.id) {
+              set((state) => ({
+                dressTypes: state.dressTypes.map((item) => (item.id === newId ? { ...item, id: data.id } : item)),
+              }));
+            }
           } catch (err) {
             console.error('[Supabase Dress Type Insert Error]:', err);
           }
@@ -1088,7 +1194,7 @@ export const useAdminStore = create<AdminState>()(
 
         if (isSupabaseConfigured()) {
           try {
-            await supabase.from('tailoring_fabrics').insert({
+            const { data } = await supabase.from('tailoring_fabrics').insert({
               name: fabric.name,
               slug: fabric.slug,
               swatch_image: fabric.swatchImage,
@@ -1098,7 +1204,13 @@ export const useAdminStore = create<AdminState>()(
               compatible_dress_type_ids: fabric.compatibleDressTypeIds,
               in_stock: fabric.inStock,
               display_order: fabric.displayOrder,
-            });
+            }).select().single();
+
+            if (data?.id) {
+              set((state) => ({
+                tailoringFabrics: state.tailoringFabrics.map((item) => (item.id === newId ? { ...item, id: data.id } : item)),
+              }));
+            }
           } catch (err) {
             console.error('[Supabase Fabric Insert Error]:', err);
           }
@@ -1171,14 +1283,20 @@ export const useAdminStore = create<AdminState>()(
 
         if (isSupabaseConfigured()) {
           try {
-            await supabase.from('tailoring_measurement_fields').insert({
+            const { data } = await supabase.from('tailoring_measurement_fields').insert({
               dress_type_id: field.dressTypeId,
               field_name: field.fieldName,
               field_label: field.fieldLabel,
               min_value: field.minValue,
               max_value: field.maxValue,
               display_order: field.displayOrder,
-            });
+            }).select().single();
+
+            if (data?.id) {
+              set((state) => ({
+                measurementFields: state.measurementFields.map((item) => (item.id === newId ? { ...item, id: data.id } : item)),
+              }));
+            }
           } catch (err) {
             console.error('[Supabase Field Insert Error]:', err);
           }
@@ -1229,11 +1347,17 @@ export const useAdminStore = create<AdminState>()(
 
         if (isSupabaseConfigured()) {
           try {
-            await supabase.from('tailoring_size_presets').insert({
+            const { data } = await supabase.from('tailoring_size_presets').insert({
               dress_type_id: preset.dressTypeId,
               size_label: preset.sizeLabel,
               measurements: preset.measurements,
-            });
+            }).select().single();
+
+            if (data?.id) {
+              set((state) => ({
+                sizePresets: state.sizePresets.map((item) => (item.id === newId ? { ...item, id: data.id } : item)),
+              }));
+            }
           } catch (err) {
             console.error('[Supabase Size Preset Insert Error]:', err);
           }
@@ -1271,10 +1395,161 @@ export const useAdminStore = create<AdminState>()(
           }
         }
       },
+
+      // ── BANK ACCOUNTS & DIRECT DEPOSIT ACTIONS ──
+      addBankAccount: (account) => {
+        const newAccount: BankAccount = {
+          ...account,
+          id: `bank-${Date.now()}`,
+          displayOrder: (get().settings.bankAccounts?.length || 0) + 1,
+        };
+        const updatedAccounts = [...(get().settings.bankAccounts || []), newAccount];
+        get().updateSettings({ bankAccounts: updatedAccounts });
+      },
+
+      updateBankAccount: (id, updates) => {
+        const updatedAccounts = (get().settings.bankAccounts || []).map((acc) =>
+          acc.id === id ? { ...acc, ...updates } : acc
+        );
+        get().updateSettings({ bankAccounts: updatedAccounts });
+      },
+
+      deleteBankAccount: (id) => {
+        const updatedAccounts = (get().settings.bankAccounts || []).filter((acc) => acc.id !== id);
+        get().updateSettings({ bankAccounts: updatedAccounts });
+      },
+
+      toggleBankAccountActive: (id) => {
+        const updatedAccounts = (get().settings.bankAccounts || []).map((acc) =>
+          acc.id === id ? { ...acc, isActive: !acc.isActive } : acc
+        );
+        get().updateSettings({ bankAccounts: updatedAccounts });
+      },
+
+      uploadOrderBankSlip: (orderId, slipUrl, reference) => {
+        set((state) => ({
+          orders: state.orders.map((o) => {
+            if (o.orderId === orderId) {
+              return {
+                ...o,
+                bankTransferDetails: {
+                  ...(o.bankTransferDetails as any),
+                  slipUrl,
+                  referenceNumber: reference || o.bankTransferDetails?.referenceNumber,
+                  submittedAt: new Date().toISOString(),
+                },
+              };
+            }
+            return o;
+          }),
+        }));
+
+        // Also update in auth store local storage if patron has order stored
+        try {
+          const authKey = 'azhai-auth-store';
+          const raw = localStorage.getItem(authKey);
+          if (raw) {
+            const parsed = JSON.parse(raw);
+            if (parsed?.state?.orders) {
+              parsed.state.orders = parsed.state.orders.map((ord: any) => {
+                if (ord.orderId === orderId) {
+                  return {
+                    ...ord,
+                    bankTransferDetails: {
+                      ...(ord.bankTransferDetails || {}),
+                      slipUrl,
+                      referenceNumber: reference || ord.bankTransferDetails?.referenceNumber,
+                      submittedAt: new Date().toISOString(),
+                    },
+                  };
+                }
+                return ord;
+              });
+              localStorage.setItem(authKey, JSON.stringify(parsed));
+            }
+          }
+        } catch {
+          // ignore
+        }
+      },
+
+      verifyBankTransferPayment: async (orderId, adminNotes) => {
+        set((state) => ({
+          orders: state.orders.map((o) => {
+            if (o.orderId === orderId) {
+              return {
+                ...o,
+                status: o.status === 'pending' ? 'confirmed' : o.status,
+                paymentStatus: 'paid',
+                adminNotes: adminNotes || o.adminNotes,
+                bankTransferDetails: {
+                  ...(o.bankTransferDetails as any),
+                  verifiedAt: new Date().toISOString(),
+                  verifiedBy: state.adminUser?.name || 'Preethi (Owner)',
+                },
+              };
+            }
+            return o;
+          }),
+        }));
+
+        if (isSupabaseConfigured()) {
+          try {
+            await supabase
+              .from('orders')
+              .update({
+                payment_status: 'paid',
+                status: 'confirmed',
+                admin_notes: adminNotes,
+              })
+              .eq('order_code', orderId);
+          } catch (err) {
+            console.error('[Supabase Verify Bank Payment Error]:', err);
+          }
+        }
+
+        try {
+          const authKey = 'azhai-auth-store';
+          const raw = localStorage.getItem(authKey);
+          if (raw) {
+            const parsed = JSON.parse(raw);
+            if (parsed?.state?.orders) {
+              parsed.state.orders = parsed.state.orders.map((ord: any) => {
+                if (ord.orderId === orderId) {
+                  return {
+                    ...ord,
+                    paymentStatus: 'paid',
+                    status: ord.status === 'pending' ? 'confirmed' : ord.status,
+                    bankTransferDetails: {
+                      ...(ord.bankTransferDetails || {}),
+                      verifiedAt: new Date().toISOString(),
+                      verifiedBy: 'Atelier Admin',
+                    },
+                  };
+                }
+                return ord;
+              });
+              localStorage.setItem(authKey, JSON.stringify(parsed));
+            }
+          }
+        } catch {
+          // ignore
+        }
+      },
     }),
     {
-      name: 'azhai-admin-store',
+      name: 'azhai-admin-store-v3',
       storage: createJSONStorage(() => localStorage),
     }
   )
 );
+
+// Cross-tab synchronization so storefront tabs instantly reflect Admin updates
+if (typeof window !== 'undefined') {
+  window.addEventListener('storage', (event) => {
+    if (event.key === 'azhai-admin-store-v3') {
+      useAdminStore.persist?.rehydrate();
+    }
+  });
+}
+

@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Mail, Lock, Eye, EyeOff, LogIn, Sparkles, ArrowRight, ShieldCheck } from 'lucide-react';
 import { useAuthStore } from '@/store/auth';
 import { validateEmail } from '@/lib/auth-utils';
+import SEOHead from '@/components/SEOHead';
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -12,11 +13,18 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const { login } = useAuthStore();
+  const { login, isAuthenticated } = useAuthStore();
   const navigate = useNavigate();
   const location = useLocation();
 
   const from = (location.state as { from?: { pathname: string } })?.from?.pathname || '/account';
+
+  // Auto-redirect if already logged in
+  useEffect(() => {
+    if (isAuthenticated) {
+      navigate(from, { replace: true });
+    }
+  }, [isAuthenticated, navigate, from]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -43,14 +51,9 @@ export default function Login() {
     }
   };
 
-  const handleFillDemo = () => {
-    setEmail('preethi@azhai.lk');
-    setPassword('Azhai@2026');
-    setError(null);
-  };
-
   return (
     <div className="min-h-screen pt-28 pb-16 px-4 sm:px-6 flex items-center justify-center relative overflow-hidden bg-[#FCFBF8]">
+      <SEOHead title="Sign In | Azhai Boutique Colombo" description="Access your Azhai boutique account to view order history, saved family measurements, and exclusive festive wishlists." noindex={true} />
       {/* Background Decorative Gradient Orbs */}
       <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[550px] h-[550px] bg-gradient-to-br from-[#701626]/10 via-[#C5A059]/10 to-transparent rounded-full blur-3xl pointer-events-none" />
 
@@ -155,20 +158,6 @@ export default function Login() {
               )}
             </button>
           </form>
-
-          {/* Quick Demo Credentials Pill */}
-          <div className="p-3 bg-[#F7F4EE] rounded-2xl border border-[#C5A059]/30 flex items-center justify-between gap-2">
-            <div className="text-[11px] text-[#6D6268]">
-              <span className="font-bold text-[#110B0E]">Demo:</span> preethi@azhai.lk
-            </div>
-            <button
-              type="button"
-              onClick={handleFillDemo}
-              className="text-[10px] font-bold uppercase tracking-wider text-[#701626] hover:underline px-2.5 py-1 rounded-lg bg-white border border-[#C5A059]/30 shrink-0"
-            >
-              Fill Demo
-            </button>
-          </div>
 
           {/* Bottom Link to Signup */}
           <div className="pt-2 border-t border-[#C5A059]/20 text-center space-y-3">

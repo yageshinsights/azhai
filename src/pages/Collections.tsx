@@ -1,16 +1,41 @@
+import { useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import { useAdminStore } from '@/store/admin';
-import { COLLECTIONS } from '@/lib/data';
+import { COLLECTIONS, PRODUCTS, type Product } from '@/lib/data';
 import { ArrowRight, Crown } from 'lucide-react';
+import SEOHead from '@/components/SEOHead';
 
 export default function Collections() {
   const adminCategories = useAdminStore((s) => s.categories);
   const products = useAdminStore((s) => s.products);
-  const categoriesList = adminCategories && adminCategories.length > 0 ? adminCategories : COLLECTIONS;
+  const categoriesList = Array.isArray(adminCategories) && adminCategories.length > 0 ? adminCategories : COLLECTIONS;
+  const allProducts = Array.isArray(products) ? products : PRODUCTS;
+
+  const collectionsSchema = useMemo(() => ({
+    '@context': 'https://schema.org',
+    '@type': 'CollectionPage',
+    name: 'Curated Silhouettes & Collections — Azhai Clothing',
+    description: 'Explore Azhai’s handcrafted festive collections: handloom kurti sets, lotus organza sarees, Kashmiri tilla shawls, and tailored silk crop tops.',
+    url: 'https://azhaiclothing.lk/collections',
+    hasPart: categoriesList.map((col) => ({
+      '@type': 'ProductModel',
+      name: col.name,
+      description: col.description,
+      url: `https://azhaiclothing.lk/collections/${col.slug}`,
+      image: col.heroImage,
+    })),
+  }), [categoriesList]);
 
   return (
     <div className="min-h-screen bg-[#FCFBF8] pt-24 text-[#110B0E]">
+      <SEOHead
+        title="The Collections — Handloom Silks, Saree Sets & Kurties"
+        description="Explore curated handloom kurti sets, hand-painted lotus organza sarees, Kashmiri tilla shawls, and tailored festive couture by Preethi."
+        canonicalUrl="https://azhaiclothing.lk/collections"
+        url="https://azhaiclothing.lk/collections"
+        schema={collectionsSchema}
+      />
       <div className="max-w-7xl mx-auto px-4 sm:px-8 py-16">
         
         {/* Header */}
@@ -31,10 +56,11 @@ export default function Collections() {
         </motion.div>
 
         {/* Collections Grid (2-Column Landscape Editorial Banners) */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 sm:gap-8">
-          {categoriesList.map((col, i) => {
-            const count = products.filter((p) =>
-              p.categories.some((c) => c.slug === col.slug)
+        {categoriesList.length > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 sm:gap-8">
+            {categoriesList.map((col, i) => {
+            const count = allProducts.filter((p: Product) =>
+              p.categories && p.categories.some((c: any) => c.slug === col.slug)
             ).length;
 
             return (
@@ -99,6 +125,23 @@ export default function Collections() {
             );
           })}
         </div>
+      ) : (
+        <div className="text-center py-20 bg-white rounded-3xl border border-[#C5A059]/30 p-8 max-w-xl mx-auto space-y-4 shadow-sm">
+          <div className="w-14 h-14 rounded-full bg-[#701626]/10 text-[#701626] flex items-center justify-center mx-auto border border-[#C5A059]/30">
+            <Crown className="w-6 h-6 text-[#C5A059]" />
+          </div>
+          <h3 className="font-display text-2xl font-bold text-[#110B0E]">New Curations Coming Soon</h3>
+          <p className="text-xs sm:text-sm text-[#6D6268] leading-relaxed">
+            Our upcoming festive collections and handcrafted handloom silks are currently being tailored in our Colombo studio.
+          </p>
+          <Link
+            to="/"
+            className="inline-block px-7 py-3 bg-[#701626] text-white text-xs font-bold uppercase tracking-wider rounded-full shadow-md hover:bg-[#8E1E34] transition-colors"
+          >
+            Return to Boutique
+          </Link>
+        </div>
+      )}
 
       </div>
     </div>

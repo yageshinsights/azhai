@@ -15,36 +15,43 @@ import AdminLayout from '@/components/admin/AdminLayout';
 import { useAdminStore } from '@/store/admin';
 
 export default function AdminSEO() {
-  const { products } = useAdminStore();
+  const { products, settings, updateSettings } = useAdminStore();
   const [selectedProduct, setSelectedProduct] = useState(products[0]);
   const [metaTitle, setMetaTitle] = useState(
-    'Azhai Clothing by Preethi | Handcrafted Luxury Silk Kurties & Sarees Sri Lanka'
+    settings.seo?.metaTitle || 'Azhai Clothing by Preethi | Handcrafted Luxury Silk Kurties & Sarees Sri Lanka'
   );
   const [metaDesc, setMetaDesc] = useState(
-    'Discover heirloom handloom kurti sets, cloud-light organza sarees, and tailored corset tops. Island-wide Sri Lanka delivery & bespoke sizing in Colombo.'
+    settings.seo?.metaDescription || 'Discover heirloom handloom kurti sets, cloud-light organza sarees, and tailored corset tops. Island-wide Sri Lanka delivery & bespoke sizing in Colombo.'
   );
   const [targetKeywords, setTargetKeywords] = useState(
-    'silk kurties sri lanka, bridal saree colombo, handloom clothing boutique, preethi silk couture'
+    settings.seo?.targetKeywords || 'silk kurties sri lanka, bridal saree colombo, handloom clothing boutique, preethi silk couture'
   );
   const [savedToast, setSavedToast] = useState(false);
 
   const handleSaveSEO = (e: React.FormEvent) => {
     e.preventDefault();
+    updateSettings({
+      seo: {
+        metaTitle,
+        metaDescription: metaDesc,
+        targetKeywords,
+      },
+    });
     setSavedToast(true);
-    setTimeout(() => setSavedToast(false), 2000);
+    setTimeout(() => setSavedToast(false), 2500);
   };
 
   const jsonLdCode = {
     '@context': 'https://schema.org',
     '@type': 'ClothingStore',
     name: 'Azhai Clothing by Preethi',
-    image: 'https://azhai.lk/logo-light.png',
-    url: 'https://azhai.lk',
-    telephone: '+94771234567',
+    image: 'https://azhaiclothing.lk/logo-light.png',
+    url: 'https://azhaiclothing.lk',
+    telephone: settings.phoneNumber || '+94 77 123 4567',
     priceRange: 'LKR 8,500 - LKR 45,000',
     address: {
       '@type': 'PostalAddress',
-      streetAddress: '42/A Temple Road, Kollupitiya',
+      streetAddress: settings.atelierAddress || '42/A Temple Road, Kollupitiya',
       addressLocality: 'Colombo',
       postalCode: '00300',
       addressCountry: 'LK',

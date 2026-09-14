@@ -4,6 +4,7 @@ import { motion } from 'framer-motion';
 import { Lock, Eye, EyeOff, KeyRound, Sparkles, CheckCircle2, ArrowLeft, Check } from 'lucide-react';
 import { useAuthStore } from '@/store/auth';
 import { getPasswordStrength } from '@/lib/auth-utils';
+import SEOHead from '@/components/SEOHead';
 
 export default function ResetPassword() {
   const [searchParams] = useSearchParams();
@@ -56,6 +57,7 @@ export default function ResetPassword() {
 
   return (
     <div className="min-h-screen pt-28 pb-16 px-4 sm:px-6 flex items-center justify-center relative overflow-hidden bg-[#FCFBF8]">
+      <SEOHead title="Set New Password | Azhai Boutique Colombo" noindex={true} />
       {/* Background Decorative Gradient Orbs */}
       <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[550px] h-[550px] bg-gradient-to-br from-[#701626]/10 via-[#C5A059]/10 to-transparent rounded-full blur-3xl pointer-events-none" />
 

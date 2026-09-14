@@ -4,10 +4,18 @@ import { useNavigate } from 'react-router-dom';
 import { X, Trash2, ShoppingBag, ArrowRight, Plus, Minus, Sparkles, Tag, Gift, Heart, User } from 'lucide-react';
 import { useCartStore } from '@/store/cart';
 import { useAuthStore } from '@/store/auth';
+import { useAdminStore } from '@/store/admin';
+import { PRODUCTS } from '@/lib/data';
+import { calculateSLPostPostage, estimateCartWeight } from '@/lib/slpost-calculator';
 
 export default function CartDrawer() {
   const { items, isOpen, setCartOpen, removeItem, updateQuantity, totalPrice } = useCartStore();
   const { user, isAuthenticated, wishlist } = useAuthStore();
+  const adminProducts = useAdminStore((s) => s.products);
+  const adminSettings = useAdminStore((s) => s.settings);
+  const storeCoupons = useAdminStore((s) => s.coupons);
+  const allProducts = Array.isArray(adminProducts) ? adminProducts : PRODUCTS;
+  const validWishlistCount = wishlist.filter((slug) => allProducts.some((p) => p.slug === slug)).length;
   const navigate = useNavigate();
   const rawTotal = totalPrice();
 
@@ -17,10 +25,36 @@ export default function CartDrawer() {
   const [isGiftNoteOpen, setIsGiftNoteOpen] = useState(false);
   const [giftNote, setGiftNote] = useState('');
 
-  const FREE_SHIPPING_THRESHOLD = 15000;
+  const freeShippingThreshold = adminSettings?.freeShippingThreshold || 15000;
+  const standardShippingFee = adminSettings?.standardShippingFee || 450;
 
   const applyCoupon = (code: string) => {
     const clean = code.trim().toUpperCase();
+    // Check in dynamic coupons from store
+    const matchedCoupon = storeCoupons?.find(
+      (c) => c.code.toUpperCase() === clean && c.isActive
+    );
+
+    if (matchedCoupon) {
+      if (matchedCoupon.minSpend && rawTotal < matchedCoupon.minSpend) {
+        alert(`This coupon requires a minimum spend of LKR ${matchedCoupon.minSpend.toLocaleString()}`);
+        return;
+      }
+      let disc = 0;
+      if (matchedCoupon.discountType === 'percentage') {
+        disc = Math.round(rawTotal * (matchedCoupon.value / 100));
+        if (matchedCoupon.maxDiscount && disc > matchedCoupon.maxDiscount) {
+          disc = matchedCoupon.maxDiscount;
+        }
+      } else {
+        disc = matchedCoupon.value;
+      }
+      setDiscountAmount(disc);
+      setAppliedCoupon(matchedCoupon.code);
+      return;
+    }
+
+    // Default promotional fallbacks
     if (clean === 'AZHAI10') {
       const disc = Math.round(rawTotal * 0.10);
       setDiscountAmount(disc);
@@ -50,7 +84,22 @@ export default function CartDrawer() {
     });
   };
 
-  const shippingCost = rawTotal >= FREE_SHIPPING_THRESHOLD ? 0 : (rawTotal > 0 ? 450 : 0);
+  // Weight-based SL Post Speed Post Courier estimation
+  const cartWeight = estimateCartWeight(
+    items.map((item) => {
+      const matched = allProducts?.find(
+        (p) => String(p.id) === String(item.id) || p.name === item.name
+      );
+      return {
+        name: item.name,
+        quantity: item.quantity,
+        weightGrams: matched?.weightGrams,
+      };
+    })
+  );
+
+  const estimatedPostage = calculateSLPostPostage(cartWeight).fee;
+  const shippingCost = rawTotal >= freeShippingThreshold ? 0 : (rawTotal > 0 ? estimatedPostage : 0);
   const finalTotal = Math.max(0, rawTotal - discountAmount + shippingCost);
 
   return (
@@ -59,7 +108,7 @@ export default function CartDrawer() {
         <>
           {/* Backdrop */}
           <motion.div
-            className="fixed inset-0 bg-[#110B0E]/60 backdrop-blur-sm z-[60]"
+            className="fixed inset-0 bg-[#110B0E]/60 backdrop-blur-sm z-[9994]"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
@@ -68,7 +117,7 @@ export default function CartDrawer() {
 
           {/* Drawer */}
           <motion.div
-            className="fixed inset-y-0 right-0 z-[70] w-full sm:max-w-md flex flex-col bg-[#FCFBF8] shadow-2xl border-l border-[#C5A059]/40"
+            className="fixed inset-y-0 right-0 z-[9995] w-full sm:max-w-md flex flex-col bg-[#FCFBF8] shadow-2xl border-l border-[#C5A059]/40"
             initial={{ x: '100%' }}
             animate={{ x: 0 }}
             exit={{ x: '100%' }}
@@ -105,11 +154,11 @@ export default function CartDrawer() {
             <div className="px-5 sm:px-6 py-2.5 bg-[#F7F4EE] border-b border-[#C5A059]/30 flex items-center justify-between text-[11px] text-[#6D6268]">
               <span className="flex items-center gap-1.5 font-medium text-[#701626]">
                 <Sparkles className="w-3.5 h-3.5 text-[#C5A059]" />
-                {rawTotal >= FREE_SHIPPING_THRESHOLD 
+                {rawTotal >= freeShippingThreshold 
                   ? "You've unlocked Free Island-wide Delivery!" 
-                  : `Add LKR ${(FREE_SHIPPING_THRESHOLD - rawTotal).toLocaleString('en-US')} more for Free Delivery`}
+                  : `Add LKR ${(freeShippingThreshold - rawTotal).toLocaleString('en-US')} more for Free Delivery`}
               </span>
-              {wishlist.length > 0 && (
+              {validWishlistCount > 0 && (
                 <button
                   onClick={() => {
                     setCartOpen(false);
@@ -117,7 +166,7 @@ export default function CartDrawer() {
                   }}
                   className="text-[10px] text-[#701626] font-bold hover:underline flex items-center gap-1 shrink-0"
                 >
-                  <Heart className="w-3 h-3 fill-[#701626]" /> {wishlist.length} Saved
+                  <Heart className="w-3 h-3 fill-[#701626]" /> {validWishlistCount} Saved
                 </button>
               )}
             </div>
@@ -298,9 +347,9 @@ export default function CartDrawer() {
                     </div>
                   )}
                   <div className="flex justify-between text-[#6D6268]">
-                    <span>Island-wide Delivery</span>
+                    <span>SL Post Speed Post ({cartWeight < 1000 ? `${cartWeight}g` : `${(cartWeight / 1000).toFixed(2)}kg`})</span>
                     <span className="text-[#701626] font-semibold">
-                      {shippingCost === 0 ? 'FREE' : `LKR ${shippingCost}`}
+                      {shippingCost === 0 ? 'FREE' : `LKR ${shippingCost.toLocaleString()}`}
                     </span>
                   </div>
                   <div className="flex justify-between items-baseline pt-2 border-t border-[#C5A059]/30">

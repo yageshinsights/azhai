@@ -5,6 +5,7 @@ import { ArrowLeft, Sparkles, SlidersHorizontal, ArrowUpDown, X, Filter } from '
 import { COLLECTIONS, PRODUCTS, type Product } from '@/lib/data';
 import { useAdminStore } from '@/store/admin';
 import ProductCard from '@/components/ProductCard';
+import SEOHead from '@/components/SEOHead';
 
 type SortOption = 'featured' | 'price-low' | 'price-high' | 'rating';
 
@@ -13,8 +14,8 @@ export default function CollectionDetail() {
   const storeCategories = useAdminStore((state) => state.categories);
   const storeProducts = useAdminStore((state) => state.products);
 
-  const allCategories = storeCategories.length > 0 ? storeCategories : COLLECTIONS;
-  const allProducts = storeProducts.length > 0 ? storeProducts : PRODUCTS;
+  const allCategories = Array.isArray(storeCategories) && storeCategories.length > 0 ? storeCategories : COLLECTIONS;
+  const allProducts = Array.isArray(storeProducts) ? storeProducts : PRODUCTS;
 
   const collection = allCategories.find((c) => c.slug === slug);
   const rawProducts = allProducts.filter((p) => p.categories.some((c) => c.slug === slug));
@@ -75,16 +76,96 @@ export default function CollectionDetail() {
     setSortBy('featured');
   };
 
+  const collectionSchema = useMemo(() => {
+    if (!collection) return undefined;
+    return [
+      {
+        '@context': 'https://schema.org',
+        '@type': 'BreadcrumbList',
+        itemListElement: [
+          {
+            '@type': 'ListItem',
+            position: 1,
+            name: 'Home',
+            item: 'https://azhaiclothing.lk/',
+          },
+          {
+            '@type': 'ListItem',
+            position: 2,
+            name: 'Collections',
+            item: 'https://azhaiclothing.lk/collections',
+          },
+          {
+            '@type': 'ListItem',
+            position: 3,
+            name: collection.name,
+            item: `https://azhaiclothing.lk/collections/${collection.slug}`,
+          },
+        ],
+      },
+      {
+        '@context': 'https://schema.org',
+        '@type': 'CollectionPage',
+        name: `${collection.name} Collection — Azhai Clothing`,
+        description: collection.description,
+        url: `https://azhaiclothing.lk/collections/${collection.slug}`,
+        image: collection.heroImage,
+        mainEntity: {
+          '@type': 'ItemList',
+          itemListElement: rawProducts.map((p, idx) => ({
+            '@type': 'ListItem',
+            position: idx + 1,
+            url: `https://azhaiclothing.lk/products/${p.slug}`,
+            name: p.name,
+          })),
+        },
+      },
+    ];
+  }, [collection, rawProducts]);
+
   if (!collection) {
     return (
-      <div className="min-h-screen flex items-center justify-center text-[#6D6268] font-display text-2xl bg-[#FCFBF8]">
-        Collection not found.
+      <div className="min-h-screen bg-[#FCFBF8] pt-32 pb-20 text-[#110B0E]">
+        <SEOHead title="Collection Not Found" noindex={true} />
+        <div className="max-w-md mx-auto px-4 text-center space-y-6">
+          <div className="w-16 h-16 rounded-full bg-[#701626]/10 text-[#701626] flex items-center justify-center mx-auto border border-[#C5A059]/30">
+            <Sparkles className="w-8 h-8 text-[#C5A059]" />
+          </div>
+          <div className="space-y-2">
+            <h1 className="font-display text-3xl font-bold text-[#110B0E]">Collection Not Found</h1>
+            <p className="text-xs text-[#6D6268] leading-relaxed">
+              This seasonal collection may have been archived or moved. Explore our ongoing festive selections below.
+            </p>
+          </div>
+          <div className="flex flex-col sm:flex-row gap-3 justify-center pt-2">
+            <Link
+              to="/collections"
+              className="px-6 py-3 bg-[#701626] hover:bg-[#8E1E34] text-white text-xs font-bold uppercase tracking-wider rounded-2xl shadow-md transition-colors"
+            >
+              All Collections
+            </Link>
+            <Link
+              to="/"
+              className="px-6 py-3 bg-white hover:bg-gray-50 border border-[#C5A059]/40 text-[#110B0E] text-xs font-bold uppercase tracking-wider rounded-2xl transition-colors"
+            >
+              Return Home
+            </Link>
+          </div>
+        </div>
       </div>
     );
   }
 
   return (
     <div className="min-h-screen bg-[#FCFBF8] pt-24 text-[#110B0E]">
+      <SEOHead
+        title={`${collection.name} Collection — Handcrafted Silk Couture`}
+        description={collection.description || `Discover Azhai's handcrafted ${collection.name} collection in Colombo, Sri Lanka.`}
+        image={collection.heroImage}
+        canonicalUrl={`https://azhaiclothing.lk/collections/${collection.slug}`}
+        url={`https://azhaiclothing.lk/collections/${collection.slug}`}
+        schema={collectionSchema}
+      />
       {/* Hero Banner */}
       <section className="relative h-[40vh] min-h-[320px] overflow-hidden">
         <img
@@ -158,6 +239,22 @@ export default function CollectionDetail() {
               </div>
             )}
 
+            {/* Desktop Price Slider */}
+            <div className="hidden xl:flex items-center gap-2.5 bg-white px-3.5 py-2 rounded-2xl border border-[#C5A059]/30 text-xs">
+              <span className="text-[#6D6268] font-light">Max:</span>
+              <span className="font-bold text-[#701626] min-w-[70px]">LKR {priceMax.toLocaleString('en-US')}</span>
+              <input
+                type="range"
+                min={5000}
+                max={50000}
+                step={1000}
+                value={priceMax}
+                onChange={(e) => setPriceMax(Number(e.target.value))}
+                className="w-24 accent-[#701626] cursor-pointer"
+                title={`Max Price: LKR ${priceMax.toLocaleString()}`}
+              />
+            </div>
+
             {/* Sort Select Dropdown */}
             <div className="flex items-center gap-2 bg-white px-3.5 py-2 rounded-2xl border border-[#C5A059]/30 text-xs">
               <ArrowUpDown className="w-3.5 h-3.5 text-[#701626]" />
@@ -180,7 +277,8 @@ export default function CollectionDetail() {
             {/* Mobile Filter Trigger Button */}
             <button
               onClick={() => setFilterDrawerOpen(!filterDrawerOpen)}
-              className="lg:hidden flex items-center gap-2 bg-white px-4 py-2 rounded-2xl border border-[#C5A059]/30 text-xs font-bold text-[#110B0E]"
+              className="lg:hidden flex items-center gap-2 bg-white px-4 py-2 rounded-2xl border border-[#C5A059]/30 text-xs font-bold text-[#110B0E] cursor-pointer"
+              aria-label="Open Filter Drawer"
             >
               <SlidersHorizontal className="w-3.5 h-3.5 text-[#701626]" />
               <span>Filters {hasActiveFilters && '•'}</span>
@@ -208,18 +306,24 @@ export default function CollectionDetail() {
         {/* Mobile Filter Modal */}
         <AnimatePresence>
           {filterDrawerOpen && (
-            <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/60 backdrop-blur-sm lg:hidden">
+            <div 
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="mobileFilterTitle"
+              className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/60 backdrop-blur-sm lg:hidden"
+            >
               <motion.div
                 initial={{ opacity: 0, y: '100%' }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: '100%' }}
-                className="bg-white rounded-t-3xl sm:rounded-3xl p-6 w-full max-w-md space-y-6 shadow-2xl border border-[#C5A059]/40"
+                className="bg-white rounded-t-3xl sm:rounded-3xl p-6 w-full max-w-md space-y-6 shadow-2xl border border-[#C5A059]/40 max-h-[85vh] overflow-y-auto"
               >
                 <div className="flex items-center justify-between border-b border-[#C5A059]/20 pb-3">
-                  <h3 className="font-display text-xl font-bold text-[#110B0E]">Filter Collection</h3>
+                  <h3 id="mobileFilterTitle" className="font-display text-xl font-bold text-[#110B0E]">Filter Collection</h3>
                   <button
                     onClick={() => setFilterDrawerOpen(false)}
-                    className="p-2 rounded-full bg-[#F7F4EE] text-[#110B0E]"
+                    className="p-2 rounded-full bg-[#F7F4EE] text-[#110B0E] cursor-pointer"
+                    aria-label="Close Filter Drawer"
                   >
                     <X className="w-4 h-4" />
                   </button>
@@ -234,7 +338,7 @@ export default function CollectionDetail() {
                     <button
                       type="button"
                       onClick={() => setSelectedSize('all')}
-                      className={`px-4 py-2 text-xs font-bold rounded-xl border ${
+                      className={`px-4 py-2 text-xs font-bold rounded-xl border cursor-pointer ${
                         selectedSize === 'all'
                           ? 'bg-[#701626] text-white border-[#701626]'
                           : 'bg-[#F7F4EE] text-[#6D6268] border-[#C5A059]/25'
@@ -247,7 +351,7 @@ export default function CollectionDetail() {
                         key={size}
                         type="button"
                         onClick={() => setSelectedSize(size)}
-                        className={`px-4 py-2 text-xs font-bold rounded-xl border ${
+                        className={`px-4 py-2 text-xs font-bold rounded-xl border cursor-pointer ${
                           selectedSize === size
                             ? 'bg-[#701626] text-white border-[#701626]'
                             : 'bg-[#F7F4EE] text-[#6D6268] border-[#C5A059]/25'
@@ -256,6 +360,32 @@ export default function CollectionDetail() {
                         {size}
                       </button>
                     ))}
+                  </div>
+                </div>
+
+                {/* Mobile Price Range Slider */}
+                <div className="space-y-2 pt-2 border-t border-[#C5A059]/20">
+                  <div className="flex justify-between items-center text-xs">
+                    <label htmlFor="mobilePriceMax" className="font-bold text-[#110B0E] uppercase tracking-wider">
+                      Price Up To:
+                    </label>
+                    <span className="font-bold text-[#701626]">
+                      LKR {priceMax.toLocaleString('en-US')}
+                    </span>
+                  </div>
+                  <input
+                    id="mobilePriceMax"
+                    type="range"
+                    min={5000}
+                    max={50000}
+                    step={1000}
+                    value={priceMax}
+                    onChange={(e) => setPriceMax(Number(e.target.value))}
+                    className="w-full accent-[#701626] cursor-pointer"
+                  />
+                  <div className="flex justify-between text-[10px] text-[#6D6268]">
+                    <span>LKR 5,000</span>
+                    <span>LKR 50,000</span>
                   </div>
                 </div>
 
@@ -284,6 +414,22 @@ export default function CollectionDetail() {
             {filteredProducts.map((p, i) => (
               <ProductCard key={p.id} product={p} index={i} />
             ))}
+          </div>
+        ) : rawProducts.length === 0 ? (
+          <div className="py-20 text-center space-y-4 bg-white rounded-3xl p-8 border border-[#C5A059]/30 max-w-lg mx-auto shadow-sm">
+            <div className="w-14 h-14 rounded-full bg-[#701626]/10 text-[#701626] flex items-center justify-center mx-auto border border-[#C5A059]/30">
+              <Sparkles className="w-7 h-7 text-[#C5A059]" />
+            </div>
+            <p className="font-display text-2xl font-bold text-[#110B0E]">New Curations Arriving Soon</p>
+            <p className="text-xs text-[#6D6268] leading-relaxed max-w-sm mx-auto">
+              Our master artisans are currently weaving and preparing pieces for this collection. Explore our made-to-measure studio in the meantime.
+            </p>
+            <Link
+              to="/tailoring"
+              className="inline-flex items-center gap-2 px-6 py-2.5 bg-[#701626] text-white text-xs font-bold uppercase tracking-wider rounded-2xl shadow-sm hover:bg-[#8E1E34] transition-colors cursor-pointer"
+            >
+              Explore Bespoke Studio
+            </Link>
           </div>
         ) : (
           <div className="py-20 text-center space-y-4 bg-white rounded-3xl p-8 border border-[#C5A059]/30">

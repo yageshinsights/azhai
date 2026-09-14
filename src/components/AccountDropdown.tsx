@@ -20,6 +20,8 @@ import {
   ArrowRight
 } from 'lucide-react';
 import { useAuthStore } from '@/store/auth';
+import { useAdminStore } from '@/store/admin';
+import { PRODUCTS } from '@/lib/data';
 import { validateEmail } from '@/lib/auth-utils';
 
 interface AccountDropdownProps {
@@ -30,6 +32,9 @@ interface AccountDropdownProps {
 export default function AccountDropdown({ isOpen, onClose }: AccountDropdownProps) {
   const dropdownRef = useRef<HTMLDivElement>(null);
   const { user, isAuthenticated, logout, wishlist, orders, login } = useAuthStore();
+  const adminProducts = useAdminStore((s) => s.products);
+  const allProducts = Array.isArray(adminProducts) ? adminProducts : PRODUCTS;
+  const validWishlistCount = wishlist.filter((slug) => allProducts.some((p) => p.slug === slug)).length;
   const navigate = useNavigate();
 
   // Mobile Auth Form State
@@ -191,9 +196,9 @@ export default function AccountDropdown({ isOpen, onClose }: AccountDropdownProp
                       <Heart className="w-4 h-4 text-[#701626]" />
                       <span>Wishlist</span>
                     </div>
-                    {wishlist.length > 0 && (
+                    {validWishlistCount > 0 && (
                       <span className="text-[10px] bg-[#C5A059]/20 text-[#701626] font-bold px-2 py-0.5 rounded-full">
-                        {wishlist.length}
+                        {validWishlistCount}
                       </span>
                     )}
                   </Link>
@@ -415,9 +420,9 @@ export default function AccountDropdown({ isOpen, onClose }: AccountDropdownProp
                       <Heart className="w-4 h-4 text-[#701626]/80" />
                       <span>Wishlist</span>
                     </div>
-                    {wishlist.length > 0 && (
+                    {validWishlistCount > 0 && (
                       <span className="text-[9px] bg-[#C5A059]/20 text-[#701626] font-bold px-2 py-0.5 rounded-full">
-                        {wishlist.length}
+                        {validWishlistCount}
                       </span>
                     )}
                   </Link>

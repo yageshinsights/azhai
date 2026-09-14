@@ -1,9 +1,16 @@
 import { Link } from 'react-router-dom';
 import { ShieldCheck, Lock, ArrowLeft } from 'lucide-react';
+import SEOHead from '@/components/SEOHead';
 
 export default function PrivacyPolicy() {
   return (
     <div className="min-h-screen bg-[#FCFBF8] pt-24 pb-20 text-[#110B0E]">
+      <SEOHead
+        title="Privacy & Data Protection Policy — Azhai Atelier"
+        description="Learn how Azhai protects your personal data, payment coordinates, and tailoring measurements in compliance with Sri Lankan privacy standards."
+        canonicalUrl="https://azhaiclothing.lk/privacy-policy"
+        url="https://azhaiclothing.lk/privacy-policy"
+      />
       <div className="max-w-4xl mx-auto px-4 sm:px-8 py-10 space-y-10">
         
         {/* Back Link */}
@@ -46,7 +53,7 @@ export default function PrivacyPolicy() {
           <div className="space-y-2">
             <h2 className="font-display text-lg font-bold text-[#110B0E]">3. Courier Data Sharing</h2>
             <p>
-              Your contact details (name, delivery address, phone number) are shared strictly with our verified delivery partners (PromptX / Koombiyo) solely for delivering your parcel and sending SMS status alerts.
+              Your contact details (name, delivery address, phone number) are shared strictly with our verified delivery partner (Sri Lanka Post Speed Post Courier) solely for delivering your parcel and dispatch status verification.
             </p>
           </div>
 

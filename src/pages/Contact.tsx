@@ -1,8 +1,21 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { motion } from 'framer-motion';
-import { Mail, MessageCircle, MapPin, Clock, Send, Sparkles, CheckCircle2, Phone } from 'lucide-react';
+import { Mail, MessageCircle, MapPin, Clock, Send, Sparkles, CheckCircle2, Phone, ExternalLink, PhoneCall } from 'lucide-react';
+import SEOHead from '@/components/SEOHead';
+import { useAdminStore, cleanWhatsAppDigits } from '@/store/admin';
+import { STORE_ADDRESS_FULL, STORE_PHONE, STORE_SUPPORT_EMAIL } from '@/lib/constants';
+import { sendBrevoEmail } from '@/lib/brevo';
 
 export default function Contact() {
+  const settings = useAdminStore((s) => s.settings);
+
+  const activeAddress = settings?.atelierAddress || STORE_ADDRESS_FULL;
+  const activePhone = settings?.phoneNumber || STORE_PHONE;
+  const activeWhatsApp = settings?.whatsappNumber || STORE_PHONE;
+  const activeWhatsAppDigits = cleanWhatsAppDigits(activeWhatsApp);
+  const activeEmail = settings?.studio?.supportEmail || STORE_SUPPORT_EMAIL;
+  const activeHours = settings?.studio?.openingHours || 'Mon – Sat: 10:00 AM – 7:30 PM (Closed on Poya)';
+
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
@@ -12,11 +25,95 @@ export default function Contact() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    try {
+      const stored = localStorage.getItem('azhai-inquiries');
+      const list = stored ? JSON.parse(stored) : [];
+      list.push({
+        id: `inq_${Date.now()}`,
+        name,
+        email,
+        phone,
+        topic,
+        message,
+        createdAt: new Date().toISOString(),
+      });
+      localStorage.setItem('azhai-inquiries', JSON.stringify(list));
+
+      // Send immediate email notification to Atelier management via Brevo
+      sendBrevoEmail({
+        to: [{ email: activeEmail, name: 'Azhai Atelier Operations' }],
+        replyTo: { email, name },
+        subject: `[Atelier Inquiry] ${topic} — from ${name}`,
+        htmlContent: `
+          <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; background: #FCFBF8; border: 1px solid #C5A059; border-radius: 16px;">
+            <div style="border-bottom: 2px solid #701626; padding-bottom: 12px; margin-bottom: 18px;">
+              <h2 style="color: #701626; margin: 0; font-size: 20px;">New Customer Inquiry</h2>
+              <p style="color: #C5A059; margin: 4px 0 0; font-size: 13px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.1em;">Azhai Boutique Atelier</p>
+            </div>
+            <table style="width: 100%; border-collapse: collapse; font-size: 14px; margin-bottom: 20px;">
+              <tr>
+                <td style="padding: 6px 0; color: #6D6268; width: 120px;"><strong>Patron Name:</strong></td>
+                <td style="padding: 6px 0; color: #110B0E;">${name}</td>
+              </tr>
+              <tr>
+                <td style="padding: 6px 0; color: #6D6268;"><strong>Email:</strong></td>
+                <td style="padding: 6px 0;"><a href="mailto:${email}" style="color: #701626; font-weight: bold;">${email}</a></td>
+              </tr>
+              <tr>
+                <td style="padding: 6px 0; color: #6D6268;"><strong>Phone:</strong></td>
+                <td style="padding: 6px 0; color: #110B0E;">${phone || 'Not provided'}</td>
+              </tr>
+              <tr>
+                <td style="padding: 6px 0; color: #6D6268;"><strong>Inquiry Topic:</strong></td>
+                <td style="padding: 6px 0; color: #701626; font-weight: bold;">${topic}</td>
+              </tr>
+            </table>
+            <div style="background: #ffffff; border: 1px solid #E6DEC9; border-radius: 12px; padding: 16px; margin-bottom: 18px;">
+              <div style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em; color: #C5A059; font-weight: bold; margin-bottom: 6px;">Message Content</div>
+              <p style="margin: 0; color: #110B0E; font-size: 14px; line-height: 1.6; white-space: pre-wrap;">${message}</p>
+            </div>
+            <p style="font-size: 11px; color: #9E9399; margin: 0; text-align: center;">
+              Submitted through the Azhai Boutique Concierge Form on ${new Date().toLocaleString('en-LK', { timeZone: 'Asia/Colombo' })}
+            </p>
+          </div>
+        `,
+      }).catch((err) => console.warn('[Brevo Inquiry Alert Exception]:', err));
+    } catch (err) {
+      console.warn('Inquiry storage error:', err);
+    }
     setSubmitted(true);
   };
 
+  const contactSchema = useMemo(() => ({
+    '@context': 'https://schema.org',
+    '@type': 'ContactPage',
+    name: 'Contact Azhai Atelier — Colombo, Sri Lanka',
+    description: 'Get in touch with Preethi for bespoke bridal tailoring, custom sizing advice, or WhatsApp styling assistance.',
+    url: 'https://azhaiclothing.lk/contact',
+    mainEntity: {
+      '@type': 'ClothingStore',
+      name: 'Azhai Clothing by Preethi',
+      telephone: activePhone,
+      email: activeEmail,
+      address: {
+        '@type': 'PostalAddress',
+        streetAddress: activeAddress,
+        addressLocality: 'Colombo',
+        postalCode: '00300',
+        addressCountry: 'LK',
+      },
+    },
+  }), [activeAddress, activePhone, activeEmail]);
+
   return (
     <div className="min-h-screen bg-[#FCFBF8] pt-24 pb-20 text-[#110B0E]">
+      <SEOHead
+        title="Contact Azhai Atelier — Bespoke Styling & Customer Care Colombo"
+        description="Connect with Azhai Clothing by Preethi in Colombo. WhatsApp concierge, bespoke fitting inquiries, parcel dispatch updates, and showroom appointments."
+        canonicalUrl="https://azhaiclothing.lk/contact"
+        url="https://azhaiclothing.lk/contact"
+        schema={contactSchema}
+      />
       <div className="max-w-7xl mx-auto px-4 sm:px-8 py-10">
         
         {/* Header */}
@@ -54,9 +151,47 @@ export default function Contact() {
                 </div>
               </div>
               <p className="text-xs text-[#6D6268] leading-relaxed">
-                42/A Temple Road, Kollupitiya, Colombo 03, Sri Lanka.<br />
-                <span className="text-[11px] text-[#C5A059] font-medium">(Private showroom visits by prior appointment)</span>
+                {activeAddress}<br />
+                <span className="text-[11px] text-[#C5A059] font-medium">(Private showroom visits & bespoke fittings by appointment)</span>
               </p>
+              <div className="pt-1 border-t border-[#C5A059]/20">
+                <a
+                  href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(activeAddress)}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1.5 text-xs font-bold text-[#701626] hover:underline cursor-pointer"
+                >
+                  <span>Open Directions in Google Maps</span>
+                  <ExternalLink className="w-3.5 h-3.5" />
+                </a>
+              </div>
+            </div>
+
+            {/* Direct Voice & Support Card */}
+            <div className="bg-white rounded-3xl p-6 sm:p-7 border border-[#C5A059]/30 shadow-sm space-y-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-[#701626]/10 text-[#701626] flex items-center justify-center">
+                  <PhoneCall className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-display text-lg font-bold text-[#110B0E]">Direct Lines</h3>
+                  <p className="text-xs text-[#6D6268] font-light">Voice Calls & Email Inquiries</p>
+                </div>
+              </div>
+              <div className="text-xs space-y-2 text-[#6D6268]">
+                <div className="flex items-center justify-between">
+                  <span>Studio Phone:</span>
+                  <a href={`tel:${activePhone}`} className="font-semibold text-[#110B0E] hover:text-[#701626] transition-colors">
+                    {activePhone}
+                  </a>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span>Concierge Email:</span>
+                  <a href={`mailto:${activeEmail}`} className="font-semibold text-[#110B0E] hover:text-[#701626] transition-colors">
+                    {activeEmail}
+                  </a>
+                </div>
+              </div>
             </div>
 
             {/* Operating Hours */}
@@ -71,8 +206,7 @@ export default function Contact() {
                 </div>
               </div>
               <div className="text-xs space-y-1 text-[#6D6268]">
-                <p><strong className="text-[#110B0E]">Monday – Saturday:</strong> 10:00 AM – 7:30 PM</p>
-                <p><strong className="text-[#110B0E]">Sunday:</strong> 11:00 AM – 5:00 PM</p>
+                <p className="font-medium text-[#110B0E]">{activeHours}</p>
               </div>
             </div>
 
@@ -83,10 +217,10 @@ export default function Contact() {
                 <h3 className="font-display text-xl font-bold">Instant WhatsApp Stylist</h3>
               </div>
               <p className="text-xs text-white/80 font-light leading-relaxed">
-                Need urgent sizing advice or same-day dispatch assistance in Colombo? Message Preethi directly on WhatsApp.
+                Need urgent sizing advice, custom bridal consultation, or same-day dispatch assistance in Colombo? Message Preethi directly on WhatsApp ({activeWhatsApp}).
               </p>
               <a
-                href="https://wa.me/?text=Hello%20Preethi!%20I%20would%20like%20to%20inquire%20about%20an%20Azhai%20piece."
+                href={`https://wa.me/${activeWhatsAppDigits}?text=${encodeURIComponent('Hello Preethi! I would like to inquire about an Azhai piece.')}`}
                 target="_blank"
                 rel="noreferrer"
                 className="inline-flex items-center gap-2 px-6 py-3 bg-[#25D366] text-white font-bold text-xs uppercase tracking-wider rounded-2xl shadow-md hover:bg-[#20bd5a] transition-colors"
@@ -134,10 +268,11 @@ export default function Contact() {
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
                   <div className="space-y-1.5">
-                    <label className="block text-xs font-bold text-[#110B0E] uppercase tracking-wider">
+                    <label htmlFor="contact-name" className="block text-xs font-bold text-[#110B0E] uppercase tracking-wider">
                       Your Full Name *
                     </label>
                     <input
+                      id="contact-name"
                       type="text"
                       value={name}
                       onChange={(e) => setName(e.target.value)}
@@ -148,10 +283,11 @@ export default function Contact() {
                   </div>
 
                   <div className="space-y-1.5">
-                    <label className="block text-xs font-bold text-[#110B0E] uppercase tracking-wider">
+                    <label htmlFor="contact-email" className="block text-xs font-bold text-[#110B0E] uppercase tracking-wider">
                       Email Address *
                     </label>
                     <input
+                      id="contact-email"
                       type="email"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
@@ -164,10 +300,11 @@ export default function Contact() {
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-1.5">
-                    <label className="block text-xs font-bold text-[#110B0E] uppercase tracking-wider">
+                    <label htmlFor="contact-phone" className="block text-xs font-bold text-[#110B0E] uppercase tracking-wider">
                       Phone (Optional)
                     </label>
                     <input
+                      id="contact-phone"
                       type="tel"
                       value={phone}
                       onChange={(e) => setPhone(e.target.value)}
@@ -177,10 +314,11 @@ export default function Contact() {
                   </div>
 
                   <div className="space-y-1.5">
-                    <label className="block text-xs font-bold text-[#110B0E] uppercase tracking-wider">
+                    <label htmlFor="contact-topic" className="block text-xs font-bold text-[#110B0E] uppercase tracking-wider">
                       Subject / Topic
                     </label>
                     <select
+                      id="contact-topic"
                       value={topic}
                       onChange={(e) => setTopic(e.target.value)}
                       className="w-full px-4 py-3 rounded-2xl bg-[#F7F4EE]/70 border border-[#C5A059]/30 text-xs focus:border-[#701626] focus:bg-white focus:outline-none"
@@ -195,10 +333,11 @@ export default function Contact() {
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="block text-xs font-bold text-[#110B0E] uppercase tracking-wider">
+                  <label htmlFor="contact-message" className="block text-xs font-bold text-[#110B0E] uppercase tracking-wider">
                     Your Message *
                   </label>
                   <textarea
+                    id="contact-message"
                     value={message}
                     onChange={(e) => setMessage(e.target.value)}
                     placeholder="Tell us about the pieces you are interested in, your sizing queries, or required celebration dates..."

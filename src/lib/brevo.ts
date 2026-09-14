@@ -10,12 +10,10 @@ const SENDER_EMAIL = (typeof import.meta !== 'undefined' && import.meta.env?.VIT
 const SENDER_NAME = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_SENDER_NAME) || 'Azhai Clothing by Preethi';
 const STORE_URL = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_STORE_URL) || 'https://azhaiclothing.lk';
 
-// Supabase Public Storage Brand Asset URL or Local / CDN Fallback
+// Supabase Public Storage Brand Asset URL (Publicly accessible in all email inboxes)
 export const LOGO_URL = 
   (typeof import.meta !== 'undefined' && import.meta.env?.VITE_BRAND_LOGO_URL) ||
-  ((typeof import.meta !== 'undefined' && import.meta.env?.VITE_SUPABASE_URL && !import.meta.env.VITE_SUPABASE_URL.includes('placeholder'))
-    ? `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/brand-assets/logo-gold.png`
-    : '/logo-gold.png');
+  'https://hrmcxxcrnxqhesiywqsc.supabase.co/storage/v1/object/public/product-images/brand/logo-gold.png';
 
 export interface EmailRecipient {
   email: string;
@@ -106,17 +104,30 @@ function wrapEmailLayout(title: string, bodyContent: string): string {
           <!-- Dynamic Editorial Lookbook Footer Banner -->
           <tr>
             <td style="padding: 0 28px 24px 28px;">
-              <div style="background: linear-gradient(135deg, #FCFBF8 0%, #F7F4EE 100%); border-radius: 18px; border: 1px solid #DFBF77; padding: 18px; text-align: center;">
-                <p style="margin: 0 0 4px 0; font-size: 10px; font-weight: bold; text-transform: uppercase; letter-spacing: 2px; color: #701626;">Festive Atelier Releases</p>
-                <p style="margin: 0 0 12px 0; font-size: 12px; color: #6D6268;">Featherlight hand-painted organzas & pure temple silks</p>
-                <div style="display: flex; gap: 8px; justify-content: center; margin-bottom: 12px;">
-                  <img src="https://images.unsplash.com/photo-1610030469983-98e550d6193c?auto=format&fit=crop&w=300&q=80" style="width: 80px; height: 95px; object-fit: cover; border-radius: 10px; border: 1px solid #DFBF77; display: inline-block;" />
-                  <img src="https://images.unsplash.com/photo-1583391733956-3750e0ff4e8b?auto=format&fit=crop&w=300&q=80" style="width: 80px; height: 95px; object-fit: cover; border-radius: 10px; border: 1px solid #DFBF77; display: inline-block;" />
-                  <img src="https://images.unsplash.com/photo-1617627143750-d86bc21e42bb?auto=format&fit=crop&w=300&q=80" style="width: 80px; height: 95px; object-fit: cover; border-radius: 10px; border: 1px solid #DFBF77; display: inline-block;" />
+              <div style="background: linear-gradient(135deg, #FCFBF8 0%, #F7F4EE 100%); border-radius: 18px; border: 1px solid #DFBF77; padding: 20px; text-align: center;">
+                <p style="margin: 0 0 4px 0; font-size: 10px; font-weight: bold; text-transform: uppercase; letter-spacing: 2px; color: #701626; text-align: center;">Festive Atelier Releases</p>
+                <p style="margin: 0 0 14px 0; font-size: 12px; color: #6D6268; text-align: center;">Featherlight hand-painted organzas & pure temple silks</p>
+                
+                <!-- Strictly Centered 3-Column Image Table for all Email Clients -->
+                <table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center" style="margin: 0 auto 14px auto; text-align: center;">
+                  <tr>
+                    <td style="padding: 0 5px;" align="center" valign="middle">
+                      <img src="https://images.unsplash.com/photo-1610030469983-98e550d6193c?auto=format&fit=crop&w=300&q=80" alt="Kurti Set" style="width: 82px; height: 98px; object-fit: cover; border-radius: 10px; border: 1px solid #DFBF77; display: block;" />
+                    </td>
+                    <td style="padding: 0 5px;" align="center" valign="middle">
+                      <img src="https://images.unsplash.com/photo-1583391733956-3750e0ff4e8b?auto=format&fit=crop&w=300&q=80" alt="Lotus Saree" style="width: 82px; height: 98px; object-fit: cover; border-radius: 10px; border: 1px solid #DFBF77; display: block;" />
+                    </td>
+                    <td style="padding: 0 5px;" align="center" valign="middle">
+                      <img src="https://images.unsplash.com/photo-1617627143750-d86bc21e42bb?auto=format&fit=crop&w=300&q=80" alt="Silk Shawl" style="width: 82px; height: 98px; object-fit: cover; border-radius: 10px; border: 1px solid #DFBF77; display: block;" />
+                    </td>
+                  </tr>
+                </table>
+
+                <div style="text-align: center;">
+                  <a href="${STORE_URL}/collections" style="display: inline-block; font-size: 11px; font-weight: bold; color: #701626; text-transform: uppercase; letter-spacing: 1.5px; text-decoration: none; border-bottom: 1px solid #701626; padding-bottom: 2px;">
+                    Explore Lookbook ↗
+                  </a>
                 </div>
-                <a href="${STORE_URL}/collections" style="display: inline-block; font-size: 11px; font-weight: bold; color: #701626; text-transform: uppercase; letter-spacing: 1.5px; text-decoration: none; border-bottom: 1px solid #701626; padding-bottom: 2px;">
-                  Explore Lookbook ↗
-                </a>
               </div>
             </td>
           </tr>
@@ -196,8 +207,19 @@ export function buildOrderConfirmationHtml(order: {
   items: { name: string; size?: string; quantity: number; price: string; image?: string; tailoring?: any }[];
   deliveryMethod: string;
   paymentMethod: string;
+  bankTransferDetails?: {
+    bankName: string;
+    accountNumber: string;
+    accountName: string;
+    branchName?: string;
+    swiftCode?: string;
+    customInstructions?: string;
+  };
 }): string {
   const firstName = order.customerName ? order.customerName.split(' ')[0] : 'Valued Patron';
+  const isBankTransfer = 
+    Boolean(order.bankTransferDetails) || 
+    (order.paymentMethod && order.paymentMethod.toLowerCase().includes('bank'));
   
   const itemsHtml = order.items
     .map(
@@ -229,16 +251,73 @@ export function buildOrderConfirmationHtml(order: {
     )
     .join('');
 
+  const bankHtml = isBankTransfer ? `
+    <!-- Direct Bank Deposit Instructions Table -->
+    <div style="background-color: #FFFFFF; border-radius: 16px; border: 2px solid #DFBF77; padding: 18px 20px; margin-bottom: 24px;">
+      <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
+        <tr>
+          <td>
+            <span style="font-size: 9.5px; font-weight: bold; text-transform: uppercase; letter-spacing: 2px; color: #701626;">
+              Direct Bank Deposit Details
+            </span>
+            <h4 style="font-family: Georgia, serif; font-size: 16px; color: #110B0E; margin: 4px 0 12px 0;">
+              ${order.bankTransferDetails?.bankName || 'Bank Transfer Account'}
+            </h4>
+          </td>
+        </tr>
+        <tr>
+          <td>
+            <table role="presentation" width="100%" cellspacing="0" cellpadding="6" border="0" style="font-size: 12px; background-color: #FCFBF8; border-radius: 10px; border: 1px solid #E5E0D8;">
+              <tr>
+                <td style="color: #6D6268; width: 38%;"><strong>Account Holder:</strong></td>
+                <td style="color: #110B0E; font-weight: bold;">${order.bankTransferDetails?.accountName || 'Azhai Clothing (Pvt) Ltd'}</td>
+              </tr>
+              <tr>
+                <td style="color: #6D6268;"><strong>Account Number:</strong></td>
+                <td style="color: #701626; font-family: monospace; font-size: 14px; font-weight: bold;">${order.bankTransferDetails?.accountNumber || 'Pending Account #'}</td>
+              </tr>
+              ${order.bankTransferDetails?.branchName ? `
+              <tr>
+                <td style="color: #6D6268;"><strong>Branch:</strong></td>
+                <td style="color: #110B0E;">${order.bankTransferDetails.branchName}</td>
+              </tr>` : ''}
+              ${order.bankTransferDetails?.swiftCode ? `
+              <tr>
+                <td style="color: #6D6268;"><strong>SWIFT Code:</strong></td>
+                <td style="color: #110B0E; font-family: monospace;">${order.bankTransferDetails.swiftCode}</td>
+              </tr>` : ''}
+              <tr>
+                <td style="color: #6D6268;"><strong>Exact Amount:</strong></td>
+                <td style="color: #701626; font-weight: bold; font-size: 14px;">LKR ${order.total.toLocaleString()}</td>
+              </tr>
+              <tr>
+                <td style="color: #6D6268;"><strong>Payment Reference:</strong></td>
+                <td style="color: #110B0E; font-family: monospace; font-weight: bold;">#${order.orderId}</td>
+              </tr>
+            </table>
+            <p style="font-size: 11px; color: #6D6268; margin: 12px 0 0 0; line-height: 1.5;">
+              Once deposited, please reply to this email with your slip or send it to our WhatsApp concierge (+94 77 123 4567). Your order will be confirmed and processed immediately upon verification.
+            </p>
+          </td>
+        </tr>
+      </table>
+    </div>
+  ` : '';
+
   const body = `
     <div style="text-align: center; margin-bottom: 24px;">
-      <span style="background-color: #E8F5E9; color: #2E7D32; font-size: 10px; font-weight: bold; text-transform: uppercase; letter-spacing: 2px; padding: 4px 14px; border-radius: 20px;">
-        Order Placed #${order.orderId}
+      <span style="background-color: ${isBankTransfer ? '#FFF8E1' : '#E8F5E9'}; color: ${isBankTransfer ? '#B78103' : '#2E7D32'}; font-size: 10px; font-weight: bold; text-transform: uppercase; letter-spacing: 2px; padding: 4px 14px; border-radius: 20px;">
+        ${isBankTransfer ? 'Awaiting Bank Deposit · Order Reserved' : `Order Placed #${order.orderId}`}
       </span>
       <h2 style="font-family: Georgia, serif; color: #110B0E; font-size: 25px; margin: 12px 0 6px 0;">Thank you, ${firstName}</h2>
       <p style="color: #6D6268; font-size: 13px; margin: 0; line-height: 1.6;">
-        Your handcrafted order has been received by our Colombo atelier and is being carefully tailored for dispatch.
+        ${isBankTransfer 
+          ? 'Your handcrafted pieces have been reserved. Please complete your bank transfer using the instructions below.' 
+          : 'Your handcrafted order has been received by our Colombo atelier and is being carefully tailored for dispatch.'}
       </p>
     </div>
+
+    ${bankHtml}
 
     <!-- Itemized Products Table with Images -->
     <div style="background-color: #FCFBF8; border-radius: 18px; border: 1px solid #DFBF77; padding: 20px; margin-bottom: 24px;">

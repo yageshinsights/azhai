@@ -1,6 +1,8 @@
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Printer, Sparkles, Truck, Package, ShieldCheck } from 'lucide-react';
 import type { AdminOrder } from '@/store/admin';
+import { useAdminStore } from '@/store/admin';
+import { STORE_ADDRESS_FULL, STORE_PHONE, STORE_SUPPORT_EMAIL } from '@/lib/constants';
 
 interface PrintablePackingSlipProps {
   order: AdminOrder | null;
@@ -9,7 +11,14 @@ interface PrintablePackingSlipProps {
 }
 
 export default function PrintablePackingSlip({ order, isOpen, onClose }: PrintablePackingSlipProps) {
+  const settings = useAdminStore((s) => s.settings);
+
   if (!isOpen || !order) return null;
+
+  const senderAddress = settings?.atelierAddress || STORE_ADDRESS_FULL;
+  const senderPhone = settings?.phoneNumber || STORE_PHONE;
+  const senderWhatsApp = settings?.whatsappNumber || STORE_PHONE;
+  const senderEmail = settings?.studio?.supportEmail || STORE_SUPPORT_EMAIL;
 
   const handlePrint = () => {
     window.print();
@@ -51,9 +60,9 @@ export default function PrintablePackingSlip({ order, isOpen, onClose }: Printab
             <div className="flex flex-col sm:flex-row items-start justify-between gap-4 border-b border-[#C5A059]/30 pb-5">
               <div>
                 <img src="/logo-light.png" alt="Azhai Clothing" className="h-10 sm:h-12 w-auto object-contain" />
-                <p className="text-[11px] text-[#6D6268] pt-1">
-                  Atelier & Studio: 42/A Temple Road, Kollupitiya, Colombo 03<br />
-                  WhatsApp Concierge: +94 77 123 4567 · hello@azhai.lk
+                <p className="text-[11px] text-[#6D6268] pt-1 leading-relaxed">
+                  Atelier & Studio: {senderAddress}<br />
+                  WhatsApp: {senderWhatsApp} · Phone: {senderPhone} · {senderEmail}
                 </p>
               </div>
 
@@ -68,37 +77,69 @@ export default function PrintablePackingSlip({ order, isOpen, onClose }: Printab
               </div>
             </div>
 
-            {/* Recipient Coordinates */}
+            {/* Recipient Coordinates & SL Post Postal Waybill Format */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 rounded-2xl bg-[#F7F4EE] border border-[#C5A059]/25 text-xs">
               <div className="space-y-1">
-                <p className="text-[10px] font-bold uppercase tracking-wider text-[#701626]">
-                  Deliver To (Patron):
-                </p>
+                <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-[#701626]">
+                  <span>From (Sender - Left Side):</span>
+                </div>
+                <p className="font-bold text-sm text-[#110B0E]">Azhai Clothing Atelier</p>
+                <p className="text-[#6D6268] leading-relaxed">{senderAddress}</p>
+                <p className="font-bold text-[#110B0E] pt-1">Phone: {senderPhone}</p>
+                <p className="text-[10px] text-[#6D6268]">SL Post COD Reg. Merchant: AZH-COL-03</p>
+              </div>
+
+              <div className="space-y-1">
+                <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-[#701626]">
+                  <span>To (Recipient - Right Side):</span>
+                </div>
                 <p className="font-bold text-sm text-[#110B0E]">{order.customer.fullName}</p>
                 <p className="text-[#6D6268] leading-relaxed">{order.customer.address}</p>
                 <p className="text-[#6D6268]">
-                  {order.customer.city}, {order.customer.district} {order.customer.postalCode && `(${order.customer.postalCode})`}
+                  {order.customer.city}, {order.customer.district} {order.customer.postalCode ? `· Postal Code: ${order.customer.postalCode}` : ''}
                 </p>
                 <p className="font-bold text-[#110B0E] pt-1">Phone: {order.customer.phone}</p>
+                {order.customer.email && <p className="text-[11px] text-[#6D6268]">{order.customer.email}</p>}
               </div>
+            </div>
 
-              <div className="space-y-1 text-left sm:text-right">
-                <p className="text-[10px] font-bold uppercase tracking-wider text-[#701626]">
-                  Courier & Payment:
-                </p>
-                <p className="font-bold text-[#110B0E]">{order.courierPartner || 'PromptX Courier'}</p>
-                {order.trackingNumber && (
-                  <p className="text-[#6D6268]">Tracking #: {order.trackingNumber}</p>
-                )}
-                <div className="pt-2">
-                  <span className={`inline-block px-3 py-1 rounded-full text-[10px] font-bold uppercase ${
-                    order.paymentStatus === 'paid'
-                      ? 'bg-emerald-100 text-emerald-800'
-                      : 'bg-amber-100 text-amber-800 border border-amber-300'
-                  }`}>
-                    {order.paymentStatus === 'paid' ? 'Paid in Full' : `Collect COD: LKR ${order.total.toLocaleString()}`}
+            {/* SL Post Official Parcel Barcode & Dispatch Badge */}
+            <div className="p-4 rounded-2xl bg-[#FCFBF8] border-2 border-dashed border-[#701626]/30 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
+              <div className="space-y-0.5 text-center sm:text-left">
+                <div className="flex items-center gap-2">
+                  <span className="px-2 py-0.5 rounded bg-[#701626] text-white font-bold text-[10px] uppercase tracking-wider">
+                    {order.courierPartner || 'Sri Lanka Post'}
+                  </span>
+                  <span className="font-bold text-[#110B0E] text-xs">Speed Post Courier</span>
+                  <span className="text-[11px] text-[#6D6268]">
+                    ({order.customer.district?.toLowerCase().includes('colombo') || order.customer.district?.toLowerCase().includes('gampaha') || order.customer.district?.toLowerCase().includes('kalutara') ? 'Zone A (Western): 24h SLA' : 'Zone B (Outstation): 48h SLA'})
                   </span>
                 </div>
+                <p className="text-xs font-mono font-bold tracking-widest text-[#110B0E] pt-1">
+                  Tracking #: {order.trackingNumber || `BA${order.orderId.replace(/[^0-9]/g, '').padEnd(9, '0').slice(0, 9)}LK`}
+                </p>
+                <p className="text-[11px] text-[#6D6268]">
+                  Weight: {order.weightGrams ? `${(order.weightGrams / 1000).toFixed(2)} kg (${order.weightGrams}g)` : 'Approx 550g'} (Max allowed 40kg)
+                </p>
+              </div>
+
+              <div className="text-center sm:text-right">
+                {order.paymentStatus === 'paid' ? (
+                  <div className="px-4 py-2 rounded-xl bg-emerald-50 border border-emerald-300 text-emerald-800 text-center">
+                    <p className="text-[10px] uppercase font-bold tracking-wider">Prepaid Article</p>
+                    <p className="font-bold text-sm">NO CASH COLLECTION</p>
+                  </div>
+                ) : (
+                  <div className="px-4 py-2 rounded-xl bg-amber-50 border-2 border-amber-400 text-amber-900 text-center shadow-sm">
+                    <p className="text-[10px] uppercase font-black tracking-wider text-[#701626]">
+                      ★ SL POST CASH ON DELIVERY (COD) ★
+                    </p>
+                    <p className="font-display font-black text-base text-[#701626]">
+                      COLLECT: LKR {order.total.toLocaleString()}
+                    </p>
+                    <p className="text-[9px] text-[#6D6268] font-medium">Money Order Remittance to Azhai Boutique</p>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -144,11 +185,11 @@ export default function PrintablePackingSlip({ order, isOpen, onClose }: Printab
                   </div>
                 )}
                 <div className="flex justify-between text-[#6D6268]">
-                  <span>Shipping</span>
+                  <span>Postage & Handling</span>
                   <span>{order.shipping === 0 ? 'FREE' : `LKR ${order.shipping}`}</span>
                 </div>
                 <div className="flex justify-between text-base font-bold text-[#110B0E] pt-2 border-t border-[#C5A059]/30 font-display">
-                  <span>Total Amount</span>
+                  <span>Total Due</span>
                   <span className="text-[#701626]">LKR {order.total.toLocaleString()}</span>
                 </div>
               </div>
@@ -159,7 +200,7 @@ export default function PrintablePackingSlip({ order, isOpen, onClose }: Printab
               <p className="font-bold text-[#701626] uppercase tracking-wider">
                 🪷 Fragile Artisan Handloom Silks
               </p>
-              <p>Keep dry. Do not bend or crush parcel packaging. 14-day doorstep exchange permitted.</p>
+              <p>Handled via Sri Lanka Post Speed Post. Keep dry. Do not bend or crush parcel packaging.</p>
             </div>
           </div>
         </motion.div>

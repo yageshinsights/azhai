@@ -1,13 +1,47 @@
-import { useState, useEffect } from 'react';
+import { useMemo } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { Package, ArrowRight, Sparkles, Truck, CheckCircle2, ChevronRight, ShoppingBag } from 'lucide-react';
+import { Package, ChevronRight, ShoppingBag } from 'lucide-react';
 import { useAuthStore } from '@/store/auth';
+import { useAdminStore } from '@/store/admin';
 import OrderDetail from './OrderDetail';
 
 export default function Orders() {
-  const { orders } = useAuthStore();
+  const { orders: authOrders, user } = useAuthStore();
+  const adminOrders = useAdminStore((s) => s.orders);
   const [searchParams, setSearchParams] = useSearchParams();
   const selectedOrderId = searchParams.get('order');
+
+  // Reactively synchronize user orders with live updates from admin panel & stores
+  const orders = useMemo(() => {
+    const combined = [...authOrders];
+
+    // Include any orders from AdminStore placed with the user's email
+    if (user?.email) {
+      const userEmailLower = user.email.toLowerCase().trim();
+      const matchingAdminOrders = adminOrders.filter(
+        (ao) =>
+          ao.customer.email?.toLowerCase().trim() === userEmailLower &&
+          !combined.some((co) => co.orderId === ao.orderId)
+      );
+      combined.push(...matchingAdminOrders);
+    }
+
+    // Merge the latest status, courier, tracking, and notes from admin store
+    return combined.map((ord) => {
+      const adminMatch = adminOrders.find((ao) => ao.orderId === ord.orderId);
+      if (adminMatch) {
+        return {
+          ...ord,
+          status: adminMatch.status,
+          courierPartner: adminMatch.courierPartner,
+          trackingNumber: adminMatch.trackingNumber,
+          adminNotes: adminMatch.adminNotes,
+          paymentStatus: adminMatch.paymentStatus,
+        };
+      }
+      return ord;
+    });
+  }, [authOrders, adminOrders, user?.email]);
 
   const selectedOrder = orders.find((o) => o.orderId === selectedOrderId);
 
@@ -47,6 +81,42 @@ export default function Orders() {
     );
   }
 
+  const getStatusBadge = (status?: string) => {
+    switch (status) {
+      case 'processing':
+        return (
+          <span className="text-[10px] bg-amber-50 text-amber-900 font-bold px-2.5 py-0.5 rounded-full border border-amber-200">
+            Atelier Crafting
+          </span>
+        );
+      case 'shipped':
+        return (
+          <span className="text-[10px] bg-blue-50 text-blue-900 font-bold px-2.5 py-0.5 rounded-full border border-blue-200">
+            In Transit / Shipped
+          </span>
+        );
+      case 'delivered':
+        return (
+          <span className="text-[10px] bg-purple-50 text-purple-900 font-bold px-2.5 py-0.5 rounded-full border border-purple-200">
+            Delivered
+          </span>
+        );
+      case 'cancelled':
+        return (
+          <span className="text-[10px] bg-rose-50 text-rose-900 font-bold px-2.5 py-0.5 rounded-full border border-rose-200">
+            Cancelled
+          </span>
+        );
+      case 'confirmed':
+      default:
+        return (
+          <span className="text-[10px] bg-emerald-50 text-emerald-800 font-bold px-2.5 py-0.5 rounded-full border border-emerald-200">
+            Confirmed
+          </span>
+        );
+    }
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -85,9 +155,7 @@ export default function Orders() {
                   <span className="font-display text-lg font-bold text-[#110B0E] group-hover:text-[#701626] transition-colors">
                     #{order.orderId}
                   </span>
-                  <span className="text-[10px] bg-emerald-50 text-emerald-800 font-bold px-2.5 py-0.5 rounded-full border border-emerald-200">
-                    Confirmed
-                  </span>
+                  {getStatusBadge(order.status)}
                   <span className="text-xs text-[#6D6268]">· {formattedDate}</span>
                 </div>
 
