@@ -31,6 +31,7 @@ interface AccountDropdownProps {
 
 export default function AccountDropdown({ isOpen, onClose }: AccountDropdownProps) {
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const mobileSheetRef = useRef<HTMLDivElement>(null);
   const { user, isAuthenticated, logout, wishlist, orders, login } = useAuthStore();
   const adminProducts = useAdminStore((s) => s.products);
   const allProducts = Array.isArray(adminProducts) ? adminProducts : PRODUCTS;
@@ -44,19 +45,28 @@ export default function AccountDropdown({ isOpen, onClose }: AccountDropdownProp
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Close on outside click for desktop
+  // Close on outside click for both desktop dropdown and mobile sheet
   useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        onClose();
+    const handleClickOutside = (event: MouseEvent | TouchEvent) => {
+      const target = event.target as Node;
+      // If clicking inside desktop dropdown, do not close
+      if (dropdownRef.current && dropdownRef.current.contains(target)) {
+        return;
       }
+      // If clicking inside mobile bottom sheet modal, do not close
+      if (mobileSheetRef.current && mobileSheetRef.current.contains(target)) {
+        return;
+      }
+      onClose();
     };
 
     if (isOpen) {
       document.addEventListener('mousedown', handleClickOutside);
+      document.addEventListener('touchstart', handleClickOutside);
     }
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('touchstart', handleClickOutside);
     };
   }, [isOpen, onClose]);
 
@@ -130,6 +140,8 @@ export default function AccountDropdown({ isOpen, onClose }: AccountDropdownProp
 
           {/* Bottom Sheet Modal Container */}
           <motion.div
+            ref={mobileSheetRef}
+            onClick={(e) => e.stopPropagation()}
             initial={{ y: '100%' }}
             animate={{ y: 0 }}
             exit={{ y: '100%' }}
