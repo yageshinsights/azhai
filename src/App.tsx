@@ -1,5 +1,5 @@
 import { lazy, Suspense } from 'react';
-import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, useLocation, Navigate } from 'react-router-dom';
 import { AnimatePresence, motion, type Variants } from 'framer-motion';
 import Navbar from '@/components/Navbar';
 import CartDrawer from '@/components/CartDrawer';
@@ -96,7 +96,9 @@ function AnimatedRoutes() {
             <Route path="/contact" element={<Contact />} />
             <Route path="/shipping-policy" element={<ShippingPolicy />} />
             <Route path="/returns-exchanges" element={<ReturnsExchanges />} />
+            <Route path="/returns" element={<Navigate to="/returns-exchanges" replace />} />
             <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+            <Route path="/privacy" element={<Navigate to="/privacy-policy" replace />} />
             <Route path="/terms" element={<TermsConditions />} />
             <Route path="/coming-soon" element={<ComingSoon />} />
 
