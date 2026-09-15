@@ -551,6 +551,90 @@ export const useAdminStore = create<AdminState>()(
             set({ orders: Array.from(mergedMap.values()) });
           }
 
+          // 6b. Fetch Customer Profiles & Sync CRM Registry
+          try {
+            const { data: dbProfiles } = await supabase
+              .from('profiles')
+              .select('*')
+              .order('created_at', { ascending: false });
+
+            const currentCustomers = get().customers || [];
+            const customerMap = new Map<string, CustomerRecord>();
+
+            // 1. Preload existing/seed customers
+            currentCustomers.forEach((c) => customerMap.set(c.email.toLowerCase().trim(), c));
+
+            // 2. Hydrate from Supabase registered user profiles
+            if (dbProfiles && dbProfiles.length > 0) {
+              dbProfiles.forEach((p: any) => {
+                const email = p.email?.toLowerCase().trim();
+                if (!email) return;
+
+                const customerOrders = (dbOrders || []).filter(
+                  (o: any) => o.customer_details?.email?.toLowerCase().trim() === email
+                );
+                const totalOrders = customerOrders.length;
+                const totalSpent = customerOrders.reduce((sum: number, o: any) => sum + (Number(o.total) || 0), 0);
+                const latestOrder = customerOrders[0];
+
+                const existing = customerMap.get(email);
+                const vipTier: 'Gold Patron' | 'Silver Patron' | 'Standard' =
+                  totalSpent >= 50000 ? 'Gold Patron' : totalSpent >= 25000 ? 'Silver Patron' : 'Standard';
+
+                customerMap.set(email, {
+                  id: p.id || existing?.id || 'cust-' + Math.random().toString(36).substring(2, 8),
+                  fullName: p.full_name || existing?.fullName || email.split('@')[0],
+                  email,
+                  phone: p.phone || existing?.phone || latestOrder?.customer_details?.phone || '',
+                  district: p.preferences?.district || existing?.district || latestOrder?.customer_details?.district || 'Colombo',
+                  city: p.preferences?.city || existing?.city || latestOrder?.customer_details?.city || 'Colombo',
+                  totalOrders: Math.max(totalOrders, existing?.totalOrders || 0),
+                  totalSpent: Math.max(totalSpent, existing?.totalSpent || 0),
+                  firstJoined: p.created_at || existing?.firstJoined || new Date().toISOString(),
+                  lastOrderDate: latestOrder?.created_at || existing?.lastOrderDate,
+                  vipTier: existing?.vipTier || vipTier,
+                  notes: p.role === 'admin' ? 'Atelier Administrator' : existing?.notes || 'Registered online patron account.',
+                });
+              });
+            }
+
+            // 3. Also capture any guest orders placed via storefront
+            if (dbOrders && dbOrders.length > 0) {
+              dbOrders.forEach((o: any) => {
+                const email = o.customer_details?.email?.toLowerCase().trim();
+                if (!email || customerMap.has(email)) return;
+
+                const custDetails = o.customer_details || {};
+                const customerOrders = dbOrders.filter(
+                  (ord: any) => ord.customer_details?.email?.toLowerCase().trim() === email
+                );
+                const totalOrders = customerOrders.length;
+                const totalSpent = customerOrders.reduce((sum: number, ord: any) => sum + (Number(ord.total) || 0), 0);
+                const vipTier: 'Gold Patron' | 'Silver Patron' | 'Standard' =
+                  totalSpent >= 50000 ? 'Gold Patron' : totalSpent >= 25000 ? 'Silver Patron' : 'Standard';
+
+                customerMap.set(email, {
+                  id: 'cust-' + Math.random().toString(36).substring(2, 8),
+                  fullName: custDetails.fullName || email.split('@')[0],
+                  email,
+                  phone: custDetails.phone || '',
+                  district: custDetails.district || 'Colombo',
+                  city: custDetails.city || 'Colombo',
+                  totalOrders,
+                  totalSpent,
+                  firstJoined: o.created_at || new Date().toISOString(),
+                  lastOrderDate: customerOrders[0]?.created_at,
+                  vipTier,
+                  notes: 'Customer placed order via storefront.',
+                });
+              });
+            }
+
+            set({ customers: Array.from(customerMap.values()) });
+          } catch (profileErr) {
+            console.warn('[Supabase Profiles Hydration Notice]:', profileErr);
+          }
+
           // 7. Fetch Tailoring Tables (Safe with fallback)
           try {
             const { data: dbDressTypes } = await supabase.from('tailoring_dress_types').select('*').order('display_order', { ascending: true });

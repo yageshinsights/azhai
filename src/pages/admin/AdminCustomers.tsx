@@ -18,12 +18,16 @@ import { useAdminStore, type CustomerRecord } from '@/store/admin';
 import { useAuthStore } from '@/store/auth';
 
 export default function AdminCustomers() {
-  const { customers, syncCustomerFromAuth } = useAdminStore();
+  const { customers, syncCustomerFromAuth, fetchSupabaseData } = useAdminStore();
   const authAccounts = useAuthStore((s) => s.accounts);
   const currentAuthUser = useAuthStore((s) => s.user);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedVipTier, setSelectedVipTier] = useState<string>('all');
   const [selectedCustomer, setSelectedCustomer] = useState<CustomerRecord | null>(null);
+
+  useEffect(() => {
+    fetchSupabaseData();
+  }, [fetchSupabaseData]);
 
   // Auto-sync any registered online patron accounts to the Admin CRM Registry
   useEffect(() => {
