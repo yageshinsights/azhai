@@ -284,12 +284,11 @@ export const useAuthStore = create<AuthState>()(
               supabaseUserId = sbData.user.id;
             } else if (sbErr) {
               console.warn('[Supabase Auth Signup Notice]:', sbErr.message);
-              if (sbErr.message.toLowerCase().includes('already registered')) {
-                return { success: false, error: 'An account with this email already exists. Please log in.' };
-              }
+              return { success: false, error: sbErr.message };
             }
-          } catch (sbEx) {
+          } catch (sbEx: any) {
             console.warn('[Supabase Signup Exception]:', sbEx);
+            return { success: false, error: sbEx?.message || 'Database connection error. Please try again.' };
           }
         }
 

@@ -1,4 +1,4 @@
-import { ReactNode, useState } from 'react';
+import { ReactNode, useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
@@ -30,10 +30,15 @@ interface AdminLayoutProps {
 }
 
 export default function AdminLayout({ children }: AdminLayoutProps) {
-  const { adminUser, adminLogout, orders, settings, toggleCOD } = useAdminStore();
+  const { adminUser, adminLogout, orders, settings, toggleCOD, fetchSupabaseData } = useAdminStore();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
+
+  // Always refresh latest store data (orders, customer profiles, settings, products) on admin navigation
+  useEffect(() => {
+    fetchSupabaseData();
+  }, [location.pathname, fetchSupabaseData]);
 
   const handleLogout = () => {
     adminLogout();
