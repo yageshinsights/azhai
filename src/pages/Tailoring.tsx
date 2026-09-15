@@ -37,7 +37,7 @@ export default function Tailoring() {
   }), []);
 
   return (
-    <div className="min-h-screen bg-[#FCFBF8] pt-24 sm:pt-32 pb-20">
+    <div className="min-h-screen bg-[#FCFBF8] pt-32 sm:pt-36 xl:pt-40 pb-20">
       <SEOHead
         title="Custom Tailoring Studio & 2D Saree Blouse Customizer"
         description="Design your custom saree blouse or bespoke handloom outfit with Azhai. Real-time 2D neckline & sleeve customizer, fitting vault, and express island-wide delivery."

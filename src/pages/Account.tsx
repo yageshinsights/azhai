@@ -50,7 +50,7 @@ export default function Account() {
   if (!user) return null;
 
   return (
-    <div className="min-h-screen pt-24 pb-20 px-4 sm:px-8 max-w-7xl mx-auto relative z-10">
+    <div className="min-h-screen pt-32 sm:pt-36 xl:pt-40 pb-20 px-4 sm:px-8 max-w-7xl mx-auto relative z-10">
       <SEOHead title="My Account" noindex={true} />
       {/* Top Header / Welcome */}
       <div className="mb-8 space-y-1">

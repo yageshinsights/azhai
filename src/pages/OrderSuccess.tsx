@@ -156,7 +156,7 @@ export default function OrderSuccess() {
 
   if (!order) {
     return (
-      <div className="min-h-screen bg-[#FCFBF8] pt-28 pb-20 text-[#110B0E]">
+      <div className="min-h-screen bg-[#FCFBF8] pt-32 sm:pt-36 xl:pt-40 pb-20 text-[#110B0E]">
         <SEOHead title="Order Status" noindex={true} />
         <div className="max-w-xl mx-auto px-4 text-center space-y-6">
           <div className="w-16 h-16 rounded-full bg-amber-50 border border-amber-200 text-amber-600 flex items-center justify-center mx-auto">
@@ -190,7 +190,7 @@ export default function OrderSuccess() {
   }
 
   return (
-    <div className="min-h-screen bg-[#FCFBF8] pt-24 pb-20 text-[#110B0E]">
+    <div className="min-h-screen bg-[#FCFBF8] pt-32 sm:pt-36 xl:pt-40 pb-20 text-[#110B0E]">
       <SEOHead title="Order Confirmed" noindex={true} />
       <div className="max-w-3xl mx-auto px-4 sm:px-8">
         

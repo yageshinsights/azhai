@@ -465,7 +465,7 @@ export default function Checkout() {
   };
 
   return (
-    <div className="min-h-screen bg-[#FCFBF8] pt-24 pb-20 text-[#110B0E]">
+    <div className="min-h-screen bg-[#FCFBF8] pt-32 sm:pt-36 xl:pt-40 pb-20 text-[#110B0E]">
       <SEOHead title="Secure Checkout" noindex={true} />
       <div className="max-w-7xl mx-auto px-4 sm:px-8">
         

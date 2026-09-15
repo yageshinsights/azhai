@@ -52,7 +52,7 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen pt-28 pb-16 px-4 sm:px-6 flex items-center justify-center relative overflow-hidden bg-[#FCFBF8]">
+    <div className="min-h-screen pt-32 sm:pt-36 xl:pt-40 pb-16 px-4 sm:px-6 flex items-center justify-center relative overflow-hidden bg-[#FCFBF8]">
       <SEOHead title="Sign In | Azhai Boutique Colombo" description="Access your Azhai boutique account to view order history, saved family measurements, and exclusive festive wishlists." noindex={true} />
       {/* Background Decorative Gradient Orbs */}
       <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[550px] h-[550px] bg-gradient-to-br from-[#701626]/10 via-[#C5A059]/10 to-transparent rounded-full blur-3xl pointer-events-none" />
