@@ -226,7 +226,10 @@ export default function Checkout() {
           .insert({
             order_code: orderData.orderId,
             user_id: user?.id || null,
-            customer_details: orderData.customer,
+            customer_details: {
+              ...orderData.customer,
+              bank_transfer_details: orderData.bankTransferDetails || null,
+            },
             delivery_notes: deliveryNotes.trim() || null,
             gift_note: state.giftNote || null,
             coupon_code: state.appliedCoupon || null,
@@ -238,7 +241,6 @@ export default function Checkout() {
             delivery_method: orderData.deliveryMethod,
             payment_method: orderData.paymentMethod,
             payment_status: paymentMethod === 'card' ? 'paid' : paymentMethod === 'bank' ? 'pending_bank' : 'pending_cod',
-            bank_transfer_details: orderData.bankTransferDetails || null,
             status: paymentMethod === 'bank' ? 'pending' : 'confirmed',
             courier_partner: orderData.courierPartner || 'Sri Lanka Post',
             tracking_number: orderData.trackingNumber || null,

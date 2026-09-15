@@ -533,7 +533,7 @@ export const useAdminStore = create<AdminState>()(
               courierPartner: o.courier_partner || undefined,
               trackingNumber: o.tracking_number || undefined,
               adminNotes: o.admin_notes || undefined,
-              bankTransferDetails: o.bank_transfer_details || undefined,
+              bankTransferDetails: o.customer_details?.bank_transfer_details || o.bank_transfer_details || undefined,
               costPrice: o.cost_price ? Number(o.cost_price) : Math.round(Number(o.subtotal) * 0.45),
             }));
 
@@ -1513,19 +1513,23 @@ export const useAdminStore = create<AdminState>()(
             try {
               const { data: existingOrder } = await supabase
                 .from('orders')
-                .select('bank_transfer_details')
+                .select('customer_details')
                 .eq('order_code', orderId)
                 .maybeSingle();
 
-              const existingDetails = (existingOrder?.bank_transfer_details as Record<string, any>) || {};
+              const currentCustomer = (existingOrder?.customer_details as Record<string, any>) || {};
+              const existingDetails = (currentCustomer?.bank_transfer_details as Record<string, any>) || {};
               await supabase
                 .from('orders')
                 .update({
-                  bank_transfer_details: {
-                    ...existingDetails,
-                    slipUrl,
-                    referenceNumber: reference || existingDetails.referenceNumber,
-                    submittedAt,
+                  customer_details: {
+                    ...currentCustomer,
+                    bank_transfer_details: {
+                      ...existingDetails,
+                      slipUrl,
+                      referenceNumber: reference || existingDetails.referenceNumber,
+                      submittedAt,
+                    },
                   },
                 })
                 .eq('order_code', orderId);
@@ -1591,13 +1595,14 @@ export const useAdminStore = create<AdminState>()(
           try {
             const { data: existingOrder } = await supabase
               .from('orders')
-              .select('status, bank_transfer_details')
+              .select('status, customer_details')
               .eq('order_code', orderId)
               .maybeSingle();
 
             const currentStatus = existingOrder?.status;
             const updatedStatus = currentStatus === 'pending' ? 'confirmed' : (currentStatus || 'confirmed');
-            const existingDetails = (existingOrder?.bank_transfer_details as Record<string, any>) || {};
+            const currentCustomer = (existingOrder?.customer_details as Record<string, any>) || {};
+            const existingDetails = (currentCustomer?.bank_transfer_details as Record<string, any>) || {};
 
             await supabase
               .from('orders')
@@ -1605,10 +1610,13 @@ export const useAdminStore = create<AdminState>()(
                 payment_status: 'paid',
                 status: updatedStatus,
                 admin_notes: adminNotes,
-                bank_transfer_details: {
-                  ...existingDetails,
-                  verifiedAt,
-                  verifiedBy,
+                customer_details: {
+                  ...currentCustomer,
+                  bank_transfer_details: {
+                    ...existingDetails,
+                    verifiedAt,
+                    verifiedBy,
+                  },
                 },
               })
               .eq('order_code', orderId);

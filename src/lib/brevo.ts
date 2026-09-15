@@ -28,11 +28,6 @@ export interface SendEmailPayload {
 }
 
 export async function sendBrevoEmail(payload: SendEmailPayload): Promise<{ success: boolean; error?: string }> {
-  if (!BREVO_API_KEY) {
-    console.warn(`[Brevo Email Simulation]: No VITE_BREVO_API_KEY found in .env. Email was NOT dispatched to inboxes. Target: ${payload.to.map(t => t.email).join(', ')} | Subject: "${payload.subject}"`);
-    return { success: true };
-  }
-
   const emailBody = {
     sender: { name: SENDER_NAME, email: SENDER_EMAIL },
     to: payload.to,
@@ -41,13 +36,14 @@ export async function sendBrevoEmail(payload: SendEmailPayload): Promise<{ succe
     replyTo: payload.replyTo || { name: SENDER_NAME, email: SENDER_EMAIL },
   };
 
-  // 1. Try server-side proxy endpoint (/api/send-email) which bypasses browser CORS
+  // 1. Try server-side proxy endpoint (/api/send-email) which bypasses browser CORS.
+  // In production (Cloudflare Worker), the worker securely holds the Brevo API key as a secret.
   try {
     const proxyRes = await fetch('/api/send-email', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        apiKey: BREVO_API_KEY,
+        apiKey: BREVO_API_KEY || undefined,
         payload: emailBody,
       }),
     });
@@ -61,6 +57,12 @@ export async function sendBrevoEmail(payload: SendEmailPayload): Promise<{ succe
     console.warn('[Brevo Proxy Non-200]:', errData);
   } catch (proxyErr) {
     console.warn('[Brevo Proxy Unreachable, trying direct fetch]:', proxyErr);
+  }
+
+  // 2. Direct fallback to Brevo REST API (only if client has direct API key)
+  if (!BREVO_API_KEY) {
+    console.warn(`[Brevo Email]: Proxy failed or unreachable, and no client VITE_BREVO_API_KEY for direct fallback.`);
+    return { success: false, error: 'Email service unreachable' };
   }
 
   // 2. Direct fallback to Brevo REST API
