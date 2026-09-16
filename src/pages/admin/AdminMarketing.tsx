@@ -540,7 +540,7 @@ export default function AdminMarketing() {
                     type="email"
                     value={testEmailAddress}
                     onChange={(e) => setTestEmailAddress(e.target.value)}
-                    placeholder="preethi@azhai.lk"
+                    placeholder="admin@azhai.lk"
                     className="w-full sm:w-72 px-3 py-2 text-xs bg-white rounded-xl border border-[#C5A059]/40 font-semibold text-[#110B0E]"
                   />
                 </div>

@@ -115,11 +115,6 @@ export default function AccountDropdown({ isOpen, onClose }: AccountDropdownProp
     }
   };
 
-  const handleFillDemo = () => {
-    setEmail('preethi@azhai.lk');
-    setPassword('Azhai@2026');
-    setError(null);
-  };
 
   const firstName = user?.fullName ? user.fullName.split(' ')[0] : 'Guest';
 
@@ -341,14 +336,6 @@ export default function AccountDropdown({ isOpen, onClose }: AccountDropdownProp
                       Create Account →
                     </Link>
                   </div>
-
-                  <button
-                    type="button"
-                    onClick={handleFillDemo}
-                    className="w-full py-2 bg-[#F7F4EE] hover:bg-[#F0ECE1] text-[#701626] text-[11px] font-bold rounded-xl border border-[#C5A059]/30 transition-colors"
-                  >
-                    ⚡ Quick Fill Demo Account
-                  </button>
                 </div>
               </div>
             )}
@@ -499,12 +486,6 @@ export default function AccountDropdown({ isOpen, onClose }: AccountDropdownProp
                   >
                     <UserPlus className="w-3.5 h-3.5" /> Create Account
                   </Link>
-                </div>
-
-                <div className="pt-2 border-t border-[#C5A059]/15 text-center">
-                  <p className="text-[9.5px] text-[#6D6268]">
-                    Demo: <span className="font-semibold text-[#701626]">preethi@azhai.lk</span> / <span className="font-semibold text-[#701626]">Azhai@2026</span>
-                  </p>
                 </div>
               </div>
             )}
