@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { MessageCircle, X, Sparkles, Send, ShieldCheck } from 'lucide-react';
 import { useLocation } from 'react-router-dom';
@@ -11,6 +11,26 @@ export default function WhatsAppConcierge() {
   const location = useLocation();
   const isCartOpen = useCartStore((s) => s.isOpen);
   const whatsappNumber = useAdminStore((s) => s.settings?.whatsappNumber);
+
+  const isHomePage = location.pathname === '/';
+  const [isVisible, setIsVisible] = useState(!isHomePage);
+
+  useEffect(() => {
+    if (!isHomePage) {
+      setIsVisible(true);
+      return;
+    }
+
+    const checkScroll = () => {
+      // Fade in smoothly once scrolled down past the hero section
+      const heroThreshold = Math.min(window.innerHeight * 0.6, 420);
+      setIsVisible(window.scrollY > heroThreshold);
+    };
+
+    checkScroll();
+    window.addEventListener('scroll', checkScroll, { passive: true });
+    return () => window.removeEventListener('scroll', checkScroll);
+  }, [isHomePage]);
 
   // Hide concierge on admin pages or when cart drawer is open
   if (location.pathname.startsWith('/admin') || isCartOpen) {
@@ -41,16 +61,24 @@ export default function WhatsAppConcierge() {
   };
 
   return (
-    <div className={`fixed ${isProductPage ? 'bottom-36 lg:bottom-8' : 'bottom-20 lg:bottom-6'} right-3.5 sm:right-6 z-50 print:hidden transition-all duration-300`}>
-      <AnimatePresence>
-        {isOpen && (
-          <motion.div
-            initial={{ opacity: 0, y: 20, scale: 0.9 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 20, scale: 0.9 }}
-            transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-            className="mb-3 w-[calc(100vw-2rem)] max-w-xs sm:max-w-sm bg-white rounded-3xl p-5 border border-[#DFBF77] shadow-2xl space-y-4 text-left relative overflow-hidden"
-          >
+    <AnimatePresence>
+      {isVisible && (
+        <motion.div
+          initial={{ opacity: 0, y: 30, scale: 0.9 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          exit={{ opacity: 0, y: 30, scale: 0.9 }}
+          transition={{ duration: 0.65, ease: [0.16, 1, 0.3, 1] }}
+          className={`fixed ${isProductPage ? 'bottom-36 lg:bottom-8' : 'bottom-20 lg:bottom-6'} right-3.5 sm:right-6 z-50 print:hidden`}
+        >
+          <AnimatePresence>
+            {isOpen && (
+              <motion.div
+                initial={{ opacity: 0, y: 20, scale: 0.9 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: 20, scale: 0.9 }}
+                transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+                className="mb-3 w-[calc(100vw-2rem)] max-w-xs sm:max-w-sm bg-white rounded-3xl p-5 border border-[#DFBF77] shadow-2xl space-y-4 text-left relative overflow-hidden"
+              >
             {/* Top Atelier Bar */}
             <div className="flex items-center justify-between border-b border-[#C5A059]/20 pb-3">
               <div className="flex items-center gap-2.5">
@@ -138,6 +166,8 @@ export default function WhatsAppConcierge() {
           Styling Concierge
         </span>
       </motion.button>
-    </div>
+        </motion.div>
+      )}
+    </AnimatePresence>
   );
 }
