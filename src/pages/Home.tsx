@@ -56,6 +56,7 @@ export default function Home() {
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [direction, setDirection] = useState(1);
   const isHovered = useRef(false);
+  const touchStartX = useRef<number | null>(null);
 
   // Reset activeSlide if heroCategories length changes
   useEffect(() => {
@@ -124,9 +125,20 @@ export default function Home() {
       
       {/* ── FIT-TO-SCREEN EDITORIAL CATEGORY HERO ── */}
       <section 
-        className="relative w-full h-[100svh] min-h-[580px] sm:min-h-[640px] pt-18 sm:pt-24 flex flex-col justify-between overflow-hidden bg-[#110B0E]"
+        className="relative w-full h-[100svh] min-h-[640px] pt-20 sm:pt-24 pb-22 sm:pb-8 flex flex-col justify-between overflow-hidden bg-[#0D0709]"
         onMouseEnter={() => { isHovered.current = true; }}
         onMouseLeave={() => { isHovered.current = false; }}
+        onTouchStart={(e) => { touchStartX.current = e.touches[0].clientX; }}
+        onTouchEnd={(e) => {
+          if (touchStartX.current === null) return;
+          const deltaX = e.changedTouches[0].clientX - touchStartX.current;
+          if (deltaX > 45) {
+            handlePrev();
+          } else if (deltaX < -45) {
+            handleNext();
+          }
+          touchStartX.current = null;
+        }}
       >
         
         {/* Background Category Sliding Imagery */}
@@ -135,75 +147,82 @@ export default function Home() {
             <motion.div
               key={currentCategory.id || currentCategory.slug}
               custom={direction}
-              initial={{ opacity: 0, scale: 1.06 }}
+              initial={{ opacity: 0, scale: 1.05 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.98 }}
-              transition={{ duration: 0.8, ease: [0.25, 0.46, 0.45, 0.94] }}
+              transition={{ duration: 0.85, ease: [0.25, 0.46, 0.45, 0.94] }}
               className="absolute inset-0 z-0"
             >
               <img
                 src={currentCategory.heroImage}
                 alt={currentCategory.name}
                 className="w-full h-full object-cover object-center"
+                loading="eager"
               />
-              {/* Vignette Gradients */}
-              <div className="absolute inset-0 bg-gradient-to-t from-[#110B0E] via-[#110B0E]/60 to-[#110B0E]/25" />
-              <div className="absolute inset-0 bg-gradient-to-r from-[#110B0E]/85 via-[#110B0E]/30 to-transparent hidden md:block" />
+              {/* Warm Couture Lighting Gradients: Bottom contrast + subtle amber/burgundy glow */}
+              <div className="absolute inset-0 bg-gradient-to-t from-[#0D0709] via-[#0D0709]/55 via-45% to-transparent" />
+              <div className="absolute inset-0 bg-gradient-to-r from-[#0D0709]/85 via-[#701626]/20 to-transparent" />
+              <div className="absolute top-0 right-0 w-80 sm:w-96 h-80 sm:h-96 bg-[#DFBF77]/10 rounded-full blur-3xl pointer-events-none" />
             </motion.div>
           )}
         </AnimatePresence>
 
         {/* Content Area */}
-        <div className="relative z-20 px-4 sm:px-8 max-w-7xl mx-auto w-full my-auto py-4 sm:py-6">
+        <div className="relative z-20 px-4 sm:px-8 max-w-7xl mx-auto w-full my-auto py-2 sm:py-6">
           <div className="max-w-2xl text-left space-y-3.5 sm:space-y-4">
             
-            {/* Season Badge */}
+            {/* Season Badge with Live Beacon */}
             <motion.div 
               initial={{ opacity: 0, y: 15 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5 }}
-              className="inline-flex items-center gap-2 bg-[#701626]/80 backdrop-blur-md px-3.5 sm:px-4 py-1 sm:py-1.5 rounded-full border border-[#C5A059]/40 shadow-lg"
+              className="inline-flex items-center gap-2.5 bg-black/45 backdrop-blur-md px-4 py-1.5 rounded-full border border-[#DFBF77]/50 shadow-xl"
             >
-              <Sparkles className="w-3.5 h-3.5 text-[#DFBF77]" />
-              <span className="text-[9px] sm:text-[10px] uppercase tracking-[0.25em] text-[#DFBF77] font-bold">
-                {currentCategory?.season || 'Festive Couture'} · {currentCategory?.count || 6} Pieces
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+              </span>
+              <span className="text-[9px] sm:text-[10.5px] uppercase tracking-[0.25em] text-[#DFBF77] font-bold">
+                Colombo Atelier · {currentCategory?.season || 'Festive Drop'} · {currentCategory?.count || 6} Handcrafted Edits
               </span>
             </motion.div>
 
-            {/* Dynamic Collection Title */}
+            {/* Dynamic Collection Title & Storyline */}
             <AnimatePresence mode="wait">
               <motion.div
                 key={currentCategory?.id || currentCategory?.slug}
-                initial={{ opacity: 0, y: 20 }}
+                initial={{ opacity: 0, y: 22 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -15 }}
-                transition={{ duration: 0.5 }}
-                className="space-y-2"
+                transition={{ duration: 0.55, ease: [0.16, 1, 0.3, 1] }}
+                className="space-y-3"
               >
-                <h2 className="font-display text-4xl sm:text-6xl md:text-7xl font-bold text-white tracking-tight leading-[1.08] drop-shadow-md">
+                <h2 className="font-display text-4xl sm:text-6xl md:text-7xl lg:text-[4.75rem] font-bold text-white tracking-tight leading-[1.06] text-balance drop-shadow-md">
                   {currentCategory?.name}
                 </h2>
-                <p className="text-sm sm:text-base text-white/85 font-light max-w-lg leading-relaxed drop-shadow">
-                  {currentCategory?.description}
-                </p>
+                {currentCategory?.description && (
+                  <p className="text-xs sm:text-base text-[#FCFBF8]/90 font-light max-w-xl leading-relaxed border-l-2 border-[#DFBF77]/60 pl-3.5 sm:pl-4 italic font-serif">
+                    "{currentCategory?.description}"
+                  </p>
+                )}
               </motion.div>
             </AnimatePresence>
 
             {/* Action Buttons */}
-            <div className="flex flex-wrap items-center gap-3 pt-2">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 pt-3 w-full sm:w-auto">
               <Link
                 to={`/collections/${currentCategory?.slug}`}
-                className="px-7 py-3.5 bg-[#701626] hover:bg-[#8E1E34] text-white text-xs uppercase tracking-[0.2em] font-bold rounded-full transition-all shadow-xl shadow-[#701626]/30 border border-[#C5A059]/40 flex items-center gap-2 group cursor-pointer"
+                className="px-7 py-3.5 sm:py-4 bg-[#701626] hover:bg-[#8E1E34] text-white text-xs uppercase tracking-[0.22em] font-bold rounded-full transition-all shadow-xl shadow-[#701626]/30 border border-[#DFBF77]/70 flex items-center justify-center gap-2.5 group cursor-pointer hover:shadow-[0_0_25px_rgba(223,191,119,0.35)]"
               >
                 <span>Explore {currentCategory?.name}</span>
-                <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
+                <ArrowRight className="w-3.5 h-3.5 text-[#DFBF77] group-hover:translate-x-1.5 transition-transform" />
               </Link>
               
               <Link
                 to="/collections"
-                className="px-6 py-3.5 bg-white/10 hover:bg-white/20 backdrop-blur-md text-white text-xs uppercase tracking-[0.18em] font-semibold rounded-full transition-all border border-white/20"
+                className="px-6 py-3.5 sm:py-4 bg-white/10 hover:bg-white/20 backdrop-blur-md text-white text-xs uppercase tracking-[0.18em] font-semibold rounded-full transition-all border border-[#DFBF77]/35 hover:border-[#DFBF77] flex items-center justify-center text-center"
               >
-                View All Categories
+                View All Collections
               </Link>
             </div>
 
@@ -211,29 +230,35 @@ export default function Home() {
         </div>
 
         {/* Bottom Interactive Navigation */}
-        <div className="relative z-20 w-full px-4 sm:px-8 pb-4 sm:pb-6 max-w-7xl mx-auto">
-          <div className="flex flex-col md:flex-row items-center justify-between gap-3 pt-3 border-t border-white/15">
+        <div className="relative z-20 w-full px-4 sm:px-8 pb-2 sm:pb-4 max-w-7xl mx-auto">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pt-3 border-t border-white/15">
             
-            {/* Arrows */}
-            <div className="hidden sm:flex items-center gap-2">
-              <button 
-                onClick={handlePrev}
-                className="w-9 h-9 rounded-full bg-white/10 hover:bg-[#701626] border border-white/20 text-white flex items-center justify-center transition-all cursor-pointer"
-                title="Previous Category"
-              >
-                <ChevronLeft className="w-4 h-4" />
-              </button>
-              <button 
-                onClick={handleNext}
-                className="w-9 h-9 rounded-full bg-white/10 hover:bg-[#701626] border border-white/20 text-white flex items-center justify-center transition-all cursor-pointer"
-                title="Next Category"
-              >
-                <ChevronRight className="w-4 h-4" />
-              </button>
+            {/* Left side: Arrows and Slide Counter */}
+            <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-start">
+              <div className="flex items-center gap-2">
+                <button 
+                  onClick={handlePrev}
+                  className="w-9 h-9 rounded-full bg-black/40 hover:bg-[#701626] border border-[#DFBF77]/40 text-[#DFBF77] hover:text-white flex items-center justify-center transition-all cursor-pointer backdrop-blur-md"
+                  title="Previous Category"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </button>
+                <button 
+                  onClick={handleNext}
+                  className="w-9 h-9 rounded-full bg-black/40 hover:bg-[#701626] border border-[#DFBF77]/40 text-[#DFBF77] hover:text-white flex items-center justify-center transition-all cursor-pointer backdrop-blur-md"
+                  title="Next Category"
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
+
+              <div className="text-[11px] font-serif text-[#DFBF77] font-semibold tracking-wider px-2">
+                0{activeSlide + 1} <span className="text-white/40">/</span> 0{heroCategories.length}
+              </div>
             </div>
 
-            {/* Category Tabs */}
-            <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 w-full md:w-auto">
+            {/* Right side: Category Pills Strip (Horizontal scrolling on mobile, no-scrollbar, snap-x) */}
+            <div className="flex items-center gap-2 overflow-x-auto no-scrollbar w-full sm:w-auto py-1 snap-x scroll-smooth">
               {heroCategories.map((col: Collection, idx: number) => {
                 const isActive = activeSlide === idx;
                 return (
@@ -243,24 +268,36 @@ export default function Home() {
                       setDirection(idx > activeSlide ? 1 : -1);
                       setActiveSlide(idx);
                     }}
-                    className={`relative px-3 sm:px-5 py-2.5 rounded-xl sm:rounded-2xl transition-all text-center sm:text-left cursor-pointer overflow-hidden ${
+                    className={`relative shrink-0 px-3.5 sm:px-5 py-2 sm:py-2.5 rounded-xl sm:rounded-2xl transition-all cursor-pointer overflow-hidden snap-start ${
                       isActive 
-                        ? 'bg-[#701626] text-white border border-[#C5A059]/60 shadow-lg' 
-                        : 'bg-black/30 hover:bg-black/50 text-white/70 border border-white/10'
+                        ? 'bg-[#701626] text-white border border-[#DFBF77] shadow-lg shadow-[#701626]/40' 
+                        : 'bg-black/35 hover:bg-black/60 text-white/75 border border-white/10'
                     }`}
                   >
-                    <span className="relative z-10 flex items-center justify-center gap-1.5 sm:gap-2">
+                    <span className="relative z-10 flex items-center gap-2 text-left">
                       <span className={`text-[8.5px] sm:text-[10px] font-bold uppercase tracking-wider ${isActive ? 'text-[#DFBF77]' : 'text-white/40'}`}>
                         0{idx + 1}
                       </span>
-                      <span className="font-display text-xs sm:text-base font-bold tracking-wide">
+                      <span className="font-display text-xs sm:text-sm font-bold tracking-wide whitespace-nowrap">
                         {col.name}
                       </span>
                     </span>
+
+                    {/* Live Golden Slide Countdown Bar on Active Pill */}
+                    {isActive && (
+                      <motion.div
+                        key={`progress-${activeSlide}`}
+                        initial={{ width: '0%' }}
+                        animate={{ width: '100%' }}
+                        transition={{ duration: 5.5, ease: 'linear' }}
+                        className="absolute bottom-0 left-0 h-[2.5px] bg-gradient-to-r from-[#C5A059] via-[#DFBF77] to-[#C5A059] shadow-[0_0_8px_#DFBF77]"
+                      />
+                    )}
                   </button>
                 );
               })}
             </div>
+
           </div>
         </div>
 
