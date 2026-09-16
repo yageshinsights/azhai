@@ -180,7 +180,7 @@ export default function Home() {
         </AnimatePresence>
 
         {/* Content Area */}
-        <div className="relative z-20 px-4 sm:px-8 max-w-7xl mx-auto w-full my-auto py-2 sm:py-6">
+        <div className="relative z-20 px-4 sm:px-8 max-w-7xl mx-auto w-full my-auto py-2 sm:py-6 translate-y-8 sm:translate-y-0">
           <div className="max-w-3xl text-left space-y-4 sm:space-y-5">
             
             {/* Dynamic Collection Title & Storyline */}
