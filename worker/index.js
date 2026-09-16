@@ -324,6 +324,56 @@ export default {
       }
     }
 
+    // ── 4. Dynamic Open Graph Crawler Support (WhatsApp, Meta, Twitter, LinkedIn) ──
+    const userAgent = request.headers.get('user-agent') || '';
+    const isSocialCrawler = /facebookexternalhit|Facebot|WhatsApp|Twitterbot|Pinterest|LinkedInBot|TelegramBot|Slackbot|Discordbot/i.test(userAgent);
+
+    if (isSocialCrawler && url.pathname.startsWith('/products/')) {
+      const slug = url.pathname.replace('/products/', '').split('/')[0].split('?')[0];
+      if (slug) {
+        try {
+          const supabaseUrl = env.VITE_SUPABASE_URL || 'https://hrmcxxcrnxqhesiywqsc.supabase.co';
+          const supabaseKey = env.VITE_SUPABASE_ANON_KEY || 'sb_publishable_-ZSOc4XGHM2OysLhqKZ5yQ_4OPgdcAm';
+          const sbRes = await fetch(
+            `${supabaseUrl}/rest/v1/products?slug=eq.${encodeURIComponent(slug)}&select=name,price,description,short_description,images`,
+            {
+              headers: {
+                apikey: supabaseKey,
+                Authorization: `Bearer ${supabaseKey}`,
+              },
+            }
+          );
+          if (sbRes.ok) {
+            const products = await sbRes.json();
+            const product = products[0];
+            if (product) {
+              const res = await env.ASSETS.fetch(request);
+              const ogTitle = `${product.name} | Azhai Clothing by Preethi`;
+              const ogDesc = product.short_description || product.description || 'Handcrafted festive and bespoke couture by Preethi in Colombo, Sri Lanka.';
+              const firstImg = Array.isArray(product.images) && product.images[0]
+                ? (typeof product.images[0] === 'string' ? product.images[0] : product.images[0].src)
+                : `${url.origin}/og-azhai.jpg`;
+              const ogUrl = `${url.origin}/products/${slug}`;
+
+              return new HTMLRewriter()
+                .on('title', { element(e) { e.setInnerContent(ogTitle); } })
+                .on('meta[property="og:title"]', { element(e) { e.setAttribute('content', ogTitle); } })
+                .on('meta[property="og:description"]', { element(e) { e.setAttribute('content', ogDesc); } })
+                .on('meta[property="og:image"]', { element(e) { e.setAttribute('content', firstImg); } })
+                .on('meta[property="og:url"]', { element(e) { e.setAttribute('content', ogUrl); } })
+                .on('meta[name="twitter:title"]', { element(e) { e.setAttribute('content', ogTitle); } })
+                .on('meta[name="twitter:description"]', { element(e) { e.setAttribute('content', ogDesc); } })
+                .on('meta[name="twitter:image"]', { element(e) { e.setAttribute('content', firstImg); } })
+                .on('meta[name="description"]', { element(e) { e.setAttribute('content', ogDesc); } })
+                .transform(res);
+            }
+          }
+        } catch (e) {
+          console.warn('[Social Crawler Rewrite Error]:', e);
+        }
+      }
+    }
+
     // Falls back to SPA static assets
     return env.ASSETS.fetch(request);
   },

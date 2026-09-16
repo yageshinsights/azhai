@@ -1,8 +1,89 @@
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Mail, MessageCircle, MapPin, Phone } from 'lucide-react';
+import { Mail, MessageCircle, MapPin, Phone, Sparkles, Check, ArrowRight } from 'lucide-react';
 import { useAdminStore, cleanWhatsAppDigits } from '@/store/admin';
 import { STORE_INSTAGRAM_URL, STORE_EMAIL, STORE_ADDRESS_FULL, STORE_PHONE } from '@/lib/constants';
+import { sendBrevoEmail, buildNewsletterWelcomeHtml } from '@/lib/brevo';
+import { supabase, isSupabaseConfigured } from '@/lib/supabase';
+
+function NewsletterFooterForm() {
+  const [email, setEmail] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isSuccess, setIsSuccess] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email.trim()) return;
+
+    setIsSubmitting(true);
+    try {
+      const cleanEmail = email.trim().toLowerCase();
+
+      if (isSupabaseConfigured()) {
+        try {
+          await supabase.from('newsletter_subscribers').upsert(
+            {
+              email: cleanEmail,
+              name: 'Valued Patron',
+              source: 'footer_form',
+              subscribed_at: new Date().toISOString(),
+            },
+            { onConflict: 'email' }
+          );
+        } catch {
+          // fallback
+        }
+      }
+
+      await sendBrevoEmail({
+        to: [{ email: cleanEmail, name: 'Valued Patron' }],
+        subject: `✨ Welcome to the Azhai Circle — Enjoy 5% Privilege (Code: ATELIER5)`,
+        htmlContent: buildNewsletterWelcomeHtml({
+          customerName: 'Valued Patron',
+          couponCode: 'ATELIER5',
+        }),
+      });
+
+      setIsSuccess(true);
+      setEmail('');
+    } catch (err) {
+      console.warn('[Footer Newsletter Exception]:', err);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  if (isSuccess) {
+    return (
+      <div className="flex items-center gap-2 p-3 bg-emerald-50 text-emerald-800 rounded-2xl border border-emerald-200 text-xs font-bold">
+        <Check className="w-4 h-4 text-emerald-600 shrink-0" />
+        <span>Voucher sent! Check your inbox for code <strong>ATELIER5</strong>.</span>
+      </div>
+    );
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="flex flex-col sm:flex-row gap-2 w-full md:w-auto shrink-0">
+      <input
+        type="email"
+        required
+        placeholder="Enter your email for 5% off..."
+        value={email}
+        onChange={(e) => setEmail(e.target.value)}
+        className="px-4 py-2.5 rounded-xl bg-[#FCFBF8] border border-[#C5A059]/40 text-xs text-[#110B0E] placeholder:text-[#6D6268]/60 focus:outline-none focus:border-[#701626] w-full sm:w-64"
+      />
+      <button
+        type="submit"
+        disabled={isSubmitting}
+        className="px-5 py-2.5 bg-[#701626] hover:bg-[#8E1E34] text-white text-xs font-bold uppercase tracking-wider rounded-xl transition-all shadow-xs flex items-center justify-center gap-1.5 cursor-pointer shrink-0 disabled:opacity-50"
+      >
+        <span>{isSubmitting ? 'Joining...' : 'Subscribe'}</span>
+        <ArrowRight className="w-3.5 h-3.5 text-[#DFBF77]" />
+      </button>
+    </form>
+  );
+}
 
 export default function Footer() {
   const settings = useAdminStore((s) => s.settings);
@@ -162,6 +243,23 @@ export default function Footer() {
             </ul>
           </div>
 
+        </div>
+
+        {/* ── ATELIER VIP NEWSLETTER ROW ── */}
+        <div className="mt-12 p-6 sm:p-8 rounded-3xl bg-white border border-[#C5A059]/40 shadow-xs flex flex-col md:flex-row items-center justify-between gap-6">
+          <div className="space-y-1.5 text-center md:text-left max-w-lg">
+            <span className="text-[10px] uppercase tracking-[0.25em] text-[#701626] font-bold flex items-center justify-center md:justify-start gap-1.5">
+              <Sparkles className="w-3 h-3 text-[#C5A059]" /> Atelier VIP Circle
+            </span>
+            <h4 className="font-display text-lg sm:text-xl font-bold text-[#110B0E]">
+              Enjoy 5% Privilege on Your First Handloom Saree or Kurti
+            </h4>
+            <p className="text-xs text-[#6D6268]">
+              Be the first to receive artisanal silk drop notifications, couture private viewings, and code <strong>ATELIER5</strong>.
+            </p>
+          </div>
+
+          <NewsletterFooterForm />
         </div>
 
         <div className="mt-14 pt-6 border-t border-[#C5A059]/30 flex flex-col sm:flex-row items-center justify-between gap-3 text-[11px] text-[#6D6268]">

@@ -11,6 +11,8 @@ import AdminGuard from '@/components/admin/AdminGuard';
 import AtelierLoader from '@/components/AtelierLoader';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import WhatsAppConcierge from '@/components/WhatsAppConcierge';
+import NewsletterModal from '@/components/NewsletterModal';
+import A2HSPrompt from '@/components/A2HSPrompt';
 
 // ── Customer Storefront Pages (Lazy Loaded) ──
 const Home = lazy(() => import('@/pages/Home'));
@@ -235,6 +237,8 @@ function MainLayout() {
       {!isAdminRoute && <Footer />}
       {!isAdminRoute && <MobileBottomNav />}
       <WhatsAppConcierge />
+      {!isAdminRoute && <NewsletterModal />}
+      {!isAdminRoute && <A2HSPrompt />}
     </>
   );
 }

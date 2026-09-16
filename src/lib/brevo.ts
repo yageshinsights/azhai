@@ -1216,3 +1216,55 @@ export function buildConciergePaymentLinkEmailHtml(params: {
   `;
   return wrapEmailLayout(`Invoice: ${params.title} — Azhai Boutique`, body);
 }
+
+// ─────────────────────────────────────────────────────────────
+// 18. 🎁 ATELIER VIP NEWSLETTER WELCOME PRIVILEGE (5% CODE)
+// ─────────────────────────────────────────────────────────────
+export function buildNewsletterWelcomeHtml(params: {
+  customerName?: string;
+  couponCode?: string;
+}): string {
+  const firstName = params.customerName ? params.customerName.split(' ')[0] : 'Cherished Patron';
+  const code = params.couponCode || 'ATELIER5';
+
+  const body = `
+    <!-- Editorial Banner Image -->
+    <div style="margin-bottom: 24px; border-radius: 18px; overflow: hidden; border: 1px solid #DFBF77; position: relative;">
+      <img 
+        src="https://images.unsplash.com/photo-1610030469983-98e550d6193c?auto=format&fit=crop&w=1200&q=85" 
+        alt="Azhai Silk Edit" 
+        style="width: 100%; height: 210px; object-fit: cover; display: block;" 
+      />
+    </div>
+
+    <div style="text-align: center; margin-bottom: 24px;">
+      <span style="background-color: rgba(112, 22, 38, 0.08); color: #701626; font-size: 10px; font-weight: bold; text-transform: uppercase; letter-spacing: 2.5px; padding: 4px 14px; border-radius: 20px; border: 1px solid rgba(197, 160, 89, 0.4);">
+        Atelier VIP Invitation
+      </span>
+      <h2 style="font-family: Georgia, serif; color: #110B0E; font-size: 25px; margin: 14px 0 8px 0; font-weight: bold;">
+        Welcome to the Azhai Circle, ${firstName}
+      </h2>
+      <p style="color: #6D6268; font-size: 13.5px; margin: 0; line-height: 1.6;">
+        Thank you for subscribing to our private salon. As a welcome token, please enjoy an exclusive 5% privilege on your first handloom silk creation.
+      </p>
+    </div>
+
+    <!-- Exclusive Promo Code Box -->
+    <div style="background-color: #FCFBF8; border-radius: 18px; border: 2px dashed #DFBF77; padding: 22px; margin-bottom: 24px; text-align: center;">
+      <span style="font-size: 10.5px; uppercase; letter-spacing: 2px; color: #701626; font-weight: bold; display: block; margin-bottom: 6px;">Your Private Privilege Code</span>
+      <div style="font-family: 'Courier New', monospace; font-size: 24px; font-weight: bold; color: #701626; letter-spacing: 4px; padding: 10px 18px; background: rgba(112, 22, 38, 0.06); border-radius: 12px; display: inline-block; margin-bottom: 10px;">
+        ${code}
+      </div>
+      <p style="font-size: 12px; color: #6D6268; margin: 0;">
+        Enter code <strong>${code}</strong> at checkout to redeem 5% off any order.
+      </p>
+    </div>
+
+    <div style="text-align: center; margin-top: 24px;">
+      <a href="${STORE_URL}/collections" style="display: inline-block; background: linear-gradient(135deg, #701626 0%, #8E1E34 100%); color: #ffffff; font-size: 12px; font-weight: bold; text-transform: uppercase; letter-spacing: 2px; padding: 14px 30px; border-radius: 14px; text-decoration: none; box-shadow: 0 6px 20px rgba(112, 22, 38, 0.25);">
+        Explore Handcrafted Collections →
+      </a>
+    </div>
+  `;
+  return wrapEmailLayout('Welcome to the Azhai Circle · 5% Privilege Code Inside', body);
+}

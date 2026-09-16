@@ -18,12 +18,15 @@ import StyleQuiz from '@/components/StyleQuiz';
 import AnimatedLogo from '@/components/AnimatedLogo';
 import SEOHead from '@/components/SEOHead';
 import { LiyawelDivider } from '@/components/CulturalPatterns';
+import RecentlyViewed from '@/components/RecentlyViewed';
+import { useRecentlyViewed } from '@/hooks/useRecentlyViewed';
 import { PRODUCTS, COLLECTIONS, type Collection } from '@/lib/data';
 import { useAdminStore } from '@/store/admin';
 
 export default function Home() {
   const storeProducts = useAdminStore((s) => s.products);
   const storeCategories = useAdminStore((s) => s.categories);
+  const recentlyViewed = useRecentlyViewed();
 
   const allProducts = Array.isArray(storeProducts) ? storeProducts : PRODUCTS;
   const allCategories = Array.isArray(storeCategories) && storeCategories.length > 0 ? storeCategories : COLLECTIONS;
@@ -466,6 +469,13 @@ export default function Home() {
 
       {/* ── STYLE PERSONALITY QUIZ ── */}
       <StyleQuiz />
+
+      {/* ── RECENTLY VIEWED PIECES CAROUSEL ── */}
+      {recentlyViewed && recentlyViewed.length > 0 && (
+        <div className="max-w-7xl mx-auto px-4 sm:px-8">
+          <RecentlyViewed products={recentlyViewed} />
+        </div>
+      )}
 
       {/* ── SPOTTED ON #AZHAIGIRL (AESTHETIC PHOTO DUMP) ── */}
       <section className="py-20 px-4 sm:px-8 max-w-7xl mx-auto border-t border-[#C5A059]/30 relative z-10">

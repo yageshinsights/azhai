@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:g="http://base.google.com/ns/1.0">
+  <channel>
+    <title>Azhai Clothing — Handcrafted Silk &amp; Festive Couture</title>
+    <link>https://azhaiclothing.lk</link>
+    <description>Heirloom mulberry silks, handcrafted bridal kurtis, and bespoke ethnic couture in Colombo, Sri Lanka by Preethi.</description>
+    <item>
+      <g:id>azhai_1</g:id>
+      <g:title>The Empress Anarkali Kurti</g:title>
+      <g:description>Pure mulberry silk anarkali with zardozi embroidery.</g:description>
+      <g:link>https://azhaiclothing.lk/products/the-empress-anarkali-kurti</g:link>
+      <g:image_link>https://images.unsplash.com/photo-1610030469983-98e550d6193c?auto=format&amp;fit=crop&amp;w=1200&amp;q=85</g:image_link>
+      <g:condition>new</g:condition>
+      <g:availability>in_stock</g:availability>
+      <g:price>18500.00 LKR</g:price>
+      <g:brand>Azhai Clothing</g:brand>
+      <g:google_product_category>1604</g:google_product_category>
+      <g:product_type>Apparel &amp; Accessories &gt; Clothing &gt; Traditional &amp; Ceremonial Clothing</g:product_type>
+      <g:identifier_exists>no</g:identifier_exists>
+    </item>
+    <item>
+      <g:id>azhai_2</g:id>
+      <g:title>Lotus Blossom Organza Saree</g:title>
+      <g:description>Hand-painted blush organza with pearl borders.</g:description>
+      <g:link>https://azhaiclothing.lk/products/lotus-blossom-organza-saree</g:link>
+      <g:image_link>https://images.unsplash.com/photo-1583391733956-3750e0ff4e8b?auto=format&amp;fit=crop&amp;w=1200&amp;q=85</g:image_link>
+      <g:condition>new</g:condition>
+      <g:availability>in_stock</g:availability>
+      <g:price>26000.00 LKR</g:price>
+      <g:brand>Azhai Clothing</g:brand>
+      <g:google_product_category>1604</g:google_product_category>
+      <g:product_type>Apparel &amp; Accessories &gt; Clothing &gt; Traditional &amp; Ceremonial Clothing</g:product_type>
+      <g:identifier_exists>no</g:identifier_exists>
+    </item>
+    <item>
+      <g:id>azhai_3</g:id>
+      <g:title>Nilawela Royal Silk Ensemble</g:title>
+      <g:description>Sapphire raw silk set with golden brocade trousers.</g:description>
+      <g:link>https://azhaiclothing.lk/products/nilawela-royal-silk-ensemble</g:link>
+      <g:image_link>https://images.unsplash.com/photo-1617627143750-d86bc21e42bb?auto=format&amp;fit=crop&amp;w=1200&amp;q=85</g:image_link>
+      <g:condition>new</g:condition>
+      <g:availability>in_stock</g:availability>
+      <g:price>22500.00 LKR</g:price>
+      <g:brand>Azhai Clothing</g:brand>
+      <g:google_product_category>1604</g:google_product_category>
+      <g:product_type>Apparel &amp; Accessories &gt; Clothing &gt; Traditional &amp; Ceremonial Clothing</g:product_type>
+      <g:identifier_exists>no</g:identifier_exists>
+    </item>
+    <item>
+      <g:id>azhai_4</g:id>
+      <g:title>Mayura Golden Brocade Dupatta</g:title>
+      <g:description>Handloom golden Banarasi silk dupatta.</g:description>
+      <g:link>https://azhaiclothing.lk/products/mayura-golden-brocade-dupatta</g:link>
+      <g:image_link>https://images.unsplash.com/photo-1567401893414-76b7b1e5a7a5?auto=format&amp;fit=crop&amp;w=1200&amp;q=85</g:image_link>
+      <g:condition>new</g:condition>
+      <g:availability>in_stock</g:availability>
+      <g:price>9500.00 LKR</g:price>
+      <g:brand>Azhai Clothing</g:brand>
+      <g:google_product_category>1604</g:google_product_category>
+      <g:product_type>Apparel &amp; Accessories &gt; Clothing &gt; Traditional &amp; Ceremonial Clothing</g:product_type>
+      <g:identifier_exists>no</g:identifier_exists>
+    </item>
+  </channel>
+</rss>

@@ -43,23 +43,48 @@ export default function SearchModal({ isOpen, onClose }: SearchModalProps) {
     return list.length >= 3 ? list.slice(0, 8) : POPULAR_SEARCHES;
   }, [storeCategories, storeTags]);
 
+  const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const [selectedIndex, setSelectedIndex] = useState<number>(-1);
+
+  const categories = useMemo(() => {
+    const list = [{ id: 'all', name: 'All Pieces' }];
+    if (Array.isArray(storeCategories) && storeCategories.length > 0) {
+      storeCategories.forEach((c) => {
+        if (c.name && !list.some((item) => item.name === c.name)) {
+          list.push({ id: c.slug || c.name, name: c.name });
+        }
+      });
+    }
+    return list;
+  }, [storeCategories]);
+
   useEffect(() => {
     if (isOpen) {
       setTimeout(() => inputRef.current?.focus(), 100);
     } else {
       setQuery('');
+      setSelectedCategory('all');
+      setSelectedIndex(-1);
     }
   }, [isOpen]);
 
-  const results = query.trim()
-    ? allProducts.filter(p => 
-        p.name?.toLowerCase().includes(query.toLowerCase()) ||
-        p.shortDescription?.toLowerCase().includes(query.toLowerCase()) ||
-        p.categories?.some(c => c.name?.toLowerCase().includes(query.toLowerCase())) ||
-        p.occasion?.toLowerCase().includes(query.toLowerCase()) ||
-        p.tag?.toLowerCase().includes(query.toLowerCase())
-      )
-    : [];
+  const results = useMemo(() => {
+    if (!query.trim()) return [];
+    const q = query.toLowerCase().trim();
+
+    return allProducts.filter(p => {
+      const matchCat = selectedCategory === 'all' || p.categories?.some(c => (c.slug || c.name) === selectedCategory || c.name === selectedCategory);
+      if (!matchCat) return false;
+
+      return (
+        p.name?.toLowerCase().includes(q) ||
+        p.shortDescription?.toLowerCase().includes(q) ||
+        p.categories?.some(c => c.name?.toLowerCase().includes(q)) ||
+        p.occasion?.toLowerCase().includes(q) ||
+        p.tag?.toLowerCase().includes(q)
+      );
+    });
+  }, [query, selectedCategory, allProducts]);
 
   return (
     <AnimatePresence>
@@ -96,6 +121,15 @@ export default function SearchModal({ isOpen, onClose }: SearchModalProps) {
                     onChange={(e) => setQuery(e.target.value)}
                     className="w-full bg-transparent text-lg sm:text-2xl font-display font-bold text-[#110B0E] placeholder:text-[#6D6268]/50 focus:outline-none"
                   />
+                  {query && (
+                    <button
+                      type="button"
+                      onClick={() => setQuery('')}
+                      className="text-xs text-[#6D6268] hover:text-[#701626] font-bold px-2 py-1 bg-gray-100 rounded-lg cursor-pointer"
+                    >
+                      Clear
+                    </button>
+                  )}
                 </div>
                 <button
                   onClick={onClose}
@@ -104,6 +138,25 @@ export default function SearchModal({ isOpen, onClose }: SearchModalProps) {
                   <X className="w-6 h-6" />
                 </button>
               </div>
+
+              {/* Instant Category Filter Chips (When searching) */}
+              {query.trim() && categories.length > 1 && (
+                <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
+                  {categories.map((cat) => (
+                    <button
+                      key={cat.id}
+                      onClick={() => setSelectedCategory(cat.id)}
+                      className={`px-3 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${
+                        selectedCategory === cat.id
+                          ? 'bg-[#701626] text-white shadow-xs'
+                          : 'bg-[#F7F4EE] text-[#6D6268] hover:text-[#701626] border border-[#C5A059]/30'
+                      }`}
+                    >
+                      {cat.name}
+                    </button>
+                  ))}
+                </div>
+              )}
 
               {/* Popular Quick Suggestions */}
               {!query.trim() && (
@@ -127,9 +180,12 @@ export default function SearchModal({ isOpen, onClose }: SearchModalProps) {
               {/* Live Search Results */}
               {query.trim() && (
                 <div className="space-y-4">
-                  <p className="text-[10px] uppercase tracking-[0.25em] text-[#6D6268] font-bold">
-                    Found {results.length} {results.length === 1 ? 'Piece' : 'Pieces'}
-                  </p>
+                  <div className="flex items-center justify-between">
+                    <p className="text-[10px] uppercase tracking-[0.25em] text-[#6D6268] font-bold">
+                      Found {results.length} {results.length === 1 ? 'Piece' : 'Pieces'}
+                    </p>
+                    <span className="text-[11px] text-[#C5A059] font-medium">Instant Live Results</span>
+                  </div>
 
                   {results.length === 0 ? (
                     <div className="py-12 text-center text-[#6D6268] font-light">
