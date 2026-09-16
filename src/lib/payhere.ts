@@ -1,5 +1,6 @@
 /**
- * PayHere Payment Gateway Integration for Sri Lanka (Visa / Mastercard / AMEX / Koko)
+ * @deprecated Superceded by Payments.lk Gateway (src/lib/payments-lk.ts)
+ * Retained for legacy reference and backward compatibility with previous orders.
  */
 
 const PAYHERE_MERCHANT_ID = import.meta.env.VITE_PAYHERE_MERCHANT_ID || '1237099';

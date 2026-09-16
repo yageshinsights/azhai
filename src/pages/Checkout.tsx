@@ -15,15 +15,16 @@ import {
   Lock,
   Building2,
   Calendar,
-  Copy
+  Copy,
+  AlertCircle
 } from 'lucide-react';
-import { useCartStore } from '@/store/cart';
+import { useCartStore, type PlacedOrder } from '@/store/cart';
 import { useAuthStore } from '@/store/auth';
 import { useAdminStore } from '@/store/admin';
 import BankBadge from '@/components/BankBadge';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import { sendBrevoEmail, buildOrderConfirmationHtml, buildAdminOrderAlertHtml } from '@/lib/brevo';
-import { startPayHerePayment } from '@/lib/payhere';
+import { initiatePaymentsLkCheckout } from '@/lib/payments-lk';
 import SEOHead from '@/components/SEOHead';
 import { 
   calculateSLPostShipping, 
@@ -97,6 +98,9 @@ export default function Checkout() {
   const [saveAddressToAccount, setSaveAddressToAccount] = useState(false);
   const [selectedAddrId, setSelectedAddrId] = useState<string>(defaultAddr?.id || '');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const searchParams = new URLSearchParams(location.search);
+  const isCancelledPayment = searchParams.get('status') === 'cancelled';
+  const cancelledOrderId = searchParams.get('order_id');
 
   const activeBankAccounts = (settings.bankAccounts || []).filter((b) => b.isActive !== false);
   const [selectedBankId, setSelectedBankId] = useState<string>(activeBankAccounts[0]?.id || '');
@@ -332,7 +336,7 @@ export default function Checkout() {
     navigate(`/order-success/${orderData.orderId}`);
   };
 
-  const handlePlaceOrder = (e: React.FormEvent) => {
+  const handlePlaceOrder = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!fullName || !phone || !address || !city) {
@@ -357,7 +361,7 @@ export default function Checkout() {
 
     const generatedOrderId = `AZH-${Date.now().toString(36).toUpperCase()}-${Math.floor(1000 + Math.random() * 9000)}`;
 
-    const orderData = {
+    const orderData: PlacedOrder = {
       orderId: generatedOrderId,
       items: [...items],
       subtotal: rawTotal,
@@ -381,9 +385,9 @@ export default function Checkout() {
       weightGrams: cartWeightGrams,
       deliveryMethod: deliveryMethod === 'express' ? 'Express Colombo Same-Day' : 'Sri Lanka Post Speed Post Courier',
       shippingBreakdown: {
-        weightGrams: cartWeightGrams,
-        postage: slPostCalc.postageFee,
-        moCommission: slPostCalc.moneyOrderCommission,
+        totalWeightGrams: cartWeightGrams,
+        postageFee: slPostCalc.postageFee,
+        moneyOrderCommission: slPostCalc.moneyOrderCommission,
         serviceCharge: slPostCalc.serviceCharge,
         isCOD: paymentMethod === 'cod',
         totalShippingFee: shippingFee,
@@ -416,48 +420,83 @@ export default function Checkout() {
       placedAt: new Date().toISOString(),
     };
 
-    // If PayHere Card Payment selected, trigger PayHere Gateway modal
+    // If Online Card Payment selected, route through Payments.lk 3D Secure Hosted Checkout
     if (paymentMethod === 'card') {
       if (finalTotal <= 0) {
         // Zero-balance orders (e.g. 100% discount promo) bypass external payment gateways
         orderData.paymentStatus = 'paid';
         orderData.status = 'confirmed';
-        finalizeOrderPlacement(orderData);
+        await finalizeOrderPlacement(orderData);
         return;
       }
 
-      const rawItemsName = items.map((i) => `${i.name} (${i.size || 'M'})`).join(', ');
-      const truncatedItems = rawItemsName.length > 240 ? `${rawItemsName.substring(0, 237)}...` : rawItemsName;
-      const nameParts = fullName.trim().split(' ');
+      // Pre-save order to local state & database as pending_card before redirecting to 3D Secure gateway
+      orderData.paymentStatus = 'pending_card';
+      orderData.status = 'pending';
+      setLastOrder(orderData);
+      useAdminStore.getState().syncNewOrder(orderData);
 
-      startPayHerePayment(
-        {
-          orderId: generatedOrderId,
-          itemsName: truncatedItems,
-          amount: finalTotal,
-          currency: 'LKR',
-          firstName: nameParts[0] || fullName,
-          lastName: nameParts.slice(1).join(' ') || 'Customer',
+      if (isSupabaseConfigured()) {
+        try {
+          const { data: insertedOrder } = await supabase
+            .from('orders')
+            .insert({
+              order_code: orderData.orderId,
+              user_id: user?.id || null,
+              customer_details: orderData.customer,
+              delivery_notes: deliveryNotes.trim() || null,
+              gift_note: state.giftNote || null,
+              coupon_code: state.appliedCoupon || null,
+              subtotal: orderData.subtotal,
+              discount: orderData.discount,
+              shipping: orderData.shipping,
+              total: orderData.total,
+              cost_price: Math.round(orderData.subtotal * 0.45),
+              delivery_method: orderData.deliveryMethod,
+              payment_method: 'Online Card & LankaQR (Payments.lk)',
+              payment_status: 'pending_card',
+              status: 'pending',
+              courier_partner: orderData.courierPartner || 'Sri Lanka Post',
+              tracking_number: orderData.trackingNumber || null,
+            })
+            .select()
+            .single();
+
+          if (insertedOrder) {
+            const orderItemsPayload = items.map((item) => ({
+              order_id: insertedOrder.id,
+              product_id: null,
+              product_name: item.name,
+              price: typeof item.price === 'string' ? item.price : `LKR ${Number(item.price).toLocaleString()}`,
+              image_url: item.image || null,
+              size: item.tailoring ? `Tailored (${item.tailoring.sizeLabel}) - ${item.tailoring.fabricName}` : item.size || 'M',
+              quantity: Number(item.quantity) || 1,
+            }));
+            await supabase.from('order_items').insert(orderItemsPayload);
+          }
+        } catch (dbErr) {
+          console.warn('[Payments.lk Pre-Save Warning]:', dbErr);
+        }
+      }
+
+      const checkoutRes = await initiatePaymentsLkCheckout({
+        orderId: generatedOrderId,
+        amount: finalTotal,
+        description: `Azhai Boutique Order #${generatedOrderId}`,
+        customer: {
+          name: fullName,
           email,
           phone: phone.replace(/[^\d+]/g, ''),
           address,
           city,
           country: 'Sri Lanka',
         },
-        // PayHere Success Handler
-        () => {
-          finalizeOrderPlacement(orderData);
-        },
-        // PayHere Dismissed
-        () => {
-          setIsSubmitting(false);
-        },
-        // PayHere Error Handler - DO NOT mark as paid on error
-        (err) => {
-          setIsSubmitting(false);
-          alert(`Online payment was not completed: ${err || 'Transaction was cancelled or declined'}. Please try again or select Cash on Delivery / Direct Bank Deposit.`);
-        }
-      );
+      });
+
+      if (!checkoutRes.success) {
+        setIsSubmitting(false);
+        alert(`Could not initiate secure card checkout: ${checkoutRes.error || 'Please try again or select Direct Bank Deposit / Cash on Delivery.'}`);
+      }
     } else {
       // COD, Bank Deposit
       finalizeOrderPlacement(orderData);
@@ -480,6 +519,30 @@ export default function Checkout() {
             <span>256-bit Encrypted Checkout</span>
           </div>
         </div>
+
+        {/* Payment Cancelled Banner */}
+        {isCancelledPayment && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-8 p-4 sm:p-5 rounded-2xl bg-amber-50 border border-amber-200 text-amber-900 flex items-start gap-3.5 shadow-sm"
+          >
+            <AlertCircle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+            <div className="space-y-1 text-xs">
+              <p className="font-bold text-sm text-amber-950">
+                Payment Was Not Completed
+              </p>
+              <p className="text-amber-800 leading-relaxed">
+                Your online card payment session was cancelled or declined. Your bag items and details are preserved below. You can try again or choose Direct Bank Deposit or Cash on Delivery.
+              </p>
+              {cancelledOrderId && (
+                <p className="text-[11px] font-mono text-amber-700">
+                  Reference: {cancelledOrderId}
+                </p>
+              )}
+            </div>
+          </motion.div>
+        )}
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-14">
           
@@ -822,7 +885,7 @@ export default function Checkout() {
                     </div>
                   )}
 
-                  {/* Online Card */}
+                  {/* Online Card (Payments.lk 3D Secure Hosted Checkout) */}
                   <label className={`p-4 rounded-2xl border cursor-pointer transition-all flex flex-col justify-between space-y-2 ${
                     paymentMethod === 'card'
                       ? 'border-[#701626] bg-[#701626]/5 ring-1 ring-[#701626]'
@@ -831,7 +894,7 @@ export default function Checkout() {
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <CreditCard className="w-4 h-4 text-[#701626]" />
-                        <span className="text-xs font-bold text-[#110B0E]">Visa / Mastercard</span>
+                        <span className="text-xs font-bold text-[#110B0E]">Online Card & LankaQR</span>
                       </div>
                       <input
                         type="radio"
@@ -841,7 +904,15 @@ export default function Checkout() {
                         className="text-[#701626]"
                       />
                     </div>
-                    <p className="text-[11px] text-[#6D6268]">Secure PayHere gateway for all Sri Lankan & international cards.</p>
+                    <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+                      <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-[#701626]/8 text-[#701626] border border-[#C5A059]/30">Visa</span>
+                      <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-[#701626]/8 text-[#701626] border border-[#C5A059]/30">Mastercard</span>
+                      <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-[#701626]/8 text-[#701626] border border-[#C5A059]/30">AMEX</span>
+                      <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-200">LankaQR</span>
+                    </div>
+                    <p className="text-[11px] text-[#6D6268]">
+                      Certified 3D Secure hosted checkout powered by <strong>Payments.lk (Payable)</strong>.
+                    </p>
                   </label>
 
                   {/* Direct Bank Deposit */}

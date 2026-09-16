@@ -50,6 +50,7 @@ import {
   generateSLPostTrackingNumber, 
   getSLPostTrackingUrl 
 } from '@/lib/slpost-calculator';
+import { requestPaymentsLkRefund } from '@/lib/payments-lk';
 
 interface OrderDetailDrawerProps {
   order: AdminOrder | null;
@@ -70,6 +71,10 @@ export default function OrderDetailDrawer({ order, isOpen, onClose }: OrderDetai
   const [adminBankNotes, setAdminBankNotes] = useState('');
   const [isUploadingAdminSlip, setIsUploadingAdminSlip] = useState(false);
   const [slipModalUrl, setSlipModalUrl] = useState<string | null>(null);
+  const [isRefundModalOpen, setIsRefundModalOpen] = useState(false);
+  const [refundAmountLKR, setRefundAmountLKR] = useState<number>(order?.total || 0);
+  const [refundReason, setRefundReason] = useState('Customer requested return/cancellation');
+  const [isProcessingRefund, setIsProcessingRefund] = useState(false);
 
   // Synchronize local form inputs when active order changes
   useEffect(() => {
@@ -78,8 +83,9 @@ export default function OrderDetailDrawer({ order, isOpen, onClose }: OrderDetai
       setTrackingNumber(order.trackingNumber || '');
       setAdminNotes(order.adminNotes || '');
       setAdminBankNotes(order.bankTransferDetails?.notes || '');
+      setRefundAmountLKR(order.total);
     }
-  }, [order?.orderId]);
+  }, [order?.orderId, order?.total]);
 
   if (!isOpen || !order) return null;
 
@@ -280,6 +286,81 @@ export default function OrderDetailDrawer({ order, isOpen, onClose }: OrderDetai
       showToast('Failed to attach deposit slip.');
     } finally {
       setIsUploadingAdminSlip(false);
+    }
+  };
+
+  // Manual Trigger: 1-Click Card Refund via Payments.lk Gateway
+  const handleProcessPaymentsLkRefund = async () => {
+    if (!refundAmountLKR || refundAmountLKR <= 0) {
+      alert('Please enter a valid refund amount.');
+      return;
+    }
+
+    if (refundAmountLKR > order.total) {
+      alert(`Refund amount cannot exceed the order total of LKR ${order.total.toLocaleString()}.`);
+      return;
+    }
+
+    setIsProcessingRefund(true);
+    try {
+      const amountCents = Math.round(refundAmountLKR * 100);
+      const paymentId = (order as any).paymentId || (order as any).paymentsLkPaymentId || order.orderId;
+
+      const res = await requestPaymentsLkRefund({
+        paymentId,
+        amountCents,
+        reason: refundReason,
+      });
+
+      if (!res.success) {
+        alert(`Payments.lk Refund Failed: ${res.error || 'Check payment status on Payments.lk portal.'}`);
+        return;
+      }
+
+      // Update Order Status to Refunded in Admin store
+      const isFullRefund = refundAmountLKR >= order.total;
+      const newStatus = isFullRefund ? 'cancelled' : order.status;
+      const refundNote = `Refunded LKR ${refundAmountLKR.toLocaleString()} via Payments.lk on ${new Date().toLocaleDateString()} (${refundReason})`;
+      const updatedAdminNotes = adminNotes ? `${adminNotes}\n${refundNote}` : refundNote;
+
+      updateOrderStatus(order.orderId, newStatus, courierPartner, trackingNumber, updatedAdminNotes);
+
+      // Update status in Supabase if configured
+      if (isSupabaseConfigured()) {
+        await supabase
+          .from('orders')
+          .update({
+            payment_status: isFullRefund ? 'refunded' : 'partially_refunded',
+            status: newStatus,
+          })
+          .eq('order_code', order.orderId);
+      }
+
+      // Send cancellation/refund receipt email to customer if full refund
+      if (order.customer.email && isFullRefund) {
+        try {
+          await sendBrevoEmail({
+            to: [{ email: order.customer.email, name: order.customer.fullName }],
+            subject: `💳 Refund Processed #${order.orderId} (LKR ${refundAmountLKR.toLocaleString()}) — Azhai Atelier`,
+            htmlContent: buildOrderCancelledHtml({
+              orderId: order.orderId,
+              customerName: order.customer.fullName,
+              reason: refundReason,
+              refundNote: `Refunded LKR ${refundAmountLKR.toLocaleString()} to your card via Payments.lk.`,
+            }),
+          });
+        } catch (mailErr) {
+          console.warn('[Refund Email Notification Warning]:', mailErr);
+        }
+      }
+
+      setIsRefundModalOpen(false);
+      showToast(`Successfully refunded LKR ${refundAmountLKR.toLocaleString()} via Payments.lk!`);
+    } catch (err: any) {
+      console.error('[Payments.lk Refund Exception]:', err);
+      alert(`Refund error: ${err?.message || 'Network error while reaching Payments.lk'}`);
+    } finally {
+      setIsProcessingRefund(false);
     }
   };
 
@@ -520,6 +601,84 @@ export default function OrderDetailDrawer({ order, isOpen, onClose }: OrderDetai
                           )}
                         </div>
                       )}
+                    </div>
+                  );
+                })()}
+
+                {/* 💳 Payments.lk Online Card Payment & 1-Click Refund Card */}
+                {(() => {
+                  const isCardOrder = 
+                    (order.paymentMethod && (
+                      order.paymentMethod.toLowerCase().includes('card') || 
+                      order.paymentMethod.toLowerCase().includes('visa') ||
+                      order.paymentMethod.toLowerCase().includes('payments.lk') ||
+                      order.paymentMethod.toLowerCase().includes('lankaqr')
+                    )) ||
+                    order.paymentStatus === 'paid' && !order.bankTransferDetails && !order.paymentMethod?.toLowerCase().includes('cash');
+
+                  if (!isCardOrder) return null;
+
+                  const isRefunded = order.paymentStatus === 'refunded' || order.status === 'cancelled';
+                  const isPartiallyRefunded = order.paymentStatus === 'partially_refunded';
+
+                  return (
+                    <div className="p-4 sm:p-5 rounded-2xl bg-[#FCFBF8] border-2 border-[#C5A059]/40 space-y-3.5 shadow-xs">
+                      <div className="flex items-center justify-between gap-2 flex-wrap">
+                        <div className="flex items-center gap-2">
+                          <CreditCard className="w-5 h-5 text-[#701626]" />
+                          <div>
+                            <h3 className="font-display text-sm sm:text-base font-bold text-[#110B0E]">
+                              Payments.lk (3D Secure Card &amp; LankaQR)
+                            </h3>
+                            <p className="text-[10px] text-[#6D6268]">
+                              CBSL Licensed · Powered by Payable Gateway
+                            </p>
+                          </div>
+                        </div>
+
+                        {isRefunded ? (
+                          <span className="text-[10.5px] font-bold text-rose-800 bg-rose-50 px-2.5 py-1 rounded-full border border-rose-300 flex items-center gap-1">
+                            <AlertTriangle className="w-3.5 h-3.5 text-rose-600" /> Fully Refunded
+                          </span>
+                        ) : isPartiallyRefunded ? (
+                          <span className="text-[10.5px] font-bold text-amber-800 bg-amber-50 px-2.5 py-1 rounded-full border border-amber-300 flex items-center gap-1">
+                            <History className="w-3.5 h-3.5 text-amber-600" /> Partially Refunded
+                          </span>
+                        ) : (
+                          <span className="text-[10.5px] font-bold text-emerald-800 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-300 flex items-center gap-1">
+                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> Paid &amp; Captured
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="p-3 bg-white rounded-xl border border-[#C5A059]/25 text-xs flex items-center justify-between flex-wrap gap-2">
+                        <div>
+                          <span className="text-[11px] text-[#6D6268] block">Captured Amount</span>
+                          <strong className="font-mono text-sm font-bold text-[#701626]">
+                            LKR {order.total.toLocaleString()}
+                          </strong>
+                        </div>
+                        <div>
+                          <span className="text-[11px] text-[#6D6268] block">Reference</span>
+                          <strong className="font-mono text-xs text-[#110B0E]">
+                            {order.orderId}
+                          </strong>
+                        </div>
+
+                        {!isRefunded && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setRefundAmountLKR(order.total);
+                              setIsRefundModalOpen(true);
+                            }}
+                            className="px-3.5 py-2 bg-rose-700 hover:bg-rose-800 text-white text-xs font-bold uppercase tracking-wider rounded-xl transition-all shadow-xs flex items-center gap-1.5 cursor-pointer ml-auto"
+                          >
+                            <RefreshCw className="w-3.5 h-3.5" />
+                            <span>Issue Refund</span>
+                          </button>
+                        )}
+                      </div>
                     </div>
                   );
                 })()}
@@ -838,6 +997,126 @@ export default function OrderDetailDrawer({ order, isOpen, onClose }: OrderDetai
                   <span>Open in New Tab</span>
                   <ExternalLink className="w-3.5 h-3.5" />
                 </a>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Payments.lk 1-Click Card Refund Modal */}
+      <AnimatePresence>
+        {isRefundModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="relative max-w-lg w-full bg-white rounded-3xl p-6 sm:p-7 space-y-5 shadow-2xl border border-[#C5A059]/40"
+            >
+              <div className="flex items-center justify-between pb-3 border-b border-[#C5A059]/20">
+                <div className="flex items-center gap-2">
+                  <RefreshCw className="w-5 h-5 text-rose-700" />
+                  <h4 className="font-display text-base sm:text-lg font-bold text-[#110B0E]">
+                    Issue Card Refund via Payments.lk
+                  </h4>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsRefundModalOpen(false)}
+                  disabled={isProcessingRefund}
+                  className="p-1.5 rounded-full hover:bg-gray-100 text-gray-500 hover:text-gray-900 transition-colors font-bold cursor-pointer"
+                >
+                  ✕
+                </button>
+              </div>
+
+              <div className="p-4 rounded-2xl bg-[#F7F4EE] border border-[#C5A059]/30 text-xs space-y-1.5">
+                <div className="flex justify-between">
+                  <span className="text-[#6D6268]">Order Reference:</span>
+                  <strong className="font-mono text-[#110B0E]">{order.orderId}</strong>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-[#6D6268]">Customer:</span>
+                  <strong className="text-[#110B0E]">{order.customer.fullName}</strong>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-[#6D6268]">Original Paid Total:</span>
+                  <strong className="font-mono text-[#701626]">LKR {order.total.toLocaleString()}</strong>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <div className="space-y-1.5">
+                  <label className="block text-[11px] font-bold text-[#110B0E] uppercase tracking-wider">
+                    Refund Amount (LKR) *
+                  </label>
+                  <div className="relative">
+                    <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-xs font-bold text-[#6D6268]">
+                      LKR
+                    </span>
+                    <input
+                      type="number"
+                      min={1}
+                      max={order.total}
+                      value={refundAmountLKR}
+                      onChange={(e) => setRefundAmountLKR(Number(e.target.value))}
+                      className="w-full pl-13 pr-4 py-2.5 text-sm font-mono font-bold rounded-xl bg-white border border-[#C5A059]/40 focus:outline-none focus:border-[#701626]"
+                    />
+                  </div>
+                  <div className="flex gap-2 pt-1">
+                    <button
+                      type="button"
+                      onClick={() => setRefundAmountLKR(order.total)}
+                      className="text-[10px] font-bold px-2.5 py-1 rounded-md bg-[#701626]/10 text-[#701626] border border-[#C5A059]/30 hover:bg-[#701626]/20 transition-colors cursor-pointer"
+                    >
+                      100% Full Refund (LKR {order.total.toLocaleString()})
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setRefundAmountLKR(Math.round(order.total / 2))}
+                      className="text-[10px] font-bold px-2.5 py-1 rounded-md bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors cursor-pointer"
+                    >
+                      50% Partial Refund
+                    </button>
+                  </div>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="block text-[11px] font-bold text-[#110B0E] uppercase tracking-wider">
+                    Reason for Refund *
+                  </label>
+                  <select
+                    value={refundReason}
+                    onChange={(e) => setRefundReason(e.target.value)}
+                    className="w-full px-3 py-2.5 text-xs rounded-xl bg-white border border-[#C5A059]/40 font-semibold focus:outline-none focus:border-[#701626]"
+                  >
+                    <option value="Customer requested cancellation">Customer requested cancellation</option>
+                    <option value="Item out of stock / fabric unavailable">Item out of stock / fabric unavailable</option>
+                    <option value="Tailoring fit adjustment / exchange credit">Tailoring fit adjustment / exchange credit</option>
+                    <option value="Duplicate payment charged">Duplicate payment charged</option>
+                    <option value="Mutual goodwill agreement">Mutual goodwill agreement</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-[#C5A059]/20">
+                <button
+                  type="button"
+                  onClick={() => setIsRefundModalOpen(false)}
+                  disabled={isProcessingRefund}
+                  className="px-4 py-2.5 rounded-xl border border-gray-300 text-xs font-bold text-gray-700 hover:bg-gray-100 transition-colors cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleProcessPaymentsLkRefund}
+                  disabled={isProcessingRefund}
+                  className="px-5 py-2.5 rounded-xl bg-rose-700 hover:bg-rose-800 text-white text-xs font-bold uppercase tracking-wider transition-colors shadow-sm flex items-center gap-2 cursor-pointer disabled:opacity-50"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${isProcessingRefund ? 'animate-spin' : ''}`} />
+                  <span>{isProcessingRefund ? 'Processing with Payments.lk...' : `Confirm Refund of LKR ${refundAmountLKR.toLocaleString()}`}</span>
+                </button>
               </div>
             </motion.div>
           </div>

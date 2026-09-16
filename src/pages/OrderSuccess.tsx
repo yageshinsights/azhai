@@ -1,4 +1,4 @@
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useLocation } from 'react-router-dom';
 import { useMemo, useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
@@ -104,6 +104,36 @@ export default function OrderSuccess() {
       })();
     }
   }, [orderId, lastOrder, authOrders, adminOrders]);
+
+  // Handle return from Payments.lk 3D Secure Hosted Checkout (?payments_lk=success)
+  useEffect(() => {
+    const searchParams = new URLSearchParams(location.search);
+    const isPaymentSuccess = searchParams.get('payments_lk') === 'success';
+
+    if (isPaymentSuccess && orderId) {
+      // 1. Clear cart upon verified return
+      useCartStore.getState().clearCart();
+
+      // 2. Update status in Supabase if configured
+      if (isSupabaseConfigured()) {
+        supabase
+          .from('orders')
+          .update({
+            payment_status: 'paid',
+            status: 'confirmed',
+          })
+          .eq('order_code', orderId)
+          .then(({ error }) => {
+            if (error) {
+              console.warn('[Payments.lk Return DB Update Warning]:', error);
+            }
+          });
+      }
+
+      // 3. Update status in local Admin store if present
+      useAdminStore.getState().updateOrderStatus(orderId, 'confirmed');
+    }
+  }, [location.search, orderId]);
 
   // Multi-tier order lookup: lastOrder -> authOrders -> adminOrders -> dbOrder
   const order = useMemo(() => {

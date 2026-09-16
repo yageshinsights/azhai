@@ -62,7 +62,7 @@ export default function TermsConditions() {
           <div className="space-y-2">
             <h2 className="font-display text-lg font-bold text-[#110B0E]">3. Payment Processing & Security</h2>
             <p>
-              We accept online credit and debit card payments via Central Bank of Sri Lanka-certified payment gateways (PayHere), Cash on Delivery (subject to order limits), and verified Direct Bank Deposits. Online transactions are encrypted under 256-bit TLS protocols. We do not store credit card numbers on our servers.
+              We accept online credit and debit card payments (Visa, Mastercard, AMEX) and LankaQR via Central Bank of Sri Lanka-certified payment gateways (Payments.lk powered by Payable), Cash on Delivery (subject to order limits), and verified Direct Bank Deposits. Online transactions are encrypted under 256-bit TLS protocols with 3D Secure verification. We do not store credit card numbers on our servers.
             </p>
           </div>
 

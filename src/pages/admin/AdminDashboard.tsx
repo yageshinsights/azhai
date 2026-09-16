@@ -5,6 +5,7 @@ import {
   DollarSign, 
   Package, 
   TrendingUp, 
+  TrendingDown,
   Users, 
   Sparkles, 
   Clock, 
@@ -37,6 +38,35 @@ export default function AdminDashboard() {
   );
 
   const averageOrderValue = orders.length > 0 ? Math.round(grossRevenue / orders.length) : 0;
+
+  // Dynamic Month-over-Month Revenue Growth
+  const growthRate = useMemo(() => {
+    const now = Date.now();
+    const thirtyDaysMs = 30 * 24 * 60 * 60 * 1000;
+    const current30DaysRevenue = orders
+      .filter((o) => o.status !== 'cancelled' && new Date(o.placedAt).getTime() >= now - thirtyDaysMs)
+      .reduce((acc, o) => acc + o.total, 0);
+    const prev30DaysRevenue = orders
+      .filter(
+        (o) =>
+          o.status !== 'cancelled' &&
+          new Date(o.placedAt).getTime() >= now - 2 * thirtyDaysMs &&
+          new Date(o.placedAt).getTime() < now - thirtyDaysMs
+      )
+      .reduce((acc, o) => acc + o.total, 0);
+
+    if (prev30DaysRevenue === 0) {
+      if (current30DaysRevenue > 0) return { isPositive: true, label: '+100% vs prior month' };
+      return { isPositive: true, label: '0.0% vs prior month' };
+    }
+    const diff = ((current30DaysRevenue - prev30DaysRevenue) / prev30DaysRevenue) * 100;
+    const isPositive = diff >= 0;
+    const sign = isPositive ? '+' : '';
+    return {
+      isPositive,
+      label: `${sign}${diff.toFixed(1)}% vs last month`,
+    };
+  }, [orders]);
 
   // Category sales breakdown computed dynamically from actual orders
   const categorySales = useMemo(() => {
@@ -150,8 +180,17 @@ export default function AdminDashboard() {
               <p className="font-display text-3xl font-bold text-[#110B0E]">
                 LKR {grossRevenue.toLocaleString()}
               </p>
-              <p className="text-[11px] text-emerald-700 font-bold flex items-center gap-1 pt-1">
-                <TrendingUp className="w-3.5 h-3.5" /> +24.8% vs last month
+              <p
+                className={`text-[11px] font-bold flex items-center gap-1 pt-1 ${
+                  growthRate.isPositive ? 'text-emerald-700' : 'text-rose-600'
+                }`}
+              >
+                {growthRate.isPositive ? (
+                  <TrendingUp className="w-3.5 h-3.5" />
+                ) : (
+                  <TrendingDown className="w-3.5 h-3.5" />
+                )}{' '}
+                {growthRate.label}
               </p>
             </div>
           </div>

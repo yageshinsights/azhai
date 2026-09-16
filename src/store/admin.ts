@@ -28,7 +28,7 @@ export type OrderStatus = 'pending' | 'confirmed' | 'processing' | 'shipped' | '
 
 export interface AdminOrder extends PlacedOrder {
   status: OrderStatus;
-  paymentStatus: 'paid' | 'pending_cod' | 'pending_bank' | 'refunded';
+  paymentStatus: 'paid' | 'pending_cod' | 'pending_bank' | 'pending_card' | 'refunded' | 'partially_refunded';
   courierPartner?: 'Sri Lanka Post' | 'PromptX' | 'Koombiyo' | 'Citypak' | 'Domex' | 'Atelier Express' | string;
   trackingNumber?: string;
   adminNotes?: string;
@@ -46,6 +46,20 @@ export interface Coupon {
   usageCount: number;
   isActive: boolean;
   expiresAt?: string;
+}
+
+export type InquiryStatus = 'unread' | 'read' | 'in_progress' | 'resolved';
+
+export interface AtelierInquiry {
+  id: string;
+  name: string;
+  email: string;
+  phone?: string;
+  topic: string;
+  message: string;
+  status: InquiryStatus;
+  adminNotes?: string;
+  createdAt: string;
 }
 
 export interface CustomerRecord {
@@ -151,6 +165,7 @@ interface AdminState {
   tags: string[];
   coupons: Coupon[];
   customers: CustomerRecord[];
+  inquiries: AtelierInquiry[];
   settings: StoreSettings;
 
   // Tailoring State
@@ -172,6 +187,7 @@ interface AdminState {
   ) => void;
   syncNewOrder: (placedOrder: PlacedOrder) => void;
   syncCustomerFromAuth: (user: { fullName: string; email: string; phone?: string; district?: string; city?: string; createdAt?: string }) => void;
+  updateCustomerNotesAndTier: (email: string, notes: string, vipTier: 'Gold Patron' | 'Silver Patron' | 'Standard') => Promise<void>;
   addProduct: (product: Omit<Product, 'id'>) => void;
   updateProduct: (id: number, updates: Partial<Product>) => void;
   updateProductStock: (id: number, stockQuantity: number) => void;
@@ -187,6 +203,12 @@ interface AdminState {
   deleteCoupon: (id: string) => void;
   updateSettings: (settings: Partial<StoreSettings>) => void;
   toggleCOD: (enabled: boolean) => void;
+
+  // Atelier Inquiries Actions
+  fetchInquiries: () => Promise<void>;
+  updateInquiryStatus: (id: string, status: InquiryStatus) => Promise<void>;
+  updateInquiryNotes: (id: string, adminNotes: string) => Promise<void>;
+  deleteInquiry: (id: string) => Promise<void>;
 
   // Bank Accounts & Direct Deposit Actions
   addBankAccount: (account: Omit<BankAccount, 'id'>) => void;
@@ -354,6 +376,7 @@ export const useAdminStore = create<AdminState>()(
       tags: INITIAL_TAGS,
       coupons: INITIAL_COUPONS,
       customers: INITIAL_CUSTOMERS,
+      inquiries: [],
       settings: getInitialSettings(),
 
       // Tailoring initial state
@@ -592,8 +615,8 @@ export const useAdminStore = create<AdminState>()(
                   totalSpent: Math.max(totalSpent, existing?.totalSpent || 0),
                   firstJoined: p.created_at || existing?.firstJoined || new Date().toISOString(),
                   lastOrderDate: latestOrder?.created_at || existing?.lastOrderDate,
-                  vipTier: existing?.vipTier || vipTier,
-                  notes: p.role === 'admin' ? 'Atelier Administrator' : existing?.notes || 'Registered online patron account.',
+                  vipTier: p.preferences?.vipTier || existing?.vipTier || vipTier,
+                  notes: p.preferences?.notes || (p.role === 'admin' ? 'Atelier Administrator' : existing?.notes || 'Registered online patron account.'),
                 });
               });
             }
@@ -699,6 +722,60 @@ export const useAdminStore = create<AdminState>()(
             }
           } catch (tailoringErr) {
             console.warn('[Tailoring Supabase Fetch]: Using local defaults', tailoringErr);
+          }
+
+          // 8. Fetch Atelier Inquiries
+          try {
+            const { data: dbInquiries } = await supabase
+              .from('inquiries')
+              .select('*')
+              .order('created_at', { ascending: false });
+
+            let localInquiries: AtelierInquiry[] = [];
+            if (typeof window !== 'undefined') {
+              try {
+                const stored = localStorage.getItem('azhai-inquiries');
+                if (stored) {
+                  const list = JSON.parse(stored);
+                  if (Array.isArray(list)) {
+                    localInquiries = list.map((item: any) => ({
+                      id: item.id || `inq-${Date.now()}`,
+                      name: item.name,
+                      email: item.email,
+                      phone: item.phone || '',
+                      topic: item.topic || 'General Inquiry',
+                      message: item.message || '',
+                      status: (item.status || 'unread') as InquiryStatus,
+                      adminNotes: item.adminNotes || '',
+                      createdAt: item.createdAt || new Date().toISOString(),
+                    }));
+                  }
+                }
+              } catch {}
+            }
+
+            const inqMap = new Map<string, AtelierInquiry>();
+            localInquiries.forEach((inq) => inqMap.set(inq.id, inq));
+
+            if (dbInquiries && dbInquiries.length > 0) {
+              dbInquiries.forEach((d: any) => {
+                inqMap.set(d.id, {
+                  id: d.id,
+                  name: d.name,
+                  email: d.email,
+                  phone: d.phone || '',
+                  topic: d.topic || 'General Inquiry',
+                  message: d.message || '',
+                  status: (d.status || 'unread') as InquiryStatus,
+                  adminNotes: d.admin_notes || '',
+                  createdAt: d.created_at || new Date().toISOString(),
+                });
+              });
+            }
+
+            set({ inquiries: Array.from(inqMap.values()) });
+          } catch (inqErr) {
+            console.warn('[Supabase Inquiries Fetch Error]:', inqErr);
           }
         } catch (err) {
           console.error('[AdminStore Fetch Supabase Error]:', err);
@@ -840,6 +917,41 @@ export const useAdminStore = create<AdminState>()(
             customers: [newCustomer, ...state.customers],
           };
         });
+      },
+
+      updateCustomerNotesAndTier: async (email, notes, vipTier) => {
+        const cleanEmail = email.toLowerCase().trim();
+        set((state) => ({
+          customers: state.customers.map((c) =>
+            c.email.toLowerCase().trim() === cleanEmail
+              ? { ...c, notes, vipTier }
+              : c
+          ),
+        }));
+
+        if (isSupabaseConfigured()) {
+          try {
+            const { data: profile } = await supabase
+              .from('profiles')
+              .select('preferences')
+              .eq('email', cleanEmail)
+              .maybeSingle();
+
+            const existingPrefs = (profile?.preferences as Record<string, any>) || {};
+            await supabase
+              .from('profiles')
+              .update({
+                preferences: {
+                  ...existingPrefs,
+                  notes,
+                  vipTier,
+                },
+              })
+              .eq('email', cleanEmail);
+          } catch (err) {
+            console.warn('[Supabase Customer Note/Tier Update Exception]:', err);
+          }
+        }
       },
 
       syncNewOrder: (placedOrder) => {
@@ -1241,6 +1353,82 @@ export const useAdminStore = create<AdminState>()(
             await supabase.from('store_settings').update({ enable_cod: enabled }).eq('id', 1);
           } catch (err) {
             console.error('[Supabase Toggle COD Error]:', err);
+          }
+        }
+      },
+
+      // ── Atelier Inquiries Actions ──
+      fetchInquiries: async () => {
+        if (!isSupabaseConfigured()) return;
+        try {
+          const { data: dbInquiries, error } = await supabase
+            .from('inquiries')
+            .select('*')
+            .order('created_at', { ascending: false });
+
+          if (error) {
+            console.warn('[Supabase Fetch Inquiries Error]:', error.message);
+            return;
+          }
+
+          if (dbInquiries) {
+            set({
+              inquiries: dbInquiries.map((inq: any) => ({
+                id: inq.id,
+                name: inq.name,
+                email: inq.email,
+                phone: inq.phone || '',
+                topic: inq.topic || 'General Inquiry',
+                message: inq.message || '',
+                status: (inq.status || 'unread') as InquiryStatus,
+                adminNotes: inq.admin_notes || '',
+                createdAt: inq.created_at || new Date().toISOString(),
+              })),
+            });
+          }
+        } catch (err) {
+          console.warn('[Supabase Fetch Inquiries Exception]:', err);
+        }
+      },
+
+      updateInquiryStatus: async (id, status) => {
+        set((state) => ({
+          inquiries: state.inquiries.map((inq) => (inq.id === id ? { ...inq, status } : inq)),
+        }));
+
+        if (isSupabaseConfigured() && id.length > 30) {
+          try {
+            await supabase.from('inquiries').update({ status }).eq('id', id);
+          } catch (err) {
+            console.warn('[Supabase Update Inquiry Status Exception]:', err);
+          }
+        }
+      },
+
+      updateInquiryNotes: async (id, adminNotes) => {
+        set((state) => ({
+          inquiries: state.inquiries.map((inq) => (inq.id === id ? { ...inq, adminNotes } : inq)),
+        }));
+
+        if (isSupabaseConfigured() && id.length > 30) {
+          try {
+            await supabase.from('inquiries').update({ admin_notes: adminNotes }).eq('id', id);
+          } catch (err) {
+            console.warn('[Supabase Update Inquiry Notes Exception]:', err);
+          }
+        }
+      },
+
+      deleteInquiry: async (id) => {
+        set((state) => ({
+          inquiries: state.inquiries.filter((inq) => inq.id !== id),
+        }));
+
+        if (isSupabaseConfigured() && id.length > 30) {
+          try {
+            await supabase.from('inquiries').delete().eq('id', id);
+          } catch (err) {
+            console.warn('[Supabase Delete Inquiry Exception]:', err);
           }
         }
       },

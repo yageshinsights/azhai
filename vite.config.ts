@@ -57,6 +57,123 @@ export default defineConfig(({ mode }) => {
               next();
             }
           });
+
+          // ── Payments.lk Dev Server Proxy ────────────────────────────
+          const paymentsLkSecret = env.PAYMENTS_LK_SECRET_KEY || 'sk_test_A9ybTZkoMw9HrgiAvcAlFNdKqp6Kp7hm';
+
+          server.middlewares.use('/api/create-payments-lk-checkout', (req, res, next) => {
+            if (req.method === 'POST') {
+              let body = '';
+              req.on('data', (c) => { body += c; });
+              req.on('end', async () => {
+                try {
+                  const parsed = JSON.parse(body);
+                  const pResp = await fetch('https://api.payments.lk/v1/checkouts', {
+                    method: 'POST',
+                    headers: {
+                      'Authorization': `Bearer ${paymentsLkSecret}`,
+                      'Idempotency-Key': `order-${parsed.orderId}`,
+                      'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                      amountCents: parsed.amountCents,
+                      description: parsed.description,
+                      reference: String(parsed.orderId),
+                      customer: parsed.customer,
+                      successUrl: parsed.successUrl,
+                      cancelUrl: parsed.cancelUrl,
+                    }),
+                  });
+                  const data: any = await pResp.json();
+                  res.statusCode = pResp.status;
+                  res.setHeader('Content-Type', 'application/json');
+                  res.end(JSON.stringify({
+                    id: data.id,
+                    url: data.url,
+                    paymentId: data.payment?.id,
+                    status: data.status,
+                    error: data.message,
+                  }));
+                } catch (err: any) {
+                  res.statusCode = 500;
+                  res.setHeader('Content-Type', 'application/json');
+                  res.end(JSON.stringify({ error: err.message }));
+                }
+              });
+            } else {
+              next();
+            }
+          });
+
+          server.middlewares.use('/api/refund-payments-lk', (req, res, next) => {
+            if (req.method === 'POST') {
+              let body = '';
+              req.on('data', (c) => { body += c; });
+              req.on('end', async () => {
+                try {
+                  const parsed = JSON.parse(body);
+                  const pResp = await fetch('https://api.payments.lk/v1/refunds', {
+                    method: 'POST',
+                    headers: {
+                      'Authorization': `Bearer ${paymentsLkSecret}`,
+                      'Idempotency-Key': `ref-${parsed.paymentId}-${Date.now()}`,
+                      'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                      paymentId: parsed.paymentId,
+                      amountCents: parsed.amountCents,
+                      reason: parsed.reason,
+                    }),
+                  });
+                  const data = await pResp.json();
+                  res.statusCode = pResp.status;
+                  res.setHeader('Content-Type', 'application/json');
+                  res.end(JSON.stringify(data));
+                } catch (err: any) {
+                  res.statusCode = 500;
+                  res.setHeader('Content-Type', 'application/json');
+                  res.end(JSON.stringify({ error: err.message }));
+                }
+              });
+            } else {
+              next();
+            }
+          });
+
+          server.middlewares.use('/api/create-payments-lk-payment-link', (req, res, next) => {
+            if (req.method === 'POST') {
+              let body = '';
+              req.on('data', (c) => { body += c; });
+              req.on('end', async () => {
+                try {
+                  const parsed = JSON.parse(body);
+                  const pResp = await fetch('https://api.payments.lk/v1/payment_links', {
+                    method: 'POST',
+                    headers: {
+                      'Authorization': `Bearer ${paymentsLkSecret}`,
+                      'Idempotency-Key': `plink-${Date.now()}`,
+                      'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                      title: parsed.title,
+                      amountCents: parsed.amountCents,
+                      description: parsed.description,
+                    }),
+                  });
+                  const data = await pResp.json();
+                  res.statusCode = pResp.status;
+                  res.setHeader('Content-Type', 'application/json');
+                  res.end(JSON.stringify(data));
+                } catch (err: any) {
+                  res.statusCode = 500;
+                  res.setHeader('Content-Type', 'application/json');
+                  res.end(JSON.stringify({ error: err.message }));
+                }
+              });
+            } else {
+              next();
+            }
+          });
         },
       },
     ],

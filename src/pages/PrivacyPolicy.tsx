@@ -46,7 +46,7 @@ export default function PrivacyPolicy() {
           <div className="space-y-2">
             <h2 className="font-display text-lg font-bold text-[#110B0E]">2. Payment Security</h2>
             <p>
-              We never store your credit or debit card numbers on our servers. All card transactions are processed securely through Central Bank of Sri Lanka-certified payment gateways (PayHere) using 256-bit TLS bank-grade encryption.
+              We never store your credit or debit card numbers on our servers. All card transactions are processed securely through Central Bank of Sri Lanka-certified payment gateways (Payments.lk powered by Payable) using 256-bit TLS bank-grade encryption with 3D Secure verification.
             </p>
           </div>
 

@@ -510,6 +510,8 @@ DROP POLICY IF EXISTS "Public can submit reviews" ON public.product_reviews;
 CREATE POLICY "Public can submit reviews" ON public.product_reviews FOR INSERT WITH CHECK (true);
 DROP POLICY IF EXISTS "Public can update review likes" ON public.product_reviews;
 CREATE POLICY "Public can update review likes" ON public.product_reviews FOR UPDATE USING (true) WITH CHECK (true);
+DROP POLICY IF EXISTS "Admins can view and manage reviews" ON public.product_reviews;
+CREATE POLICY "Admins can view and manage reviews" ON public.product_reviews FOR ALL USING (true) WITH CHECK (true);
 
 CREATE TABLE IF NOT EXISTS public.inquiries (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

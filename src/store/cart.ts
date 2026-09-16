@@ -61,6 +61,7 @@ export interface PlacedOrder {
   total: number;
   coupon?: string;
   giftNote?: string;
+  deliveryNotes?: string;
   customer: {
     fullName: string;
     email: string;
@@ -87,7 +88,7 @@ export interface PlacedOrder {
     deliveryTimeline?: string;
   };
   adminNotes?: string;
-  paymentStatus?: 'paid' | 'pending_cod' | 'pending_bank' | 'refunded';
+  paymentStatus?: 'paid' | 'pending_cod' | 'pending_bank' | 'pending_card' | 'refunded' | 'partially_refunded';
   bankTransferDetails?: {
     bankId?: string;
     bankName: string;

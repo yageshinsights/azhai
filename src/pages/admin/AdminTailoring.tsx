@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Ruler, Palette, Settings2, Trash2, Edit2, Plus, Scissors, ToggleLeft, ToggleRight, Check } from 'lucide-react';
+import { Ruler, Palette, Settings2, Trash2, Edit2, Plus, Scissors, ToggleLeft, ToggleRight, Check, Link2 } from 'lucide-react';
 import AdminLayout from '@/components/admin/AdminLayout';
+import PaymentLinkModal from '@/components/admin/PaymentLinkModal';
 import { useAdminStore } from '@/store/admin';
 import { formatLKR } from '@/lib/tailoring';
 import { DEFAULT_DRESS_TYPES, DEFAULT_FABRICS, DEFAULT_MEASUREMENT_FIELDS, DEFAULT_SIZE_PRESETS } from '@/lib/tailoring';
@@ -35,6 +36,9 @@ export default function AdminTailoring() {
   const [isPresetModalOpen, setIsPresetModalOpen] = useState(false);
   const [editPreset, setEditPreset] = useState<SizePreset | null>(null);
 
+  // Payments.lk Bespoke Payment Link Modal
+  const [isPaymentLinkModalOpen, setIsPaymentLinkModalOpen] = useState(false);
+
   // Filtered fields/presets for sub-tabs
   const currentFields = measurementFields.filter(f => f.dressTypeId === selectedDressTypeId).sort((a, b) => a.displayOrder - b.displayOrder);
   const currentPresets = sizePresets.filter(p => p.dressTypeId === selectedDressTypeId);
@@ -59,6 +63,14 @@ export default function AdminTailoring() {
               Manage bespoke dress types, fabric inventory, measurements, and size charts.
             </p>
           </div>
+
+          <button
+            onClick={() => setIsPaymentLinkModalOpen(true)}
+            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-[#FCFBF8] hover:bg-[#DFBF77]/20 border border-[#C5A059]/40 text-[#701626] text-xs font-bold transition-all shadow-sm cursor-pointer self-start sm:self-auto"
+          >
+            <Link2 className="w-4 h-4 text-[#701626]" />
+            <span>Generate Tailoring Payment Link</span>
+          </button>
         </div>
 
         {/* Tabs (Horizontally Scrollable on Mobile) */}
@@ -291,7 +303,7 @@ export default function AdminTailoring() {
         initial={editDressType}
         onSave={(data) => {
           if (editDressType) safeCall(store.updateDressType, editDressType.id, data);
-          else safeCall(store.addDressType, { id: Date.now(), ...data });
+          else safeCall(store.addDressType, data);
         }}
       />
       
@@ -302,7 +314,7 @@ export default function AdminTailoring() {
         dressTypes={dressTypes}
         onSave={(data) => {
           if (editFabric) safeCall(store.updateTailoringFabric, editFabric.id, data);
-          else safeCall(store.addTailoringFabric, { id: Date.now(), ...data });
+          else safeCall(store.addTailoringFabric, data);
         }}
       />
       
@@ -312,7 +324,7 @@ export default function AdminTailoring() {
         initial={editField}
         onSave={(data) => {
           if (editField) safeCall(store.updateMeasurementField, editField.id, data);
-          else safeCall(store.addMeasurementField, { id: Date.now(), dressTypeId: selectedDressTypeId, ...data });
+          else safeCall(store.addMeasurementField, { dressTypeId: selectedDressTypeId, ...data });
         }}
       />
       
@@ -323,8 +335,17 @@ export default function AdminTailoring() {
         measurementFields={currentFields}
         onSave={(data) => {
           if (editPreset) safeCall(store.updateSizePreset, editPreset.id, data);
-          else safeCall(store.addSizePreset, { id: Date.now(), dressTypeId: selectedDressTypeId, ...data });
+          else safeCall(store.addSizePreset, { dressTypeId: selectedDressTypeId, ...data });
         }}
+      />
+
+      {/* Payments.lk Bespoke Tailoring Payment Link Modal */}
+      <PaymentLinkModal
+        isOpen={isPaymentLinkModalOpen}
+        onClose={() => setIsPaymentLinkModalOpen(false)}
+        defaultTitle="Custom Tailoring Fitting & Stitching"
+        defaultAmount={6500}
+        defaultDescription="Bespoke tailoring crafting fee, fabric matching, and courier dispatch."
       />
 
     </AdminLayout>

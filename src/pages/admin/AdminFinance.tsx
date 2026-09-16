@@ -62,7 +62,7 @@ export default function AdminFinance() {
 
     return [
       {
-        name: 'Visa & Mastercard (PayHere Online)',
+        name: 'Online Card & LankaQR (Payments.lk / Payable)',
         amount: `LKR ${cardTotal.toLocaleString()}`,
         percent: Math.round((cardTotal / total) * 100),
         color: 'bg-emerald-700',
