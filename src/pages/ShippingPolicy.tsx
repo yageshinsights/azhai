@@ -4,7 +4,7 @@ import SEOHead from '@/components/SEOHead';
 
 export default function ShippingPolicy() {
   return (
-    <div className="min-h-screen bg-[#FCFBF8] pt-24 pb-20 text-[#110B0E]">
+    <div className="min-h-screen bg-[#FCFBF8] pt-32 sm:pt-36 pb-20 text-[#110B0E]">
       <SEOHead
         title="Shipping & Delivery Policy — Express Colombo & Island-wide"
         description="Learn about Azhai Clothing's island-wide courier delivery across Sri Lanka. Same-day Colombo dispatch, free shipping over LKR 15,000, and live SMS tracking."

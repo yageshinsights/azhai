@@ -28,7 +28,7 @@ export default function Collections() {
   }), [categoriesList]);
 
   return (
-    <div className="min-h-screen bg-[#FCFBF8] pt-24 text-[#110B0E]">
+    <div className="min-h-screen bg-[#FCFBF8] pt-32 sm:pt-36 text-[#110B0E]">
       <SEOHead
         title="The Collections — Handloom Silks, Saree Sets & Kurties"
         description="Explore curated handloom kurti sets, hand-painted lotus organza sarees, Kashmiri tilla shawls, and tailored festive couture by Preethi."
@@ -72,51 +72,50 @@ export default function Collections() {
               >
                 <Link 
                   to={`/collections/${col.slug}`} 
-                  className="group block relative rounded-[2rem] overflow-hidden aspect-[16/10] sm:aspect-[16/9] bg-[#110B0E] border border-[#C5A059]/40 shadow-lg hover:shadow-2xl hover:border-[#C5A059] transition-all duration-500"
+                  className="group block relative rounded-[2rem] overflow-hidden aspect-[16/10] sm:aspect-[16/9] bg-[#110B0E] border border-[#C5A059]/30 shadow-lg hover:shadow-2xl hover:border-[#C5A059] transition-all duration-500"
                 >
                   <motion.img
                     src={col.heroImage}
                     alt={col.name}
-                    className="w-full h-full object-cover object-center opacity-90 group-hover:opacity-100"
+                    className="w-full h-full object-cover object-center opacity-95 group-hover:opacity-100"
                     whileHover={{ scale: 1.05 }}
                     transition={{ duration: 0.7 }}
                   />
-                  <div className="absolute inset-0 bg-gradient-to-t from-[#110B0E] via-[#110B0E]/40 to-black/20" />
-                  <div className="absolute inset-0 bg-gradient-to-r from-[#110B0E]/70 via-transparent to-transparent hidden sm:block" />
+                  {/* Atmospheric Bottom Gradient Scrim - Keeps upper 70% unobstructed */}
+                  <div className="absolute inset-0 bg-gradient-to-t from-[#110B0E]/90 via-[#110B0E]/40 to-transparent pointer-events-none" />
                   
-                  {/* Badges */}
-                  <div className="absolute top-4 left-4 right-4 flex items-center justify-between pointer-events-none">
-                    <span className="bg-[#701626]/90 backdrop-blur-md px-3 py-1 rounded-full text-[9px] text-[#DFBF77] font-bold uppercase tracking-[0.22em] border border-[#C5A059]/40 shadow-md">
-                      Edit 0{i + 1}
-                    </span>
-                    <span className="bg-white/95 backdrop-blur-md px-3.5 py-1 rounded-full text-[8.5px] text-[#701626] font-bold uppercase tracking-[0.2em] shadow-md border border-[#C5A059]/40">
-                      {col.season || 'Core Edit'}
-                    </span>
-                  </div>
-
-                  <div className="absolute bottom-0 left-0 right-0 p-5 sm:p-7 space-y-2 text-white">
-                    <div className="flex items-center gap-2">
-                      <span className="w-1.5 h-1.5 rounded-full bg-[#C5A059]" />
-                      <p className="text-[10px] uppercase tracking-[0.22em] text-[#DFBF77] font-semibold">
-                        {count > 0 ? `${count} Silhouettes Handcrafted` : 'New Drop'} {col.tagline ? `· ${col.tagline}` : ''}
-                      </p>
+                  {/* Top Season Badge */}
+                  {col.season && (
+                    <div className="absolute top-4 right-4 pointer-events-none z-10">
+                      <span className="bg-[#110B0E]/60 backdrop-blur-md px-3.5 py-1 rounded-full text-[9px] text-[#DFBF77] font-medium uppercase tracking-[0.2em] border border-[#C5A059]/30 shadow-sm">
+                        {col.season}
+                      </span>
                     </div>
+                  )}
+
+                  <div className="absolute bottom-0 left-0 right-0 p-5 sm:p-7 space-y-2 text-white z-10">
+                    {count > 0 && (
+                      <p className="text-[10px] uppercase tracking-[0.22em] text-[#DFBF77] font-medium">
+                        {count} Silhouettes Handcrafted {col.tagline ? `· ${col.tagline}` : ''}
+                      </p>
+                    )}
 
                     <h2 className="font-display text-2xl sm:text-3xl lg:text-4xl font-bold group-hover:text-[#DFBF77] transition-colors leading-tight">
                       {col.name}
                     </h2>
 
-                    <p className="text-xs sm:text-sm text-white/80 font-light leading-relaxed line-clamp-2 max-w-lg">
-                      {col.description}
-                    </p>
+                    {col.description && (
+                      <p className="text-xs sm:text-sm text-white/80 font-light leading-relaxed line-clamp-1 sm:line-clamp-2 max-w-lg">
+                        {col.description}
+                      </p>
+                    )}
 
-                    <div className="pt-2 flex items-center justify-between">
-                      <span className="inline-flex items-center gap-2 text-xs text-[#DFBF77] font-bold uppercase tracking-[0.18em] group-hover:translate-x-1 transition-transform">
-                        <span>Explore Collection</span>
-                        <ArrowRight className="w-3.5 h-3.5" />
-                      </span>
-                      <span className="text-[10px] text-white/50 font-mono tracking-wider">
-                        azhai.lk/{col.slug}
+                    <div className="pt-2 flex items-center">
+                      <span className="inline-flex items-center gap-2 text-xs font-semibold text-[#DFBF77] uppercase tracking-[0.18em] group-hover:text-white transition-colors">
+                        <span className="border-b border-[#C5A059]/50 group-hover:border-white pb-0.5 transition-colors">
+                          Explore Collection
+                        </span>
+                        <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1.5 transition-transform" />
                       </span>
                     </div>
                   </div>

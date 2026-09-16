@@ -157,7 +157,7 @@ export default function CollectionDetail() {
   }
 
   return (
-    <div className="min-h-screen bg-[#FCFBF8] pt-24 text-[#110B0E]">
+    <div className="min-h-screen bg-[#FCFBF8] pt-32 sm:pt-36 text-[#110B0E]">
       <SEOHead
         title={`${collection.name} Collection — Handcrafted Silk Couture`}
         description={collection.description || `Discover Azhai's handcrafted ${collection.name} collection in Colombo, Sri Lanka.`}

@@ -11,7 +11,7 @@ export default function TermsConditions() {
   const activeAddress = settings?.atelierAddress || STORE_ADDRESS_FULL;
   const activeEmail = settings?.studio?.supportEmail || STORE_EMAIL;
   return (
-    <div className="min-h-screen bg-[#FCFBF8] pt-24 pb-20 text-[#110B0E]">
+    <div className="min-h-screen bg-[#FCFBF8] pt-32 sm:pt-36 pb-20 text-[#110B0E]">
       <SEOHead
         title="Terms & Conditions — Azhai Clothing Atelier"
         description="Official terms of service, payment processing policies, bespoke tailoring contracts, and customer privileges for Azhai Clothing by Preethi in Colombo, Sri Lanka."

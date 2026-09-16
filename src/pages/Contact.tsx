@@ -139,7 +139,7 @@ export default function Contact() {
   }), [activeAddress, activePhone, activeEmail]);
 
   return (
-    <div className="min-h-screen bg-[#FCFBF8] pt-24 pb-20 text-[#110B0E]">
+    <div className="min-h-screen bg-[#FCFBF8] pt-32 sm:pt-36 pb-20 text-[#110B0E]">
       <SEOHead
         title="Contact Azhai Atelier — Bespoke Styling & Customer Care Colombo"
         description="Connect with Azhai Clothing by Preethi in Colombo. WhatsApp concierge, bespoke fitting inquiries, parcel dispatch updates, and showroom appointments."

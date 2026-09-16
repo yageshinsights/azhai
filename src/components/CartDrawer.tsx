@@ -22,6 +22,7 @@ export default function CartDrawer() {
   const [couponCode, setCouponCode] = useState('');
   const [appliedCoupon, setAppliedCoupon] = useState<string | null>(null);
   const [discountAmount, setDiscountAmount] = useState(0);
+  const [couponError, setCouponError] = useState<string | null>(null);
   const [isGiftNoteOpen, setIsGiftNoteOpen] = useState(false);
   const [giftNote, setGiftNote] = useState('');
 
@@ -29,7 +30,10 @@ export default function CartDrawer() {
   const standardShippingFee = adminSettings?.standardShippingFee || 450;
 
   const applyCoupon = (code: string) => {
+    setCouponError(null);
     const clean = code.trim().toUpperCase();
+    if (!clean) return;
+
     // Check in dynamic coupons from store
     const matchedCoupon = storeCoupons?.find(
       (c) => c.code.toUpperCase() === clean && c.isActive
@@ -37,7 +41,7 @@ export default function CartDrawer() {
 
     if (matchedCoupon) {
       if (matchedCoupon.minSpend && rawTotal < matchedCoupon.minSpend) {
-        alert(`This coupon requires a minimum spend of LKR ${matchedCoupon.minSpend.toLocaleString()}`);
+        setCouponError(`This coupon requires a minimum spend of LKR ${matchedCoupon.minSpend.toLocaleString()}`);
         return;
       }
       let disc = 0;
@@ -51,6 +55,7 @@ export default function CartDrawer() {
       }
       setDiscountAmount(disc);
       setAppliedCoupon(matchedCoupon.code);
+      setCouponError(null);
       return;
     }
 
@@ -59,11 +64,13 @@ export default function CartDrawer() {
       const disc = Math.round(rawTotal * 0.10);
       setDiscountAmount(disc);
       setAppliedCoupon('AZHAI10');
+      setCouponError(null);
     } else if (clean === 'CEYLON1000') {
       setDiscountAmount(1000);
       setAppliedCoupon('CEYLON1000');
+      setCouponError(null);
     } else {
-      alert('Invalid coupon code. Try AZHAI10 or CEYLON1000');
+      setCouponError('Invalid coupon code. Try AZHAI10 or CEYLON1000');
     }
   };
 
@@ -71,6 +78,7 @@ export default function CartDrawer() {
     setAppliedCoupon(null);
     setDiscountAmount(0);
     setCouponCode('');
+    setCouponError(null);
   };
 
   const handleProceedToCheckout = () => {
@@ -282,6 +290,13 @@ export default function CartDrawer() {
                             Apply
                           </button>
                         </div>
+                      )}
+
+                      {couponError && !appliedCoupon && (
+                        <p className="text-[11px] text-rose-600 font-medium pt-0.5 flex items-center gap-1.5">
+                          <span className="w-1.5 h-1.5 rounded-full bg-rose-600 shrink-0" />
+                          <span>{couponError}</span>
+                        </p>
                       )}
 
                       {/* Quick Apply Pills */}

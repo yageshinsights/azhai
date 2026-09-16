@@ -72,29 +72,34 @@ export default function ProductCard({ product, index = 0 }: { product: Product; 
             />
 
             {/* Top Luxury Badges */}
-            <div className="absolute top-3.5 left-3.5 right-3.5 flex items-center justify-between z-20">
+            <div className="absolute top-3.5 left-3.5 right-3.5 flex items-center justify-between z-20 pointer-events-none">
               {product.tag ? (
-                <div className="bg-[#701626] text-[#F3E8CE] text-[9px] uppercase tracking-[0.2em] font-bold px-3 py-1 rounded-full shadow-md border border-[#C5A059]/40">
+                <div className="bg-[#701626]/90 backdrop-blur-md text-[#F3E8CE] text-[9px] uppercase tracking-[0.18em] font-semibold px-3 py-1 rounded-full shadow-sm border border-[#C5A059]/30">
                   {product.tag}
                 </div>
               ) : <div />}
 
               {/* Wishlist Heart */}
               <button
+                type="button"
                 onClick={handleToggleWishlist}
-                className="w-8 h-8 rounded-full bg-white/90 backdrop-blur-md flex items-center justify-center text-[#110B0E]/70 hover:text-rose-500 transition-all shadow-sm border border-white/80"
+                className="w-8 h-8 rounded-full bg-white/90 backdrop-blur-md flex items-center justify-center text-[#110B0E]/70 hover:text-rose-500 transition-all shadow-sm border border-[#C5A059]/20 pointer-events-auto cursor-pointer"
                 title="Save to Wishlist"
               >
                 <Heart className={`w-3.5 h-3.5 ${isWishlisted ? 'fill-rose-500 text-rose-500' : ''}`} />
               </button>
             </div>
 
-            {/* Occasion Pill */}
+            {/* Occasion Pill (fades out gracefully on hover so action overlay doesn't collide) */}
             {product.occasion && (
-              <div className="absolute bottom-3.5 left-3.5 z-20 bg-white/92 backdrop-blur-md px-3 py-1 rounded-full text-[9px] font-semibold text-[#701626] border border-[#C5A059]/40 shadow-sm flex items-center gap-1.5">
-                <Sparkles className="w-2.5 h-2.5 text-[#C5A059]" />
+              <motion.div
+                animate={{ opacity: hovered ? 0 : 1 }}
+                transition={{ duration: 0.2 }}
+                className="absolute bottom-3.5 left-3.5 z-20 bg-[#110B0E]/70 backdrop-blur-md px-3 py-1 rounded-full text-[9px] font-medium text-[#DFBF77] border border-[#C5A059]/30 shadow-sm flex items-center gap-1.5 pointer-events-none"
+              >
+                <Sparkles className="w-2.5 h-2.5 text-[#DFBF77]" />
                 <span>{product.occasion}</span>
-              </div>
+              </motion.div>
             )}
 
             {/* Slide-Up Quick Action Overlay */}

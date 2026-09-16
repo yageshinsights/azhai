@@ -9,7 +9,7 @@ export default function ReturnsExchanges() {
   const activeWhatsApp = settings?.whatsappNumber || STORE_PHONE;
   const activeWhatsAppDigits = cleanWhatsAppDigits(activeWhatsApp);
   return (
-    <div className="min-h-screen bg-[#FCFBF8] pt-24 pb-20 text-[#110B0E]">
+    <div className="min-h-screen bg-[#FCFBF8] pt-32 sm:pt-36 pb-20 text-[#110B0E]">
       <SEOHead
         title="14-Day Exchanges & Returns Policy — Azhai Guarantee"
         description="Experience hassle-free sizing exchanges with Azhai. 14-day doorstep courier exchange service across Sri Lanka for unworn festive pieces."

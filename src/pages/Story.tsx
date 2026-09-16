@@ -47,7 +47,7 @@ export default function Story() {
   }), []);
 
   return (
-    <div className="min-h-screen bg-[#FCFBF8] pt-24 text-[#110B0E]">
+    <div className="min-h-screen bg-[#FCFBF8] pt-32 sm:pt-36 text-[#110B0E]">
       <SEOHead
         title="Our Story & Weaving Heritage — An Invitation by Preethi"
         description="Discover the meaning behind Azhai: the unbroken thread of handloom silk tradition, the blooming lotus crown, and sacred ritual drapes."

@@ -302,7 +302,7 @@ export default function ProductDetail() {
   const bundleTotal = prodPriceNum + compPriceNum;
 
   return (
-    <div className="min-h-screen bg-[#FCFBF8] pt-24 pb-20 text-[#110B0E]">
+    <div className="min-h-screen bg-[#FCFBF8] pt-32 sm:pt-36 pb-20 text-[#110B0E]">
       <SEOHead
         title={product.name}
         description={product.shortDescription || product.description}

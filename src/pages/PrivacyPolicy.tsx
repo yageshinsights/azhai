@@ -4,7 +4,7 @@ import SEOHead from '@/components/SEOHead';
 
 export default function PrivacyPolicy() {
   return (
-    <div className="min-h-screen bg-[#FCFBF8] pt-24 pb-20 text-[#110B0E]">
+    <div className="min-h-screen bg-[#FCFBF8] pt-32 sm:pt-36 pb-20 text-[#110B0E]">
       <SEOHead
         title="Privacy & Data Protection Policy — Azhai Atelier"
         description="Learn how Azhai protects your personal data, payment coordinates, and tailoring measurements in compliance with Sri Lankan privacy standards."

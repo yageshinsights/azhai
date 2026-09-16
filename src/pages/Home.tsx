@@ -308,10 +308,10 @@ export default function Home() {
         </div>
 
         {/* Category Filter Pills */}
-        <div className="flex flex-wrap items-center justify-center gap-2 pb-10">
+        <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-8 justify-start sm:justify-center px-1">
           <button
             onClick={() => setSelectedCategory('all')}
-            className={`px-5 py-2 rounded-full text-xs font-semibold tracking-wide transition-all ${
+            className={`whitespace-nowrap shrink-0 px-5 py-2 rounded-full text-xs font-semibold tracking-wide transition-all ${
               selectedCategory === 'all'
                 ? 'bg-[#701626] text-white shadow-lg shadow-[#701626]/20 border border-[#C5A059]/50 scale-105'
                 : 'bg-white text-[#6D6268] hover:text-[#110B0E] border border-[#C5A059]/30 hover:border-[#701626]/40 shadow-sm'
@@ -323,7 +323,7 @@ export default function Home() {
             <button
               key={cat.slug}
               onClick={() => setSelectedCategory(cat.slug)}
-              className={`px-5 py-2 rounded-full text-xs font-semibold tracking-wide transition-all ${
+              className={`whitespace-nowrap shrink-0 px-5 py-2 rounded-full text-xs font-semibold tracking-wide transition-all ${
                 selectedCategory === cat.slug
                   ? 'bg-[#701626] text-white shadow-lg shadow-[#701626]/20 border border-[#C5A059]/50 scale-105'
                   : 'bg-white text-[#6D6268] hover:text-[#110B0E] border border-[#C5A059]/30 hover:border-[#701626]/40 shadow-sm'
@@ -379,7 +379,7 @@ export default function Home() {
         {/* 2-Column Wide Landscape Grid */}
         {allCategories.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 sm:gap-8">
-            {allCategories.map((col, idx) => {
+            {allCategories.map((col) => {
               const count = allProducts.filter((p) =>
                 p.categories.some((c) => c.slug === col.slug)
               ).length;
@@ -388,53 +388,51 @@ export default function Home() {
                 <Link
                   key={col.id || col.slug}
                   to={`/collections/${col.slug}`}
-                  className="group block relative rounded-[2rem] overflow-hidden aspect-[16/10] sm:aspect-[16/9] bg-[#110B0E] border border-[#C5A059]/40 shadow-lg hover:shadow-2xl hover:border-[#C5A059] transition-all duration-500"
+                  className="group block relative rounded-[2rem] overflow-hidden aspect-[16/10] sm:aspect-[16/9] bg-[#110B0E] border border-[#C5A059]/30 shadow-lg hover:shadow-2xl hover:border-[#C5A059] transition-all duration-500"
                 >
                   {/* Landscape Hero Image */}
                   <img
                     src={col.heroImage}
                     alt={col.name}
-                    className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-700 opacity-90 group-hover:opacity-100"
+                    className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-700 opacity-95 group-hover:opacity-100"
                   />
 
-                  {/* Atmospheric Gradient Overlays */}
-                  <div className="absolute inset-0 bg-gradient-to-t from-[#110B0E] via-[#110B0E]/40 to-black/20" />
-                  <div className="absolute inset-0 bg-gradient-to-r from-[#110B0E]/70 via-transparent to-transparent hidden sm:block" />
+                  {/* Atmospheric Bottom Gradient Scrim - Keeps upper 70% unobstructed */}
+                  <div className="absolute inset-0 bg-gradient-to-t from-[#110B0E]/90 via-[#110B0E]/40 to-transparent pointer-events-none" />
 
-                  {/* Top Bar Badges */}
-                  <div className="absolute top-4 left-4 right-4 flex items-center justify-between pointer-events-none">
-                    <span className="bg-[#701626]/90 backdrop-blur-md px-3 py-1 rounded-full text-[9px] text-[#DFBF77] font-bold uppercase tracking-[0.22em] border border-[#C5A059]/40 shadow-md">
-                      Edit 0{idx + 1}
-                    </span>
-                    <span className="bg-white/95 backdrop-blur-md px-3.5 py-1 rounded-full text-[8.5px] text-[#701626] font-bold uppercase tracking-[0.2em] shadow-md border border-[#C5A059]/40">
-                      {col.season || 'Curated Edit'}
-                    </span>
-                  </div>
+                  {/* Top Season Badge */}
+                  {col.season && (
+                    <div className="absolute top-4 right-4 pointer-events-none z-10">
+                      <span className="bg-[#110B0E]/60 backdrop-blur-md px-3.5 py-1 rounded-full text-[9px] text-[#DFBF77] font-medium uppercase tracking-[0.2em] border border-[#C5A059]/30 shadow-sm">
+                        {col.season}
+                      </span>
+                    </div>
+                  )}
 
                   {/* Bottom Content Area */}
-                  <div className="absolute bottom-0 left-0 right-0 p-5 sm:p-7 space-y-2 text-white">
-                    <div className="flex items-center gap-2">
-                      <span className="w-1.5 h-1.5 rounded-full bg-[#C5A059]" />
-                      <p className="text-[10px] uppercase tracking-[0.25em] text-[#DFBF77] font-bold">
-                        {count > 0 ? `${count} Silhouettes Handcrafted` : 'Atelier Release'}
+                  <div className="absolute bottom-0 left-0 right-0 p-5 sm:p-7 space-y-2 text-white z-10">
+                    {count > 0 && (
+                      <p className="text-[10px] uppercase tracking-[0.22em] text-[#DFBF77] font-medium">
+                        {count} Silhouettes Handcrafted
                       </p>
-                    </div>
+                    )}
 
                     <h3 className="font-display text-2xl sm:text-3xl lg:text-4xl font-bold group-hover:text-[#DFBF77] transition-colors leading-tight">
                       {col.name}
                     </h3>
 
-                    <p className="text-xs sm:text-sm text-white/80 font-light line-clamp-2 max-w-lg leading-relaxed">
-                      {col.description}
-                    </p>
+                    {col.description && (
+                      <p className="text-xs sm:text-sm text-white/80 font-light line-clamp-1 sm:line-clamp-2 max-w-lg leading-relaxed">
+                        {col.description}
+                      </p>
+                    )}
 
-                    <div className="pt-2 flex items-center justify-between">
-                      <span className="inline-flex items-center gap-2 text-xs font-bold text-[#DFBF77] uppercase tracking-[0.18em] group-hover:translate-x-1 transition-transform">
-                        <span>Explore Lookbook</span>
-                        <ArrowRight className="w-3.5 h-3.5" />
-                      </span>
-                      <span className="text-[10px] text-white/50 font-mono tracking-wider">
-                        azhai.lk/{col.slug}
+                    <div className="pt-2 flex items-center">
+                      <span className="inline-flex items-center gap-2 text-xs font-semibold text-[#DFBF77] uppercase tracking-[0.18em] group-hover:text-white transition-colors">
+                        <span className="border-b border-[#C5A059]/50 group-hover:border-white pb-0.5 transition-colors">
+                          Explore Lookbook
+                        </span>
+                        <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1.5 transition-transform" />
                       </span>
                     </div>
                   </div>
