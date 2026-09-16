@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Search, X, ArrowRight, Sparkles } from 'lucide-react';
 import { Link } from 'react-router-dom';
@@ -23,7 +23,25 @@ export default function SearchModal({ isOpen, onClose }: SearchModalProps) {
   const [query, setQuery] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
   const storeProducts = useAdminStore((state) => state.products);
+  const storeCategories = useAdminStore((state) => state.categories);
+  const storeTags = useAdminStore((state) => state.tags);
   const allProducts = Array.isArray(storeProducts) ? storeProducts : PRODUCTS;
+
+  const dynamicPopularSearches = useMemo(() => {
+    const list: string[] = [];
+    if (Array.isArray(storeCategories) && storeCategories.length > 0) {
+      storeCategories.forEach((c) => {
+        if (c.name && !list.includes(c.name)) list.push(c.name);
+      });
+    }
+    if (Array.isArray(storeTags) && storeTags.length > 0) {
+      storeTags.forEach((t) => {
+        const tagName = typeof t === 'string' ? t : (t as any)?.name;
+        if (tagName && !list.includes(tagName)) list.push(tagName);
+      });
+    }
+    return list.length >= 3 ? list.slice(0, 8) : POPULAR_SEARCHES;
+  }, [storeCategories, storeTags]);
 
   useEffect(() => {
     if (isOpen) {
@@ -92,7 +110,7 @@ export default function SearchModal({ isOpen, onClose }: SearchModalProps) {
                 <div className="space-y-3">
                   <p className="text-[10px] uppercase tracking-[0.25em] text-[#6D6268] font-bold">Trending Searches</p>
                   <div className="flex flex-wrap gap-2">
-                    {POPULAR_SEARCHES.map(item => (
+                    {dynamicPopularSearches.map(item => (
                       <button
                         key={item}
                         onClick={() => setQuery(item)}

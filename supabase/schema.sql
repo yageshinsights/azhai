@@ -483,3 +483,68 @@ BEGIN
 EXCEPTION WHEN OTHERS THEN NULL;
 END $$;
 
+-- ══════════════════════════════════════════════════════════════
+-- 9. PRODUCT REVIEWS, INQUIRIES & ABANDONED CARTS
+-- ══════════════════════════════════════════════════════════════
+CREATE TABLE IF NOT EXISTS public.product_reviews (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  product_name TEXT NOT NULL,
+  product_slug TEXT,
+  user_id UUID,
+  author_name TEXT NOT NULL,
+  location TEXT DEFAULT 'Colombo',
+  rating INT NOT NULL CHECK (rating >= 1 AND rating <= 5),
+  title TEXT,
+  comment TEXT NOT NULL,
+  fit TEXT DEFAULT 'True to Size' CHECK (fit IN ('True to Size', 'Runs Slightly Small', 'Runs Slightly Large')),
+  is_verified BOOLEAN DEFAULT true,
+  likes INT DEFAULT 0,
+  is_approved BOOLEAN DEFAULT true,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE public.product_reviews ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Public can view approved reviews" ON public.product_reviews;
+CREATE POLICY "Public can view approved reviews" ON public.product_reviews FOR SELECT USING (is_approved = true);
+DROP POLICY IF EXISTS "Public can submit reviews" ON public.product_reviews;
+CREATE POLICY "Public can submit reviews" ON public.product_reviews FOR INSERT WITH CHECK (true);
+DROP POLICY IF EXISTS "Public can update review likes" ON public.product_reviews;
+CREATE POLICY "Public can update review likes" ON public.product_reviews FOR UPDATE USING (true) WITH CHECK (true);
+
+CREATE TABLE IF NOT EXISTS public.inquiries (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name TEXT NOT NULL,
+  email TEXT NOT NULL,
+  phone TEXT,
+  topic TEXT NOT NULL,
+  message TEXT NOT NULL,
+  status TEXT DEFAULT 'unread' CHECK (status IN ('unread', 'read', 'in_progress', 'resolved')),
+  admin_notes TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE public.inquiries ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Anyone can submit inquiry" ON public.inquiries;
+CREATE POLICY "Anyone can submit inquiry" ON public.inquiries FOR INSERT WITH CHECK (true);
+DROP POLICY IF EXISTS "Admins can view and manage inquiries" ON public.inquiries;
+CREATE POLICY "Admins can view and manage inquiries" ON public.inquiries FOR ALL USING (true) WITH CHECK (true);
+
+CREATE TABLE IF NOT EXISTS public.abandoned_carts (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID,
+  customer_name TEXT NOT NULL,
+  customer_email TEXT NOT NULL UNIQUE,
+  items JSONB NOT NULL DEFAULT '[]'::jsonb,
+  total_value NUMERIC(10,2) NOT NULL DEFAULT 0.00,
+  email_sent BOOLEAN DEFAULT false,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE public.abandoned_carts ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Allow cart session management" ON public.abandoned_carts;
+CREATE POLICY "Allow cart session management" ON public.abandoned_carts FOR ALL USING (true) WITH CHECK (true);
+
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS family_profiles JSONB DEFAULT '[]'::jsonb;
+
+

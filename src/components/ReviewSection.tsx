@@ -1,6 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Star, CheckCircle2, ThumbsUp, Plus, X, MessageSquare, Sparkles } from 'lucide-react';
+import { supabase, isSupabaseConfigured } from '@/lib/supabase';
+import { useAuthStore } from '@/store/auth';
 
 interface Review {
   id: string;
@@ -58,12 +60,13 @@ const INITIAL_REVIEWS: Review[] = [
 ];
 
 export default function ReviewSection({ productName }: { productName: string }) {
+  const user = useAuthStore((s) => s.user);
   const [reviews, setReviews] = useState<Review[]>(INITIAL_REVIEWS);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [likedIds, setLikedIds] = useState<string[]>([]);
 
   // Form state
-  const [authorName, setAuthorName] = useState('');
+  const [authorName, setAuthorName] = useState(user?.fullName || '');
   const [location, setLocation] = useState('');
   const [rating, setRating] = useState(5);
   const [title, setTitle] = useState('');
@@ -71,22 +74,87 @@ export default function ReviewSection({ productName }: { productName: string }) 
   const [fit, setFit] = useState<'True to Size' | 'Runs Slightly Small' | 'Runs Slightly Large'>('True to Size');
   const [submitted, setSubmitted] = useState(false);
 
+  // Sync reviews from Supabase product_reviews table
+  useEffect(() => {
+    if (!isSupabaseConfigured() || !productName) return;
+
+    let isMounted = true;
+    async function loadReviews() {
+      try {
+        const slug = productName.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+        const { data, error } = await supabase
+          .from('product_reviews')
+          .select('*')
+          .or(`product_name.eq.${productName},product_slug.eq.${slug}`)
+          .eq('is_approved', true)
+          .order('created_at', { ascending: false });
+
+        if (error) {
+          console.warn('[Supabase Review Load Notice]:', error.message);
+          return;
+        }
+
+        if (isMounted && data && data.length > 0) {
+          const mapped: Review[] = data.map((r: any) => ({
+            id: r.id,
+            author: r.author_name,
+            location: r.location || 'Sri Lanka',
+            rating: r.rating,
+            date: r.created_at
+              ? new Date(r.created_at).toLocaleDateString('en-US', {
+                  month: 'short',
+                  day: 'numeric',
+                  year: 'numeric',
+                })
+              : 'Recently',
+            title: r.title || 'Azhai Couture Experience',
+            comment: r.comment,
+            fit: r.fit || 'True to Size',
+            verified: !!r.is_verified,
+            likes: r.likes || 0,
+          }));
+          setReviews(mapped);
+        }
+      } catch (err) {
+        console.warn('[Supabase Review Load Exception]:', err);
+      }
+    }
+
+    loadReviews();
+    return () => {
+      isMounted = false;
+    };
+  }, [productName]);
+
   const averageRating = (
-    reviews.reduce((acc, r) => acc + r.rating, 0) / reviews.length
+    reviews.reduce((acc, r) => acc + r.rating, 0) / (reviews.length || 1)
   ).toFixed(1);
 
   const handleLike = (id: string) => {
     if (likedIds.includes(id)) return;
     setLikedIds([...likedIds, id]);
     setReviews(reviews.map((r) => (r.id === id ? { ...r, likes: r.likes + 1 } : r)));
+
+    if (isSupabaseConfigured() && id.length > 30) {
+      (async () => {
+        try {
+          const currentReview = reviews.find((x) => x.id === id);
+          const nextLikes = (currentReview?.likes || 0) + 1;
+          await supabase.from('product_reviews').update({ likes: nextLikes }).eq('id', id);
+        } catch (err) {
+          console.warn('[Supabase Like Review Exception]:', err);
+        }
+      })();
+    }
   };
 
   const handleAddReview = (e: React.FormEvent) => {
     e.preventDefault();
     if (!authorName.trim() || !comment.trim()) return;
 
+    const newRevId = 'rev-' + Date.now();
     const newRev: Review = {
-      id: 'rev-' + Date.now(),
+      id: newRevId,
       author: authorName.trim(),
       location: location.trim() || 'Sri Lanka',
       rating,
@@ -100,10 +168,35 @@ export default function ReviewSection({ productName }: { productName: string }) 
 
     setReviews([newRev, ...reviews]);
     setSubmitted(true);
+
+    if (isSupabaseConfigured()) {
+      (async () => {
+        try {
+          const slug = productName.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+          await supabase.from('product_reviews').insert({
+            product_name: productName,
+            product_slug: slug,
+            user_id: user?.id && user.id.length > 30 ? user.id : null,
+            author_name: authorName.trim(),
+            location: location.trim() || 'Sri Lanka',
+            rating,
+            title: title.trim() || 'Azhai Couture Experience',
+            comment: comment.trim(),
+            fit,
+            is_verified: !!user,
+            likes: 0,
+            is_approved: true,
+          });
+        } catch (err) {
+          console.warn('[Supabase Add Review Exception]:', err);
+        }
+      })();
+    }
+
     setTimeout(() => {
       setSubmitted(false);
       setIsModalOpen(false);
-      setAuthorName('');
+      setAuthorName(user?.fullName || '');
       setLocation('');
       setTitle('');
       setComment('');

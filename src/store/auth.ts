@@ -177,12 +177,73 @@ export const useAuthStore = create<AuthState>()(
 
               const mappedWishlist: string[] = (wishlist || []).map((w: any) => w.product_slug);
 
+              // Fetch user orders from Supabase
+              const emailFilter = normalizedEmail ? `,customer_details->>email.ilike.${normalizedEmail}` : '';
+              const { data: dbOrders } = await supabase
+                .from('orders')
+                .select('*, order_items(*)')
+                .or(`user_id.eq.${su.id}${emailFilter}`)
+                .order('created_at', { ascending: false });
+
+              const mappedOrders: PlacedOrder[] = (dbOrders && dbOrders.length > 0)
+                ? dbOrders.map((o: any) => ({
+                    orderId: o.order_code,
+                    items: (o.order_items || []).map((item: any) => ({
+                      id: item.product_id || 0,
+                      name: item.product_name,
+                      price: item.price,
+                      image: item.image_url || '',
+                      quantity: item.quantity,
+                      size: item.size,
+                      tailoring: item.tailoring_details || undefined,
+                    })),
+                    subtotal: Number(o.subtotal),
+                    discount: Number(o.discount || 0),
+                    shipping: Number(o.shipping || 0),
+                    total: Number(o.total),
+                    coupon: o.coupon_code || undefined,
+                    giftNote: o.gift_note || undefined,
+                    customer: o.customer_details,
+                    deliveryMethod: o.delivery_method,
+                    paymentMethod: o.payment_method,
+                    placedAt: o.created_at,
+                    status: o.status,
+                    paymentStatus: o.payment_status,
+                    courierPartner: o.courier_partner || undefined,
+                    trackingNumber: o.tracking_number || undefined,
+                    adminNotes: o.admin_notes || undefined,
+                    bankTransferDetails:
+                      o.customer_details?.bank_transfer_details || o.bank_transfer_details || undefined,
+                    shippingBreakdown: o.shipping_breakdown || undefined,
+                  }))
+                : [];
+
+              const familyProfilesFromDb: FamilyMeasurementProfile[] =
+                profile?.family_profiles && Array.isArray(profile.family_profiles)
+                  ? profile.family_profiles
+                  : [];
+
               const sessionToken = sbData.session?.access_token || generateSessionToken();
 
               // Merge into local accounts list
               const existingAccounts = get().accounts;
               const accountIdx = existingAccounts.findIndex((a) => a.email.toLowerCase() === normalizedEmail);
               const passwordHash = await hashPassword(password);
+              const existingAccount = accountIdx >= 0 ? existingAccounts[accountIdx] : null;
+
+              // Merge Supabase orders with existing local orders
+              const localOrders = existingAccount?.orders || get().orders || [];
+              const mergedOrdersMap = new Map<string, PlacedOrder>();
+              mappedOrders.forEach((o) => mergedOrdersMap.set(o.orderId, o));
+              localOrders.forEach((o) => {
+                if (!mergedOrdersMap.has(o.orderId)) mergedOrdersMap.set(o.orderId, o);
+              });
+              const finalOrders = Array.from(mergedOrdersMap.values());
+
+              const finalFamilyProfiles =
+                familyProfilesFromDb.length > 0
+                  ? familyProfilesFromDb
+                  : existingAccount?.familyProfiles || get().familyProfiles || [];
 
               let updatedAccounts = [...existingAccounts];
               if (accountIdx >= 0) {
@@ -192,6 +253,8 @@ export const useAuthStore = create<AuthState>()(
                   addresses: mappedAddresses.length > 0 ? mappedAddresses : updatedAccounts[accountIdx].addresses,
                   wishlist: mappedWishlist.length > 0 ? mappedWishlist : updatedAccounts[accountIdx].wishlist,
                   passwordHash,
+                  orders: finalOrders,
+                  familyProfiles: finalFamilyProfiles,
                 };
               } else {
                 updatedAccounts.push({
@@ -199,13 +262,12 @@ export const useAuthStore = create<AuthState>()(
                   passwordHash,
                   user: userObj,
                   addresses: mappedAddresses,
-                  orders: get().orders || [],
+                  orders: finalOrders,
                   wishlist: mappedWishlist,
-                  familyProfiles: get().familyProfiles || [],
+                  familyProfiles: finalFamilyProfiles,
                 });
               }
 
-              const existingAccount = accountIdx >= 0 ? existingAccounts[accountIdx] : null;
               set({
                 user: userObj,
                 isAuthenticated: true,
@@ -213,8 +275,8 @@ export const useAuthStore = create<AuthState>()(
                 wishlist: mappedWishlist,
                 sessionToken,
                 accounts: updatedAccounts,
-                orders: existingAccount?.orders || get().orders || [],
-                familyProfiles: existingAccount?.familyProfiles || get().familyProfiles || [],
+                orders: finalOrders,
+                familyProfiles: finalFamilyProfiles,
               });
 
               return { success: true };
@@ -758,11 +820,13 @@ export const useAuthStore = create<AuthState>()(
           updatedAt: new Date().toISOString(),
         };
 
+        let finalProfiles: FamilyMeasurementProfile[] = [];
         set((state) => {
           const updatedProfiles: FamilyMeasurementProfile[] = profile.isDefault
             ? [...state.familyProfiles.map((p) => ({ ...p, isDefault: false })), newProf]
             : [...state.familyProfiles, newProf];
 
+          finalProfiles = updatedProfiles;
           const currentUser = state.user;
           return {
             familyProfiles: updatedProfiles,
@@ -775,9 +839,24 @@ export const useAuthStore = create<AuthState>()(
               : state.accounts,
           };
         });
+
+        const currentUser = get().user;
+        if (isSupabaseConfigured() && currentUser && isUUID(currentUser.id)) {
+          (async () => {
+            try {
+              await supabase
+                .from('profiles')
+                .update({ family_profiles: finalProfiles })
+                .eq('id', currentUser.id);
+            } catch (err) {
+              console.warn('[Supabase Sync Family Profiles Warning]:', err);
+            }
+          })();
+        }
       },
 
       updateFamilyProfile: (id, updates) => {
+        let finalProfiles: FamilyMeasurementProfile[] = [];
         set((state) => {
           let updated = state.familyProfiles.map((p) =>
             p.id === id ? { ...p, ...updates, updatedAt: new Date().toISOString() } : p
@@ -785,6 +864,7 @@ export const useAuthStore = create<AuthState>()(
           if (updates.isDefault) {
             updated = updated.map((p) => (p.id === id ? p : { ...p, isDefault: false }));
           }
+          finalProfiles = updated;
           const currentUser = state.user;
           return {
             familyProfiles: updated,
@@ -797,11 +877,27 @@ export const useAuthStore = create<AuthState>()(
               : state.accounts,
           };
         });
+
+        const currentUser = get().user;
+        if (isSupabaseConfigured() && currentUser && isUUID(currentUser.id)) {
+          (async () => {
+            try {
+              await supabase
+                .from('profiles')
+                .update({ family_profiles: finalProfiles })
+                .eq('id', currentUser.id);
+            } catch (err) {
+              console.warn('[Supabase Sync Family Profiles Warning]:', err);
+            }
+          })();
+        }
       },
 
       deleteFamilyProfile: (id) => {
+        let finalProfiles: FamilyMeasurementProfile[] = [];
         set((state) => {
           const updated = state.familyProfiles.filter((p) => p.id !== id);
+          finalProfiles = updated;
           const currentUser = state.user;
           return {
             familyProfiles: updated,
@@ -814,14 +910,30 @@ export const useAuthStore = create<AuthState>()(
               : state.accounts,
           };
         });
+
+        const currentUser = get().user;
+        if (isSupabaseConfigured() && currentUser && isUUID(currentUser.id)) {
+          (async () => {
+            try {
+              await supabase
+                .from('profiles')
+                .update({ family_profiles: finalProfiles })
+                .eq('id', currentUser.id);
+            } catch (err) {
+              console.warn('[Supabase Sync Family Profiles Warning]:', err);
+            }
+          })();
+        }
       },
 
       setDefaultFamilyProfile: (id) => {
+        let finalProfiles: FamilyMeasurementProfile[] = [];
         set((state) => {
           const updated = state.familyProfiles.map((p) => ({
             ...p,
             isDefault: p.id === id,
           }));
+          finalProfiles = updated;
           const currentUser = state.user;
           return {
             familyProfiles: updated,
@@ -834,6 +946,20 @@ export const useAuthStore = create<AuthState>()(
               : state.accounts,
           };
         });
+
+        const currentUser = get().user;
+        if (isSupabaseConfigured() && currentUser && isUUID(currentUser.id)) {
+          (async () => {
+            try {
+              await supabase
+                .from('profiles')
+                .update({ family_profiles: finalProfiles })
+                .eq('id', currentUser.id);
+            } catch (err) {
+              console.warn('[Supabase Sync Family Profiles Warning]:', err);
+            }
+          })();
+        }
       },
 
       addOrder: (order) => {

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Tag, 
@@ -21,6 +21,7 @@ import {
 import AdminLayout from '@/components/admin/AdminLayout';
 import { useAdminStore, type Coupon } from '@/store/admin';
 import CouponModal from '@/components/admin/CouponModal';
+import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import { 
   sendBrevoEmail, 
   buildAbandonedCartEmailHtml,
@@ -35,7 +36,7 @@ interface AbandonedCart {
   id: string;
   customerName: string;
   customerEmail: string;
-  items: { name: string; price: string; size: string; image: string }[];
+  items: { name: string; size: string; price: string; image: string }[];
   totalValue: number;
   abandonedAt: string;
   emailSent: boolean;
@@ -44,37 +45,37 @@ interface AbandonedCart {
 const SAMPLE_ABANDONED_CARTS: AbandonedCart[] = [
   {
     id: 'cart-1',
-    customerName: 'Ananya Varma',
-    customerEmail: 'ananya.v@gmail.com',
+    customerName: 'Ananya S.',
+    customerEmail: 'ananya.desilva@gmail.com',
     items: [
-      { name: 'Ivory Hand-Painted Lotus Organza Saree', price: 'LKR 18,500', size: 'Free Size', image: 'https://images.unsplash.com/photo-1610030469983-98e550d6193c?auto=format&fit=crop&w=600&q=80' },
-      { name: 'Pure Mulberry Silk Shawl (Crimson Gold)', price: 'LKR 8,900', size: 'Standard', image: 'https://images.unsplash.com/photo-1617627143750-d86bc21e42bb?auto=format&fit=crop&w=600&q=80' }
+      { name: 'Sacred Crimson Kanjivaram Silk Saree', size: 'Standard (6.25m)', price: 'LKR 48,500', image: 'https://images.unsplash.com/photo-1610030469983-98e550d6193c?auto=format&fit=crop&w=400&q=80' },
+      { name: 'Gold Bullion Latkan Tassels Add-on', size: 'Pair', price: 'LKR 2,400', image: 'https://images.unsplash.com/photo-1583391733956-3750e0ff4e8b?auto=format&fit=crop&w=400&q=80' },
     ],
-    totalValue: 27400,
+    totalValue: 50900,
     abandonedAt: '2 hours ago',
-    emailSent: false
+    emailSent: false,
   },
   {
     id: 'cart-2',
-    customerName: 'Divya Sivaram',
-    customerEmail: 'divya.s@yahoo.com',
+    customerName: 'Dilhani P.',
+    customerEmail: 'dilhani.perera@yahoo.com',
     items: [
-      { name: 'Sacred Crimson Kanjivaram Silk Saree', price: 'LKR 26,500', size: 'Free Size', image: 'https://images.unsplash.com/photo-1583391733956-3750e0ff4e8b?auto=format&fit=crop&w=600&q=80' }
+      { name: 'Ivory Lotus Handloom Kurta & Shawl Set', size: 'M', price: 'LKR 32,000', image: 'https://images.unsplash.com/photo-1594938298603-c8148c4dae35?auto=format&fit=crop&w=400&q=80' },
     ],
-    totalValue: 26500,
+    totalValue: 32000,
     abandonedAt: '6 hours ago',
-    emailSent: true
+    emailSent: true,
   },
   {
     id: 'cart-3',
-    customerName: 'Kavitha Nathan',
-    customerEmail: 'kavitha.n@hotmail.com',
+    customerName: 'Menaka J.',
+    customerEmail: 'menaka.j@outlook.com',
     items: [
-      { name: 'Emerald Handloom Anarkali Kurti (Custom)', price: 'LKR 14,200', size: 'Custom Fit', image: 'https://images.unsplash.com/photo-1567401893414-76b7b1e5a7a5?auto=format&fit=crop&w=600&q=80' }
+      { name: 'Peacock Emerald Banarasi Brocade Saree', size: 'Standard (6.25m)', price: 'LKR 54,000', image: 'https://images.unsplash.com/photo-1617627143750-d86bc21e42bb?auto=format&fit=crop&w=400&q=80' },
     ],
-    totalValue: 14200,
+    totalValue: 54000,
     abandonedAt: '1 day ago',
-    emailSent: false
+    emailSent: false,
   }
 ];
 
@@ -93,6 +94,58 @@ export default function AdminMarketing() {
   // Test Email State
   const [testEmailAddress, setTestEmailAddress] = useState('yagesh.xtreme@gmail.com');
   const [sendingTestType, setSendingTestType] = useState<string | null>(null);
+
+  // Sync live abandoned carts from Supabase
+  useEffect(() => {
+    if (!isSupabaseConfigured()) return;
+    let isMounted = true;
+
+    async function fetchAbandoned() {
+      try {
+        const { data, error } = await supabase
+          .from('abandoned_carts')
+          .select('*')
+          .order('updated_at', { ascending: false });
+
+        if (error) {
+          console.warn('[Supabase Abandoned Carts Warning]:', error.message);
+          return;
+        }
+
+        if (isMounted && data && data.length > 0) {
+          const mapped: AbandonedCart[] = data.map((d: any) => ({
+            id: d.id,
+            customerName: d.customer_name || 'Valued Patron',
+            customerEmail: d.customer_email,
+            items: (d.items || []).map((i: any) => ({
+              name: i.name || 'Bespoke Garment',
+              size: i.size || (i.tailoring ? 'Tailored' : 'Standard'),
+              price: typeof i.price === 'number' ? `LKR ${i.price.toLocaleString('en-LK')}` : i.price,
+              image: i.image || '',
+            })),
+            totalValue: Number(d.total_value) || 0,
+            abandonedAt: d.updated_at
+              ? new Date(d.updated_at).toLocaleDateString('en-US', {
+                  month: 'short',
+                  day: 'numeric',
+                  hour: '2-digit',
+                  minute: '2-digit',
+                })
+              : 'Recently',
+            emailSent: !!d.email_sent,
+          }));
+          setAbandonedCarts(mapped);
+        }
+      } catch (e) {
+        console.warn('[Supabase Fetch Abandoned Carts Exception]:', e);
+      }
+    }
+
+    fetchAbandoned();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const showToast = (msg: string) => {
     setSavedToast(msg);
@@ -130,6 +183,11 @@ export default function AdminMarketing() {
     });
     
     setAbandonedCarts(prev => prev.map(c => c.id === cart.id ? { ...c, emailSent: true } : c));
+
+    if (isSupabaseConfigured() && cart.id.length > 30) {
+      supabase.from('abandoned_carts').update({ email_sent: true }).eq('id', cart.id).then();
+    }
+
     setSendingCartId(null);
     showToast(`Recovery email dispatched to ${cart.customerEmail}!`);
   };

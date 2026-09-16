@@ -1,6 +1,9 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import type { TailoringCartData } from '@/lib/tailoring';
+import { supabase, isSupabaseConfigured } from '@/lib/supabase';
+import { useAuthStore } from '@/store/auth';
+import { isUUID } from '@/lib/auth-utils';
 
 export interface CartItem {
   id: number;
@@ -10,6 +13,43 @@ export interface CartItem {
   quantity: number;
   size?: string;
   tailoring?: TailoringCartData; // Present only for custom tailored items
+}
+
+let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+
+function scheduleAbandonedCartSync() {
+  if (debounceTimer) clearTimeout(debounceTimer);
+  debounceTimer = setTimeout(async () => {
+    try {
+      if (!isSupabaseConfigured()) return;
+      const user = useAuthStore.getState().user;
+      if (!user || !user.email) return;
+
+      const items = useCartStore.getState().items;
+      const total = useCartStore.getState().totalPrice();
+      const email = user.email.toLowerCase().trim();
+
+      if (items.length === 0) {
+        await supabase.from('abandoned_carts').delete().eq('customer_email', email);
+        return;
+      }
+
+      await supabase.from('abandoned_carts').upsert(
+        {
+          user_id: user.id && isUUID(user.id) ? user.id : null,
+          customer_name: user.fullName || 'Patron',
+          customer_email: email,
+          items: items,
+          total_value: total,
+          email_sent: false,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: 'customer_email' }
+      );
+    } catch (err) {
+      console.warn('[Supabase Abandoned Cart Sync Exception]:', err);
+    }
+  }, 1500);
 }
 
 export interface PlacedOrder {
@@ -136,22 +176,43 @@ export const useCartStore = create<CartStore>()(
         } else {
           set((state) => ({ items: [...state.items, cleanItem], isOpen: true }));
         }
+        scheduleAbandonedCartSync();
       },
-      removeItem: (id, size) =>
+      removeItem: (id, size) => {
         set((state) => ({
           items: state.items.filter((i) => !(i.id === id && (size === undefined || i.size === size))),
-        })),
-      updateQuantity: (id, size, qty) =>
+        }));
+        scheduleAbandonedCartSync();
+      },
+      updateQuantity: (id, size, qty) => {
         set((state) => ({
           items: state.items.map((i) =>
             i.id === id && (size === undefined || i.size === size)
               ? { ...i, quantity: Math.max(1, Math.round(qty)) }
               : i
           ),
-        })),
+        }));
+        scheduleAbandonedCartSync();
+      },
       toggleCart: () => set((state) => ({ isOpen: !state.isOpen })),
       setCartOpen: (open) => set({ isOpen: open }),
-      clearCart: () => set({ items: [] }),
+      clearCart: () => {
+        set({ items: [] });
+        if (isSupabaseConfigured()) {
+          try {
+            const user = useAuthStore.getState().user;
+            if (user?.email) {
+              supabase
+                .from('abandoned_carts')
+                .delete()
+                .eq('customer_email', user.email.toLowerCase().trim())
+                .then();
+            }
+          } catch (err) {
+            console.warn('[Supabase Clear Abandoned Cart Exception]:', err);
+          }
+        }
+      },
       setLastOrder: (order) => set({ lastOrder: order }),
       totalItems: () => get().items.reduce((sum, i) => sum + (Number(i.quantity) || 0), 0),
       totalPrice: () =>

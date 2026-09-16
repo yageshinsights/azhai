@@ -6,6 +6,7 @@ import SEOHead from '@/components/SEOHead';
 import { useAdminStore, cleanWhatsAppDigits } from '@/store/admin';
 import { STORE_ADDRESS_FULL, STORE_PHONE, STORE_SUPPORT_EMAIL } from '@/lib/constants';
 import { sendBrevoEmail } from '@/lib/brevo';
+import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 
 function escapeHtml(str: string): string {
   return str
@@ -64,6 +65,27 @@ export default function Contact() {
         createdAt: new Date().toISOString(),
       });
       localStorage.setItem('azhai-inquiries', JSON.stringify(list));
+
+      // Persist inquiry in Supabase database
+      if (isSupabaseConfigured()) {
+        (async () => {
+          try {
+            const { error } = await supabase
+              .from('inquiries')
+              .insert({
+                name: name.trim(),
+                email: email.trim(),
+                phone: phone.trim() || null,
+                topic: topic.trim(),
+                message: message.trim(),
+                status: 'unread',
+              });
+            if (error) console.warn('[Supabase Inquiry Insert Warning]:', error.message);
+          } catch (err) {
+            console.warn('[Supabase Inquiry Insert Exception]:', err);
+          }
+        })();
+      }
 
       // Sanitize fields before embedding into HTML email to prevent injection attacks
       const safeName = escapeHtml(name.trim());

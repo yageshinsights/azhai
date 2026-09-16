@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { useCartStore } from '@/store/cart';
 import { useAuthStore } from '@/store/auth';
+import { useAdminStore } from '@/store/admin';
 import { formatLKR, formatMeasurement } from '@/lib/tailoring';
 import LotusIcon from './LotusIcon';
 
@@ -232,12 +233,34 @@ export default function BlouseCustomizer() {
 
   const [isAdded, setIsAdded] = useState(false);
 
-  // Price Calculation
-  const basePrice = 3800; // Base master tailoring
-  const fabricPrice = 2400; // Handloom / raw silk
+  // Dynamic Tailoring Data from Supabase/Store
+  const storeFabrics = useAdminStore((s) => s.tailoringFabrics) || [];
+  const storeDressTypes = useAdminStore((s) => s.dressTypes) || [];
+
+  const blouseDressType = useMemo(() => {
+    return storeDressTypes.find(
+      (d) => d.slug === 'saree-blouse' || d.name?.toLowerCase().includes('blouse')
+    );
+  }, [storeDressTypes]);
+
+  const matchedDbFabric = useMemo(() => {
+    if (!storeFabrics || storeFabrics.length === 0) return null;
+    return (
+      storeFabrics.find(
+        (f) =>
+          f.name?.toLowerCase().includes(selectedFabric.name.toLowerCase().split(' ')[0]) ||
+          f.slug?.includes(selectedFabric.id)
+      ) || storeFabrics[0]
+    );
+  }, [storeFabrics, selectedFabric]);
+
+  // Price Calculation linked to live database values
+  const basePrice = blouseDressType?.stitchingFee || 3800; // Base master tailoring
+  const fabricPrice = matchedDbFabric?.pricePerUnit || 2400; // Handloom / raw silk
   const latkanPrice = hasLatkanTassels ? 650 : 0;
   const pearlPrice = hasPearlPiping ? 950 : 0;
   const totalPrice = basePrice + fabricPrice + latkanPrice + pearlPrice;
+  const activeLeadTime = blouseDressType?.leadTime || '5–7 working days';
 
   // Handle Quick Load Family Profile
   const handleLoadFamilyProfile = (profId: string) => {
@@ -265,8 +288,8 @@ export default function BlouseCustomizer() {
       quantity: 1,
       size: selectedSize,
       tailoring: {
-        dressTypeName: 'Bespoke Saree Blouse',
-        dressTypeSlug: 'saree-blouse',
+        dressTypeName: blouseDressType?.name || 'Bespoke Saree Blouse',
+        dressTypeSlug: blouseDressType?.slug || 'saree-blouse',
         fabricName: `${selectedFabric.name} with ${selectedSleeve.name}`,
         fabricPrice: fabricPrice,
         stitchingFee: basePrice + latkanPrice + pearlPrice,
@@ -278,7 +301,7 @@ export default function BlouseCustomizer() {
           sleeveLength: customMeasurements.sleeveLength,
           shoulderWidth: customMeasurements.shoulderWidth,
         },
-        leadTime: '5–7 working days',
+        leadTime: activeLeadTime,
       },
     });
 

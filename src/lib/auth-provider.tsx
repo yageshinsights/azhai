@@ -95,6 +95,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             preferences: profile.preferences || { newsletter: true, smsAlerts: true },
           },
           isAuthenticated: true,
+          ...(profile.family_profiles && Array.isArray(profile.family_profiles)
+            ? { familyProfiles: profile.family_profiles }
+            : {}),
         });
       }
 
@@ -130,6 +133,62 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         useAuthStore.setState({
           wishlist: wishlist.map((w) => w.product_slug),
         });
+      }
+
+      // 4. Fetch Customer Orders
+      if (user.id || user.email) {
+        const emailFilter = user.email ? `,customer_details->>email.ilike.${user.email}` : '';
+        const { data: dbOrders, error: ordersErr } = await supabase
+          .from('orders')
+          .select('*, order_items(*)')
+          .or(`user_id.eq.${user.id}${emailFilter}`)
+          .order('created_at', { ascending: false });
+
+        if (ordersErr) {
+          console.warn('[AuthProvider Sync Orders Warning]:', ordersErr.message);
+        } else if (dbOrders && dbOrders.length > 0) {
+          const mappedOrders = dbOrders.map((o: any) => ({
+            orderId: o.order_code,
+            items: (o.order_items || []).map((item: any) => ({
+              id: item.product_id || 0,
+              name: item.product_name,
+              price: item.price,
+              image: item.image_url || '',
+              quantity: item.quantity,
+              size: item.size,
+              tailoring: item.tailoring_details || undefined,
+            })),
+            subtotal: Number(o.subtotal),
+            discount: Number(o.discount || 0),
+            shipping: Number(o.shipping || 0),
+            total: Number(o.total),
+            coupon: o.coupon_code || undefined,
+            giftNote: o.gift_note || undefined,
+            customer: o.customer_details,
+            deliveryMethod: o.delivery_method,
+            paymentMethod: o.payment_method,
+            placedAt: o.created_at,
+            status: o.status,
+            paymentStatus: o.payment_status,
+            courierPartner: o.courier_partner || undefined,
+            trackingNumber: o.tracking_number || undefined,
+            adminNotes: o.admin_notes || undefined,
+            bankTransferDetails:
+              o.customer_details?.bank_transfer_details || o.bank_transfer_details || undefined,
+            shippingBreakdown: o.shipping_breakdown || undefined,
+          }));
+
+          const currentOrders = useAuthStore.getState().orders || [];
+          const mergedMap = new Map<string, any>();
+          mappedOrders.forEach((o: any) => mergedMap.set(o.orderId, o));
+          currentOrders.forEach((o: any) => {
+            if (!mergedMap.has(o.orderId)) {
+              mergedMap.set(o.orderId, o);
+            }
+          });
+
+          useAuthStore.setState({ orders: Array.from(mergedMap.values()) });
+        }
       }
     } catch (err) {
       console.error('[AuthProvider Sync Error]:', err);
