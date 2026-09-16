@@ -825,3 +825,394 @@ export function buildPasswordResetEmailHtml(params: {
   `;
   return wrapEmailLayout('Reset Your Azhai Password', body);
 }
+
+// ─────────────────────────────────────────────────────────────
+// 12. 🏦 BANK DEPOSIT SLIP SUBMITTED (CUSTOMER RECEIPT)
+// ─────────────────────────────────────────────────────────────
+export function buildBankSlipReceivedCustomerHtml(params: {
+  orderId: string;
+  customerName: string;
+  total: number;
+  bankName: string;
+  referenceNumber?: string;
+  slipUrl?: string;
+}): string {
+  const firstName = params.customerName ? params.customerName.split(' ')[0] : 'Valued Patron';
+  const refDisplay = params.referenceNumber ? `<strong style="color: #701626;">${params.referenceNumber}</strong>` : 'Attached Deposit Slip';
+
+  const body = `
+    <div style="text-align: center; margin-bottom: 24px;">
+      <span style="background-color: rgba(197, 160, 89, 0.15); color: #701626; font-size: 10px; font-weight: bold; text-transform: uppercase; letter-spacing: 2px; padding: 4px 14px; border-radius: 20px; border: 1px solid #DFBF77;">
+        Deposit Slip Received
+      </span>
+      <h2 style="font-family: Georgia, serif; color: #110B0E; font-size: 24px; margin: 12px 0 6px 0;">We're Verifying Your Transfer</h2>
+      <p style="color: #6D6268; font-size: 13.5px; margin: 0; line-height: 1.6;">
+        Dear ${firstName}, thank you for submitting your bank transfer slip for Order <strong>#${params.orderId}</strong>.
+      </p>
+    </div>
+
+    <div style="background-color: #FCFBF8; border-radius: 18px; border: 1px solid #DFBF77; padding: 22px; margin-bottom: 24px;">
+      <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+        <tr>
+          <td style="padding: 6px 0; color: #6D6268;">Order ID:</td>
+          <td style="padding: 6px 0; font-weight: bold; color: #110B0E; text-align: right;">#${params.orderId}</td>
+        </tr>
+        <tr>
+          <td style="padding: 6px 0; color: #6D6268;">Amount Deposited:</td>
+          <td style="padding: 6px 0; font-weight: bold; color: #701626; text-align: right; font-size: 15px;">LKR ${params.total.toLocaleString('en-US')}</td>
+        </tr>
+        <tr>
+          <td style="padding: 6px 0; color: #6D6268;">Target Bank:</td>
+          <td style="padding: 6px 0; font-weight: bold; color: #110B0E; text-align: right;">${params.bankName}</td>
+        </tr>
+        <tr>
+          <td style="padding: 6px 0; color: #6D6268;">Reference / Note:</td>
+          <td style="padding: 6px 0; text-align: right;">${refDisplay}</td>
+        </tr>
+      </table>
+
+      ${params.slipUrl ? `
+        <div style="margin-top: 16px; padding-top: 16px; border-top: 1px dashed #DFBF77; text-align: center;">
+          <p style="font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: #6D6268; margin-bottom: 8px; font-weight: bold;">Submitted Slip Document</p>
+          <a href="${params.slipUrl}" target="_blank" style="display: inline-block; font-size: 11.5px; color: #701626; font-weight: bold; text-decoration: underline;">
+            View Uploaded Deposit Receipt ↗
+          </a>
+        </div>
+      ` : ''}
+    </div>
+
+    <div style="background-color: rgba(112, 22, 38, 0.04); border-radius: 14px; padding: 16px; margin-bottom: 24px; text-align: center;">
+      <p style="font-size: 12px; color: #701626; margin: 0; line-height: 1.6; font-weight: 500;">
+        ⏱ Our finance concierge cross-verifies bank statements every <strong>2 to 4 business hours</strong>. You will receive an instant confirmation as soon as your payment is reconciled!
+      </p>
+    </div>
+
+    <div style="text-align: center;">
+      <a href="${STORE_URL}/order-success/${params.orderId}" style="display: inline-block; background: linear-gradient(135deg, #701626 0%, #8E1E34 100%); color: #ffffff; font-size: 11.5px; font-weight: bold; text-transform: uppercase; letter-spacing: 2px; padding: 13px 28px; border-radius: 12px; text-decoration: none;">
+        Track Order Status →
+      </a>
+    </div>
+  `;
+  return wrapEmailLayout(`Deposit Slip Received for #${params.orderId}`, body);
+}
+
+// ─────────────────────────────────────────────────────────────
+// 13. 🔔 BANK DEPOSIT SLIP SUBMITTED (ADMIN ALERT)
+// ─────────────────────────────────────────────────────────────
+export function buildBankSlipAdminAlertHtml(params: {
+  orderId: string;
+  customerName: string;
+  customerEmail: string;
+  customerPhone?: string;
+  total: number;
+  bankName: string;
+  referenceNumber?: string;
+  slipUrl?: string;
+}): string {
+  const body = `
+    <div style="border-bottom: 2px solid #701626; padding-bottom: 12px; margin-bottom: 18px;">
+      <span style="background: #701626; color: #DFBF77; font-size: 10px; font-weight: bold; text-transform: uppercase; letter-spacing: 2px; padding: 3px 10px; border-radius: 6px;">
+        Action Required
+      </span>
+      <h2 style="color: #701626; margin: 10px 0 4px 0; font-size: 20px;">Bank Slip Uploaded: Order #${params.orderId}</h2>
+      <p style="color: #6D6268; margin: 0; font-size: 13px;">A patron has uploaded a bank transfer slip for verification.</p>
+    </div>
+
+    <table style="width: 100%; border-collapse: collapse; font-size: 13.5px; margin-bottom: 20px;">
+      <tr>
+        <td style="padding: 7px 0; color: #6D6268; width: 140px;"><strong>Order ID:</strong></td>
+        <td style="padding: 7px 0; color: #110B0E; font-weight: bold;">#${params.orderId}</td>
+      </tr>
+      <tr>
+        <td style="padding: 7px 0; color: #6D6268;"><strong>Customer:</strong></td>
+        <td style="padding: 7px 0; color: #110B0E;">${params.customerName} (${params.customerEmail})</td>
+      </tr>
+      <tr>
+        <td style="padding: 7px 0; color: #6D6268;"><strong>Phone:</strong></td>
+        <td style="padding: 7px 0; color: #110B0E;">${params.customerPhone || 'Not provided'}</td>
+      </tr>
+      <tr>
+        <td style="padding: 7px 0; color: #6D6268;"><strong>Deposited Amount:</strong></td>
+        <td style="padding: 7px 0; color: #701626; font-weight: bold; font-size: 16px;">LKR ${params.total.toLocaleString('en-US')}</td>
+      </tr>
+      <tr>
+        <td style="padding: 7px 0; color: #6D6268;"><strong>Credited Bank:</strong></td>
+        <td style="padding: 7px 0; color: #110B0E;">${params.bankName}</td>
+      </tr>
+      <tr>
+        <td style="padding: 7px 0; color: #6D6268;"><strong>Bank Reference:</strong></td>
+        <td style="padding: 7px 0; color: #701626; font-weight: bold;">${params.referenceNumber || 'None entered'}</td>
+      </tr>
+    </table>
+
+    ${params.slipUrl ? `
+      <div style="background: #ffffff; border: 1px solid #E6DEC9; border-radius: 12px; padding: 16px; margin-bottom: 20px; text-align: center;">
+        <p style="font-size: 12px; font-weight: bold; color: #701626; margin: 0 0 10px 0;">Attached Slip Receipt</p>
+        <a href="${params.slipUrl}" target="_blank" style="display: inline-block; background: #701626; color: #DFBF77; padding: 10px 20px; font-size: 11.5px; text-decoration: none; border-radius: 8px; font-weight: bold;">
+          Open / Download Slip Document ↗
+        </a>
+      </div>
+    ` : ''}
+
+    <div style="text-align: center; margin-top: 20px;">
+      <a href="${STORE_URL}/admin/orders" style="display: inline-block; background: linear-gradient(135deg, #701626 0%, #8E1E34 100%); color: #ffffff; font-size: 12px; font-weight: bold; text-transform: uppercase; letter-spacing: 2px; padding: 13px 26px; border-radius: 10px; text-decoration: none;">
+        Open Admin Order to Verify & Mark Paid →
+      </a>
+    </div>
+  `;
+  return wrapEmailLayout(`Action: Bank Slip Uploaded for #${params.orderId}`, body);
+}
+
+// ─────────────────────────────────────────────────────────────
+// 14. 💳 DEDICATED BANK PAYMENT VERIFIED & CLEARED RECEIPT
+// ─────────────────────────────────────────────────────────────
+export function buildBankPaymentVerifiedHtml(params: {
+  orderId: string;
+  customerName: string;
+  total: number;
+  items: { name: string; size?: string; quantity: number; price: string; image?: string; tailoring?: any }[];
+  deliveryMethod: string;
+  adminNotes?: string;
+}): string {
+  const firstName = params.customerName ? params.customerName.split(' ')[0] : 'Valued Patron';
+
+  const itemsRows = params.items.map((item) => `
+    <tr>
+      <td style="padding: 12px 0; border-bottom: 1px solid rgba(197, 160, 89, 0.2);">
+        <table style="width: 100%; border-collapse: collapse;">
+          <tr>
+            ${item.image ? `
+              <td style="width: 48px; vertical-align: top; padding-right: 12px;">
+                <img src="${item.image}" alt="${item.name}" style="width: 48px; height: 60px; object-fit: cover; border-radius: 8px; border: 1px solid #DFBF77;" />
+              </td>
+            ` : ''}
+            <td style="vertical-align: top;">
+              <p style="margin: 0; font-weight: bold; color: #110B0E; font-size: 13px;">${item.name}</p>
+              ${item.size ? `<span style="font-size: 11px; color: #6D6268;">Size: <strong>${item.size}</strong></span>` : ''}
+              ${item.tailoring ? `<div style="font-size: 10px; color: #701626; font-weight: bold; margin-top: 2px;">✂️ Bespoke Tailored Garment</div>` : ''}
+              <p style="margin: 3px 0 0 0; font-size: 11px; color: #6D6268;">Qty: ${item.quantity}</p>
+            </td>
+            <td style="vertical-align: top; text-align: right; font-weight: bold; color: #110B0E; font-size: 13px;">
+              ${item.price}
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  `).join('');
+
+  const body = `
+    <div style="text-align: center; margin-bottom: 24px;">
+      <span style="background-color: #E8F5E9; color: #2E7D32; font-size: 10.5px; font-weight: bold; text-transform: uppercase; letter-spacing: 2px; padding: 5px 16px; border-radius: 20px; border: 1px solid #A5D6A7;">
+        ✓ Payment Verified & Cleared
+      </span>
+      <h2 style="font-family: Georgia, serif; color: #110B0E; font-size: 25px; margin: 14px 0 6px 0;">Your Order is Fully Confirmed</h2>
+      <p style="color: #6D6268; font-size: 13.5px; margin: 0; line-height: 1.6;">
+        Dear ${firstName}, your direct bank deposit has been successfully verified by the Azhai finance team.
+      </p>
+    </div>
+
+    <div style="background-color: #FCFBF8; border-radius: 18px; border: 1px solid #DFBF77; padding: 22px; margin-bottom: 24px;">
+      <div style="display: flex; justify-content: space-between; border-bottom: 1px solid #DFBF77; padding-bottom: 12px; margin-bottom: 14px;">
+        <span style="font-size: 12px; color: #6D6268; text-transform: uppercase; letter-spacing: 1px;">Order Reference</span>
+        <strong style="font-size: 13px; color: #701626;">#${params.orderId}</strong>
+      </div>
+      
+      <table style="width: 100%; border-collapse: collapse;">
+        ${itemsRows}
+      </table>
+
+      <div style="margin-top: 16px; padding-top: 14px; border-top: 2px solid #701626; text-align: right;">
+        <span style="font-size: 11px; text-transform: uppercase; letter-spacing: 1.5px; color: #6D6268; font-weight: bold;">Cleared Total: </span>
+        <strong style="font-size: 18px; color: #701626; font-family: Georgia, serif; margin-left: 8px;">LKR ${params.total.toLocaleString('en-US')}</strong>
+      </div>
+    </div>
+
+    ${params.adminNotes ? `
+      <div style="background-color: #F7F4EE; border-radius: 12px; padding: 14px 18px; margin-bottom: 22px; border-left: 3px solid #C5A059;">
+        <p style="font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: #701626; font-weight: bold; margin: 0 0 4px 0;">Atelier Note</p>
+        <p style="font-size: 12.5px; color: #110B0E; margin: 0; line-height: 1.5;">${params.adminNotes}</p>
+      </div>
+    ` : ''}
+
+    <div style="text-align: center; margin-top: 24px;">
+      <a href="${STORE_URL}/order-success/${params.orderId}" style="display: inline-block; background: linear-gradient(135deg, #701626 0%, #8E1E34 100%); color: #ffffff; font-size: 12px; font-weight: bold; text-transform: uppercase; letter-spacing: 2px; padding: 14px 28px; border-radius: 12px; text-decoration: none; box-shadow: 0 4px 15px rgba(112, 22, 38, 0.2);">
+        Track Production & Dispatch →
+      </a>
+    </div>
+  `;
+  return wrapEmailLayout(`Payment Cleared: Order #${params.orderId}`, body);
+}
+
+// ─────────────────────────────────────────────────────────────
+// 15. 💌 CUSTOMER INQUIRY AUTORESPONDER / CONFIRMATION
+// ─────────────────────────────────────────────────────────────
+export function buildCustomerInquiryConfirmationHtml(params: {
+  customerName: string;
+  topic: string;
+  messageSnippet?: string;
+}): string {
+  const firstName = params.customerName ? params.customerName.split(' ')[0] : 'Valued Patron';
+
+  const body = `
+    <div style="text-align: center; margin-bottom: 24px;">
+      <span style="background-color: rgba(112, 22, 38, 0.08); color: #701626; font-size: 10px; font-weight: bold; text-transform: uppercase; letter-spacing: 2.5px; padding: 4px 14px; border-radius: 20px; border: 1px solid rgba(197, 160, 89, 0.4);">
+        Atelier Concierge
+      </span>
+      <h2 style="font-family: Georgia, serif; color: #110B0E; font-size: 24px; margin: 14px 0 6px 0;">Thank You for Reaching Out</h2>
+      <p style="color: #6D6268; font-size: 13.5px; margin: 0; line-height: 1.6;">
+        Dear ${firstName}, your inquiry regarding <strong>"${params.topic}"</strong> has been warmly received by our Colombo atelier.
+      </p>
+    </div>
+
+    <div style="background-color: #FCFBF8; border-radius: 18px; border: 1px solid #DFBF77; padding: 22px; margin-bottom: 24px;">
+      <p style="font-size: 13px; color: #110B0E; margin: 0 0 12px 0; line-height: 1.6;">
+        Our lead designer Preethi and concierge team personally review all tailoring questions, fabric consultations, and order requests. We aim to respond within <strong>24 business hours</strong>.
+      </p>
+
+      ${params.messageSnippet ? `
+        <div style="background: #ffffff; border-radius: 10px; border: 1px solid #E6DEC9; padding: 12px 14px; margin-top: 12px;">
+          <div style="font-size: 10.5px; color: #C5A059; text-transform: uppercase; letter-spacing: 1px; font-weight: bold; margin-bottom: 4px;">Summary of Your Inquiry</div>
+          <p style="font-size: 12px; color: #6D6268; margin: 0; font-style: italic; line-height: 1.5;">"${params.messageSnippet}"</p>
+        </div>
+      ` : ''}
+    </div>
+
+    <div style="background-color: #F7F4EE; border-radius: 14px; padding: 16px; margin-bottom: 24px; text-align: center;">
+      <p style="font-size: 11.5px; color: #6D6268; margin: 0 0 8px 0;">Need immediate bridal consultation or sizing assistance?</p>
+      <a href="https://wa.me/94777595955" style="display: inline-block; font-size: 12px; font-weight: bold; color: #25D366; text-decoration: none;">
+        💬 Chat on WhatsApp with Preethi (+94 77 759 5955)
+      </a>
+    </div>
+
+    <div style="text-align: center;">
+      <a href="${STORE_URL}/collections" style="display: inline-block; background: linear-gradient(135deg, #701626 0%, #8E1E34 100%); color: #ffffff; font-size: 11.5px; font-weight: bold; text-transform: uppercase; letter-spacing: 2px; padding: 12px 26px; border-radius: 12px; text-decoration: none;">
+        Browse New Arrivals →
+      </a>
+    </div>
+  `;
+  return wrapEmailLayout(`We Received Your Inquiry: ${params.topic}`, body);
+}
+
+// ─────────────────────────────────────────────────────────────
+// 16. ✂️ BESPOKE TAILORING INSPECTION COMPLETE & READY FOR DISPATCH
+// ─────────────────────────────────────────────────────────────
+export function buildTailoringReadyEmailHtml(params: {
+  orderId: string;
+  customerName: string;
+  dressTypeName: string;
+  fabricName: string;
+  sizeLabel: string;
+  measurements?: Record<string, number>;
+}): string {
+  const firstName = params.customerName ? params.customerName.split(' ')[0] : 'Valued Patron';
+
+  const measurementItems = params.measurements 
+    ? Object.entries(params.measurements).map(([k, v]) => `
+        <span style="display: inline-block; background: #ffffff; border: 1px solid #DFBF77; padding: 4px 10px; border-radius: 8px; font-size: 11px; margin: 3px;">
+          ${k}: <strong>${v}"</strong>
+        </span>
+      `).join('')
+    : '';
+
+  const body = `
+    <div style="text-align: center; margin-bottom: 24px;">
+      <span style="background-color: rgba(112, 22, 38, 0.08); color: #701626; font-size: 10px; font-weight: bold; text-transform: uppercase; letter-spacing: 2.5px; padding: 4px 14px; border-radius: 20px; border: 1px solid rgba(197, 160, 89, 0.4);">
+        Atelier Master Artisan Report
+      </span>
+      <h2 style="font-family: Georgia, serif; color: #110B0E; font-size: 24px; margin: 12px 0 6px 0;">Your Bespoke Creation is Ready</h2>
+      <p style="color: #6D6268; font-size: 13.5px; margin: 0; line-height: 1.6;">
+        Dear ${firstName}, your custom <strong>${params.dressTypeName}</strong> has passed our final seam quality inspection.
+      </p>
+    </div>
+
+    <div style="background-color: #FCFBF8; border-radius: 18px; border: 1px solid #DFBF77; padding: 22px; margin-bottom: 24px;">
+      <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+        <tr>
+          <td style="padding: 6px 0; color: #6D6268;">Order Reference:</td>
+          <td style="padding: 6px 0; font-weight: bold; color: #110B0E; text-align: right;">#${params.orderId}</td>
+        </tr>
+        <tr>
+          <td style="padding: 6px 0; color: #6D6268;">Silhouette:</td>
+          <td style="padding: 6px 0; font-weight: bold; color: #701626; text-align: right;">${params.dressTypeName}</td>
+        </tr>
+        <tr>
+          <td style="padding: 6px 0; color: #6D6268;">Artisanal Fabric:</td>
+          <td style="padding: 6px 0; font-weight: bold; color: #110B0E; text-align: right;">${params.fabricName}</td>
+        </tr>
+        <tr>
+          <td style="padding: 6px 0; color: #6D6268;">Fitted Size:</td>
+          <td style="padding: 6px 0; font-weight: bold; color: #701626; text-align: right;">${params.sizeLabel}</td>
+        </tr>
+      </table>
+
+      ${measurementItems ? `
+        <div style="margin-top: 14px; padding-top: 14px; border-top: 1px dashed #DFBF77;">
+          <p style="font-size: 10.5px; text-transform: uppercase; letter-spacing: 1px; color: #6D6268; font-weight: bold; margin: 0 0 8px 0;">Tailored Dimensions Summary:</p>
+          <div>${measurementItems}</div>
+        </div>
+      ` : ''}
+    </div>
+
+    <div style="background-color: rgba(197, 160, 89, 0.1); border-radius: 14px; padding: 16px; margin-bottom: 24px;">
+      <p style="font-size: 12px; color: #110B0E; margin: 0; line-height: 1.6; text-align: center;">
+        Your garment is now entering our steam-pressing room and will be encased in signature Azhai keepsake packaging for courier pickup today.
+      </p>
+    </div>
+
+    <div style="text-align: center;">
+      <a href="${STORE_URL}/order-success/${params.orderId}" style="display: inline-block; background: linear-gradient(135deg, #701626 0%, #8E1E34 100%); color: #ffffff; font-size: 11.5px; font-weight: bold; text-transform: uppercase; letter-spacing: 2px; padding: 13px 28px; border-radius: 12px; text-decoration: none;">
+        View Atelier Order Status →
+      </a>
+    </div>
+  `;
+  return wrapEmailLayout(`Your Tailored Garment is Complete #${params.orderId}`, body);
+}
+
+// ─────────────────────────────────────────────────────────────
+// 17. 💳 BESPOKE CONCIERGE PAYMENT LINK EMAIL INVOICE
+// ─────────────────────────────────────────────────────────────
+export function buildConciergePaymentLinkEmailHtml(params: {
+  customerName?: string;
+  title: string;
+  amount: number;
+  paymentUrl: string;
+  description?: string;
+}): string {
+  const firstName = params.customerName ? params.customerName.split(' ')[0] : 'Valued Patron';
+
+  const body = `
+    <div style="text-align: center; margin-bottom: 24px;">
+      <span style="background-color: rgba(112, 22, 38, 0.08); color: #701626; font-size: 10px; font-weight: bold; text-transform: uppercase; letter-spacing: 2.5px; padding: 4px 14px; border-radius: 20px; border: 1px solid rgba(197, 160, 89, 0.4);">
+        Atelier Direct Invoice
+      </span>
+      <h2 style="font-family: Georgia, serif; color: #110B0E; font-size: 24px; margin: 12px 0 6px 0;">Your Bespoke Payment Link</h2>
+      <p style="color: #6D6268; font-size: 13.5px; margin: 0; line-height: 1.6;">
+        Dear ${firstName}, here is your secure 3D Secure payment link from Azhai Boutique.
+      </p>
+    </div>
+
+    <div style="background-color: #FCFBF8; border-radius: 18px; border: 1px solid #DFBF77; padding: 24px; margin-bottom: 24px; text-align: center;">
+      <p style="font-size: 12px; text-transform: uppercase; letter-spacing: 1.5px; color: #6D6268; margin: 0 0 6px 0; font-weight: bold;">Invoice Title</p>
+      <h3 style="font-family: Georgia, serif; font-size: 20px; color: #701626; margin: 0 0 12px 0;">${params.title}</h3>
+      
+      ${params.description ? `
+        <p style="font-size: 13px; color: #6D6268; margin: 0 0 16px 0; line-height: 1.5;">${params.description}</p>
+      ` : ''}
+
+      <div style="margin: 18px 0; padding: 14px 0; border-top: 1px dashed #DFBF77; border-bottom: 1px dashed #DFBF77;">
+        <span style="font-size: 11px; text-transform: uppercase; letter-spacing: 1.5px; color: #6D6268; font-weight: bold;">Amount Due: </span>
+        <strong style="font-size: 22px; color: #110B0E; font-family: Georgia, serif; margin-left: 8px;">LKR ${params.amount.toLocaleString('en-US')}</strong>
+      </div>
+
+      <a href="${params.paymentUrl}" style="display: inline-block; background: linear-gradient(135deg, #701626 0%, #8E1E34 100%); color: #ffffff; font-size: 12px; font-weight: bold; text-transform: uppercase; letter-spacing: 2px; padding: 14px 30px; border-radius: 12px; text-decoration: none; box-shadow: 0 4px 18px rgba(112, 22, 38, 0.25);">
+        Complete Secure Payment →
+      </a>
+
+      <p style="font-size: 11px; color: #9E9399; margin: 14px 0 0 0;">
+        Powered by Payments.lk · Visa, Mastercard, and LankaQR accepted
+      </p>
+    </div>
+  `;
+  return wrapEmailLayout(`Invoice: ${params.title} — Azhai Boutique`, body);
+}

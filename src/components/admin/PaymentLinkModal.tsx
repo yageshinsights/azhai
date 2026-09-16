@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Link2, Copy, Check, ExternalLink, MessageCircle, RefreshCw, X } from 'lucide-react';
+import { Link2, Copy, Check, ExternalLink, MessageCircle, RefreshCw, X, Mail, Send } from 'lucide-react';
 import { createPaymentsLkPaymentLink } from '@/lib/payments-lk';
+import { sendBrevoEmail, buildConciergePaymentLinkEmailHtml } from '@/lib/brevo';
 
 interface PaymentLinkModalProps {
   isOpen: boolean;
@@ -10,6 +11,8 @@ interface PaymentLinkModalProps {
   defaultAmount?: number;
   defaultDescription?: string;
   customerPhone?: string;
+  customerEmail?: string;
+  customerName?: string;
 }
 
 export default function PaymentLinkModal({
@@ -19,13 +22,19 @@ export default function PaymentLinkModal({
   defaultAmount = 5000,
   defaultDescription = '',
   customerPhone = '',
+  customerEmail = '',
+  customerName = 'Valued Patron',
 }: PaymentLinkModalProps) {
   const [title, setTitle] = useState(defaultTitle);
   const [amount, setAmount] = useState<number>(defaultAmount);
   const [description, setDescription] = useState(defaultDescription);
+  const [recipientEmail, setRecipientEmail] = useState(customerEmail);
+  const [recipientName, setRecipientName] = useState(customerName);
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatedUrl, setGeneratedUrl] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [isSendingEmail, setIsSendingEmail] = useState(false);
+  const [emailSentSuccess, setEmailSentSuccess] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   if (!isOpen) return null;
@@ -65,6 +74,38 @@ export default function PaymentLinkModal({
     navigator.clipboard.writeText(generatedUrl);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleSendLinkEmail = async () => {
+    if (!generatedUrl || !recipientEmail.trim()) {
+      alert('Please enter a valid recipient email address.');
+      return;
+    }
+    setIsSendingEmail(true);
+    try {
+      const res = await sendBrevoEmail({
+        to: [{ email: recipientEmail.trim(), name: recipientName.trim() || 'Valued Patron' }],
+        subject: `💳 Payment Link: ${title} — Azhai Boutique`,
+        htmlContent: buildConciergePaymentLinkEmailHtml({
+          customerName: recipientName.trim() || 'Valued Patron',
+          title: title.trim(),
+          amount,
+          paymentUrl: generatedUrl,
+          description: description.trim() || undefined,
+        }),
+      });
+
+      if (res.success) {
+        setEmailSentSuccess(true);
+        setTimeout(() => setEmailSentSuccess(false), 3000);
+      } else {
+        alert(res.error || 'Failed to dispatch email.');
+      }
+    } catch (err: any) {
+      alert(err?.message || 'Error sending payment link email.');
+    } finally {
+      setIsSendingEmail(false);
+    }
   };
 
   const cleanPhone = customerPhone.replace(/[^\d+]/g, '');
@@ -224,6 +265,40 @@ export default function PaymentLinkModal({
                 >
                   <ExternalLink className="w-4 h-4" />
                 </a>
+              </div>
+
+              {/* Direct Email Dispatch Section */}
+              <div className="p-3.5 rounded-2xl bg-[#FCFBF8] border border-[#DFBF77] space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-bold text-[#701626] uppercase tracking-wider flex items-center gap-1.5">
+                    <Mail className="w-3.5 h-3.5" />
+                    <span>Send Payment Link via Email</span>
+                  </span>
+                  {emailSentSuccess && (
+                    <span className="text-[10px] text-emerald-700 font-bold flex items-center gap-1">
+                      <Check className="w-3 h-3 text-emerald-600" /> Dispatched!
+                    </span>
+                  )}
+                </div>
+
+                <div className="flex gap-2">
+                  <input
+                    type="email"
+                    placeholder="patron@example.com"
+                    value={recipientEmail}
+                    onChange={(e) => setRecipientEmail(e.target.value)}
+                    className="flex-1 px-3 py-2 text-xs rounded-xl bg-white border border-[#C5A059]/40 text-[#110B0E] focus:outline-none focus:border-[#701626]"
+                  />
+                  <button
+                    type="button"
+                    disabled={isSendingEmail || !recipientEmail.trim()}
+                    onClick={handleSendLinkEmail}
+                    className="px-4 py-2 bg-[#701626] hover:bg-[#8E1E34] text-white text-xs font-bold uppercase tracking-wider rounded-xl transition-colors shadow-xs flex items-center gap-1.5 cursor-pointer disabled:opacity-50 shrink-0"
+                  >
+                    <Send className="w-3.5 h-3.5" />
+                    <span>{isSendingEmail ? 'Sending...' : 'Send'}</span>
+                  </button>
+                </div>
               </div>
 
               <div className="flex justify-end pt-3 border-t border-[#C5A059]/20">

@@ -14,6 +14,11 @@ import { STORE_PHONE } from '@/lib/constants';
 import BankBadge from '@/components/BankBadge';
 import { compressToWebP } from '@/lib/image-compressor';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
+import { 
+  sendBrevoEmail, 
+  buildBankSlipReceivedCustomerHtml, 
+  buildBankSlipAdminAlertHtml 
+} from '@/lib/brevo';
 
 export default function OrderSuccess() {
   const { orderId } = useParams<{ orderId: string }>();
@@ -416,6 +421,45 @@ export default function OrderSuccess() {
                     },
                   });
                 }
+
+                // Disptach Bank Slip Email Notifications (Customer Receipt + Admin Alert)
+                const targetCustomerEmail = order.customer?.email;
+                const targetCustomerName = order.customer?.fullName || 'Valued Patron';
+                const targetBankName = bank?.bankName || order.bankTransferDetails?.bankName || 'Commercial Bank of Ceylon';
+                const targetRef = referenceInput.trim() || order.bankTransferDetails?.referenceNumber;
+
+                // 1. Send Customer Receipt
+                if (targetCustomerEmail) {
+                  sendBrevoEmail({
+                    to: [{ email: targetCustomerEmail, name: targetCustomerName }],
+                    subject: `🧾 Deposit Slip Received: Order #${order.orderId} — Azhai Boutique`,
+                    htmlContent: buildBankSlipReceivedCustomerHtml({
+                      orderId: order.orderId,
+                      customerName: targetCustomerName,
+                      total: order.total,
+                      bankName: targetBankName,
+                      referenceNumber: targetRef,
+                      slipUrl: uploadedUrl,
+                    }),
+                  }).catch((e) => console.warn('[Brevo Slip Customer Receipt Error]:', e));
+                }
+
+                // 2. Send Admin Alert to Atelier Operations
+                sendBrevoEmail({
+                  to: [{ email: 'orders@azhaiclothing.lk', name: 'Azhai Atelier Operations' }],
+                  subject: `🔔 [Action Required] Bank Slip Uploaded: Order #${order.orderId}`,
+                  htmlContent: buildBankSlipAdminAlertHtml({
+                    orderId: order.orderId,
+                    customerName: targetCustomerName,
+                    customerEmail: targetCustomerEmail || 'Not provided',
+                    customerPhone: order.customer?.phone,
+                    total: order.total,
+                    bankName: targetBankName,
+                    referenceNumber: targetRef,
+                    slipUrl: uploadedUrl,
+                  }),
+                }).catch((e) => console.warn('[Brevo Slip Admin Alert Error]:', e));
+
               } catch (err: any) {
                 console.error('[Slip Upload Error]:', err);
                 setSlipUploadError('Failed to process slip image. Please try again or send via WhatsApp.');

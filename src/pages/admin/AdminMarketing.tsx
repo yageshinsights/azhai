@@ -29,7 +29,12 @@ import {
   buildOrderConfirmationHtml,
   buildOrderShippedHtml,
   buildOrderDeliveredHtml,
-  buildPostDeliveryFeedbackEmailHtml
+  buildPostDeliveryFeedbackEmailHtml,
+  buildBankPaymentVerifiedHtml,
+  buildTailoringReadyEmailHtml,
+  buildConciergePaymentLinkEmailHtml,
+  buildBankSlipReceivedCustomerHtml,
+  buildCustomerInquiryConfirmationHtml,
 } from '@/lib/brevo';
 
 interface AbandonedCart {
@@ -244,6 +249,53 @@ export default function AdminMarketing() {
       html = buildPostDeliveryFeedbackEmailHtml({
         customerName: 'Preethi',
         orderId: 'AZH-84920',
+      });
+    } else if (type === 'bank-slip') {
+      subject = '🧾 [TEST] Deposit Slip Received: Order #AZH-84920';
+      html = buildBankSlipReceivedCustomerHtml({
+        orderId: 'AZH-84920',
+        customerName: 'Preethi',
+        total: 14500,
+        bankName: 'Commercial Bank of Ceylon',
+        referenceNumber: 'REF-COM-883910',
+      });
+    } else if (type === 'bank-cleared') {
+      subject = '✨ [TEST] Payment Cleared: Order #AZH-84920';
+      html = buildBankPaymentVerifiedHtml({
+        orderId: 'AZH-84920',
+        customerName: 'Preethi',
+        total: 14500,
+        items: [
+          { name: 'Maroon Corset Handloom Kurti Set', price: 'LKR 14,500', size: 'M', quantity: 1 }
+        ],
+        deliveryMethod: 'Sri Lanka Post Speed Post',
+        adminNotes: 'Verified via Commercial Bank Online Deposit Batch #441.',
+      });
+    } else if (type === 'tailoring-ready') {
+      subject = '✂️ [TEST] Your Tailored Garment is Complete #AZH-84920';
+      html = buildTailoringReadyEmailHtml({
+        orderId: 'AZH-84920',
+        customerName: 'Preethi',
+        dressTypeName: 'Royal Anarkali Gown',
+        fabricName: 'Pure Mulberry Raw Silk',
+        sizeLabel: 'Custom Bespoke Fit',
+        measurements: { Bust: 36, Waist: 30, Length: 52, Sleeve: 18 },
+      });
+    } else if (type === 'inquiry') {
+      subject = '💌 [TEST] Inquiry Received: Bridal Silk Consultation';
+      html = buildCustomerInquiryConfirmationHtml({
+        customerName: 'Preethi',
+        topic: 'Custom Bridal Saree & Sizing Consultation',
+        messageSnippet: 'Inquiring about handloom weaving timelines for our November wedding ceremony in Jaffna.',
+      });
+    } else if (type === 'payment-link') {
+      subject = '💳 [TEST] Invoice: Bespoke Atelier Tailoring Deposit';
+      html = buildConciergePaymentLinkEmailHtml({
+        customerName: 'Preethi',
+        title: 'Bespoke Atelier Tailoring Deposit (Order #AZH-84920)',
+        amount: 5000,
+        paymentUrl: 'https://payments.lk/pay/azhai-sample-link',
+        description: 'Advance deposit for custom handloom weaving and artisan tailoring.',
       });
     }
 
@@ -644,6 +696,41 @@ export default function AdminMarketing() {
                     desc: 'Requests 5-star rating and custom fit feedback after package arrival.',
                     tag: 'Retention',
                     previewUrl: '/email-previews/fit-review.html'
+                  },
+                  {
+                    type: 'bank-slip',
+                    title: '6. Bank Slip Upload Receipt',
+                    desc: 'Sent immediately to patron when they submit a bank transfer receipt or deposit slip.',
+                    tag: 'Payment',
+                    previewUrl: '#'
+                  },
+                  {
+                    type: 'bank-cleared',
+                    title: '7. Bank Payment Cleared Receipt',
+                    desc: 'Dispatched when admin verifies the bank deposit and marks the order confirmed/paid.',
+                    tag: 'Finance',
+                    previewUrl: '#'
+                  },
+                  {
+                    type: 'tailoring-ready',
+                    title: '8. Bespoke Tailoring Ready Notice',
+                    desc: 'Sent when artisan tailor finishes stitching, pressing, and measuring inspection.',
+                    tag: 'Atelier',
+                    previewUrl: '#'
+                  },
+                  {
+                    type: 'inquiry',
+                    title: '9. Customer Inquiry Auto-Responder',
+                    desc: 'Instant reassurance email confirming their concierge inquiry was received.',
+                    tag: 'Support',
+                    previewUrl: '#'
+                  },
+                  {
+                    type: 'payment-link',
+                    title: '10. Direct 3DS Payment Link Invoice',
+                    desc: 'Dispatched to customer email with title, amount, and 1-click Payments.lk checkout link.',
+                    tag: 'Invoice',
+                    previewUrl: '#'
                   }
                 ].map((tmpl) => (
                   <div

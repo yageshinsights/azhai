@@ -37,7 +37,9 @@ import {
   buildOrderShippedHtml,
   buildOrderDeliveredHtml,
   buildOrderCancelledHtml,
-  buildPostDeliveryFeedbackEmailHtml
+  buildPostDeliveryFeedbackEmailHtml,
+  buildBankPaymentVerifiedHtml,
+  buildTailoringReadyEmailHtml,
 } from '@/lib/brevo';
 import { STORE_PHONE, STORE_SUPPORT_EMAIL } from '@/lib/constants';
 import PrintablePackingSlip from '@/components/admin/PrintablePackingSlip';
@@ -215,6 +217,31 @@ export default function OrderDetailDrawer({ order, isOpen, onClose }: OrderDetai
     showToast('Order receipt re-sent to customer email!');
   };
 
+  // Manual Trigger: Send Tailoring Ready for Dispatch Notification
+  const handleSendTailoringReady = async () => {
+    if (!order.customer.email) return;
+    const tailoredItem = order.items.find((i) => Boolean(i.tailoring));
+    if (!tailoredItem?.tailoring) {
+      showToast('This order does not contain tailored garments.');
+      return;
+    }
+    setIsSendingEmail(true);
+    await sendBrevoEmail({
+      to: [{ email: order.customer.email, name: order.customer.fullName }],
+      subject: `✂️ Your Custom Creation is Ready #${order.orderId} — Azhai Boutique`,
+      htmlContent: buildTailoringReadyEmailHtml({
+        orderId: order.orderId,
+        customerName: order.customer.fullName,
+        dressTypeName: tailoredItem.tailoring.dressTypeName || tailoredItem.name,
+        fabricName: tailoredItem.tailoring.fabricName || 'Pure Silk/Handloom',
+        sizeLabel: tailoredItem.tailoring.sizeLabel || tailoredItem.size || 'Custom Fit',
+        measurements: tailoredItem.tailoring.measurements,
+      }),
+    });
+    setIsSendingEmail(false);
+    showToast('Custom tailoring inspection & completion email dispatched to patron!');
+  };
+
   // Manual Trigger: Verify Direct Bank Transfer Payment
   const handleVerifyBankPayment = async () => {
     setIsVerifyingPayment(true);
@@ -225,18 +252,17 @@ export default function OrderDetailDrawer({ order, isOpen, onClose }: OrderDetai
       if (order.customer.email) {
         await sendBrevoEmail({
           to: [{ email: order.customer.email, name: order.customer.fullName }],
-          subject: `✨ Payment Confirmed & Order Cleared #${order.orderId} — Azhai Boutique`,
-          htmlContent: buildOrderConfirmationHtml({
+          subject: `✨ Payment Cleared & Verified #${order.orderId} — Azhai Boutique`,
+          htmlContent: buildBankPaymentVerifiedHtml({
             orderId: order.orderId,
             customerName: order.customer.fullName,
             total: order.total,
             items: order.items,
             deliveryMethod: order.deliveryMethod,
-            paymentMethod: 'Direct Bank Transfer (Payment Verified)',
-            bankTransferDetails: order.bankTransferDetails,
+            adminNotes: adminBankNotes || 'Verified & cleared by Azhai Boutique Finance',
           }),
         });
-        showToast('Payment verification confirmation email sent to patron!');
+        showToast('Dedicated payment clearance receipt sent to patron!');
       }
     } catch (err) {
       console.error('[Verify Bank Error]:', err);
@@ -879,6 +905,18 @@ export default function OrderDetailDrawer({ order, isOpen, onClose }: OrderDetai
                       <Star className="w-3.5 h-3.5 text-[#C5A059]" />
                       <span>Request Fit Review</span>
                     </button>
+
+                    {order.items.some((i) => Boolean(i.tailoring)) && (
+                      <button
+                        type="button"
+                        disabled={isSendingEmail}
+                        onClick={handleSendTailoringReady}
+                        className="p-3 bg-[#701626]/5 hover:bg-[#701626]/10 rounded-xl border border-[#701626]/30 text-xs font-bold text-[#701626] sm:col-span-2 flex items-center justify-center gap-2 transition-colors cursor-pointer"
+                      >
+                        <Scissors className="w-3.5 h-3.5 text-[#701626]" />
+                        <span>Send Tailoring Complete & Ready Notice</span>
+                      </button>
+                    )}
                   </div>
                 </div>
 

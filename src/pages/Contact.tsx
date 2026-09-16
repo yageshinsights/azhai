@@ -5,7 +5,7 @@ import { Mail, MessageCircle, MapPin, Clock, Send, Sparkles, CheckCircle2, Phone
 import SEOHead from '@/components/SEOHead';
 import { useAdminStore, cleanWhatsAppDigits } from '@/store/admin';
 import { STORE_ADDRESS_FULL, STORE_PHONE, STORE_SUPPORT_EMAIL } from '@/lib/constants';
-import { sendBrevoEmail } from '@/lib/brevo';
+import { sendBrevoEmail, buildCustomerInquiryConfirmationHtml } from '@/lib/brevo';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 
 function escapeHtml(str: string): string {
@@ -133,6 +133,19 @@ export default function Contact() {
           </div>
         `,
       }).catch((err) => console.warn('[Brevo Inquiry Alert Exception]:', err));
+
+      // Send instant confirmation auto-responder to the patron
+      if (email.trim()) {
+        sendBrevoEmail({
+          to: [{ email: email.trim(), name: name.trim() }],
+          subject: `✨ We Received Your Atelier Inquiry: ${safeTopic} — Azhai Boutique`,
+          htmlContent: buildCustomerInquiryConfirmationHtml({
+            customerName: name.trim(),
+            topic: topic.trim(),
+            messageSnippet: message.trim().length > 180 ? `${message.trim().slice(0, 180)}...` : message.trim(),
+          }),
+        }).catch((err) => console.warn('[Brevo Customer Confirmation Exception]:', err));
+      }
     } catch (err) {
       console.warn('Inquiry storage error:', err);
     }
