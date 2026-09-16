@@ -213,7 +213,7 @@ export default function AdminMarketing() {
         ],
         total: 14500,
         deliveryMethod: 'Sri Lanka Post Speed Post (Zone A)',
-        paymentMethod: 'PayHere (Online Visa/MasterCard)',
+        paymentMethod: 'Payments.lk (Online Card & LankaQR)',
       });
     } else if (type === 'abandoned') {
       subject = '✨ [TEST] Your Azhai bag is waiting for you (Enjoy 5% privilege)';
