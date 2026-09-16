@@ -193,11 +193,11 @@ export default function Home() {
                 transition={{ duration: 0.55, ease: [0.16, 1, 0.3, 1] }}
                 className="space-y-3.5 sm:space-y-4"
               >
-                <h2 className="font-display text-5xl sm:text-7xl md:text-8xl lg:text-[5.5rem] xl:text-[6.5rem] font-bold text-white tracking-tight leading-[0.98] sm:leading-[1.02] text-balance drop-shadow-xl">
+                <h2 className="font-display text-6xl sm:text-7xl md:text-8xl lg:text-[6rem] xl:text-[7rem] font-bold text-white tracking-tight leading-[0.96] sm:leading-[1.0] text-balance drop-shadow-xl">
                   {currentCategory?.name}
                 </h2>
                 {heroSubtitle && (
-                  <p className="text-sm sm:text-lg text-[#FCFBF8]/95 font-light max-w-xl leading-relaxed border-l-2 border-[#DFBF77]/70 pl-3.5 sm:pl-4 italic font-serif">
+                  <p className="text-base sm:text-xl md:text-2xl text-[#FCFBF8]/95 font-light max-w-xl leading-relaxed border-l-2 border-[#DFBF77]/70 pl-3.5 sm:pl-4 italic font-serif">
                     "{heroSubtitle}"
                   </p>
                 )}
