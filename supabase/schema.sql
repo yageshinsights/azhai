@@ -311,7 +311,9 @@ INSERT INTO public.categories (id, name, slug, description, hero_image, count, s
 (1, 'Kurties', 'kurties', 'Modern fitted corsets & fluid handloom kurties.', 'https://images.unsplash.com/photo-1610030469983-98e550d6193c?auto=format&fit=crop&w=1200&q=90', 6, 'Core Edit', 'Tailored everyday & festive elegance.'),
 (2, 'Sarees', 'sarees', 'Hand-painted organza & pure mulberry silk sarees.', 'https://images.unsplash.com/photo-1583391733956-3750e0ff4e8b?auto=format&fit=crop&w=1200&q=90', 8, 'Signature Drapes', 'Cloud-light drapes & heirloom weaves.'),
 (3, 'Shawls', 'shawls', 'Heirloom zari-embroidered pure silk & cashmere wraps.', 'https://images.unsplash.com/photo-1617627143750-d86bc21e42bb?auto=format&fit=crop&w=1200&q=90', 4, 'Atelier Wraps', 'The finishing touch of warmth & grace.'),
-(4, 'Tops', 'tops', 'Structured handloom silk bustiers & organza tops.', 'https://images.unsplash.com/photo-1567401893414-76b7b1e5a7a5?auto=format&fit=crop&w=1200&q=90', 5, 'Modern Muse', 'Versatile structured & sheer silhouettes.')
+(4, 'Tops', 'tops', 'Structured handloom silk bustiers & organza tops.', 'https://images.unsplash.com/photo-1567401893414-76b7b1e5a7a5?auto=format&fit=crop&w=1200&q=90', 5, 'Modern Muse', 'Versatile structured & sheer silhouettes.'),
+(5, 'Lehengas', 'lehengas', 'Flared 16-kali royal Kalidar bridal & occasion skirts.', 'https://images.unsplash.com/photo-1567401893414-76b7b1e5a7a5?auto=format&fit=crop&w=1200&q=90', 3, 'Bridal & Occasion', 'Sweeping voluminous flared silhouettes.'),
+(6, 'Salwar Suits', 'salwar-suits', 'Regal Patiala pleats & bespoke tunic combinations.', 'https://images.unsplash.com/photo-1583391733956-3750e0ff4e8b?auto=format&fit=crop&w=1200&q=90', 4, 'Classic Heritage', 'Artisanal Punjabi & Mughal tailored suits.')
 ON CONFLICT (slug) DO NOTHING;
 
 -- 2. Initial Tags

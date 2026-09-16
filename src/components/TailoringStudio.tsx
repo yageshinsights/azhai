@@ -4,6 +4,7 @@ import { Scissors, Ruler, Palette, ShoppingBag, ChevronRight, ChevronLeft, Check
 import { useAdminStore } from '@/store/admin';
 import { useAuthStore } from '@/store/auth';
 import { useCartStore } from '@/store/cart';
+import { COLLECTIONS, type Collection } from '@/lib/data';
 import InteractiveMannequin from './InteractiveMannequin';
 import {
   type DressType,
@@ -16,53 +17,15 @@ import {
   formatLKR,
 } from '@/lib/tailoring';
 
-interface TailoringCollection {
-  slug: string;
-  name: string;
-  subtitle: string;
-  image: string;
-}
-
-const BASE_COLLECTIONS: TailoringCollection[] = [
-  {
-    slug: 'kurties',
-    name: 'Kurties & Tunics',
-    subtitle: 'Flared Anarkalis, tailored slits & corset peplums',
-    image: 'https://images.unsplash.com/photo-1610030469983-98e550d6193c?auto=format&fit=crop&w=700&q=85',
-  },
-  {
-    slug: 'sarees',
-    name: 'Sarees & Blouses',
-    subtitle: 'Sweetheart, princess-cut & temple border blouses',
-    image: 'https://images.unsplash.com/photo-1617627143750-d86bc21e42bb?auto=format&fit=crop&w=700&q=85',
-  },
-  {
-    slug: 'tops',
-    name: 'Tops & Bustiers',
-    subtitle: 'Structured corset bustiers & organza peplums',
-    image: 'https://images.unsplash.com/photo-1594938298603-c8148c4dae35?auto=format&fit=crop&w=700&q=85',
-  },
-  {
-    slug: 'lehengas',
-    name: 'Lehengas & Skirts',
-    subtitle: 'Flared 16-kali royal Kalidar bridal & occasion skirts',
-    image: 'https://images.unsplash.com/photo-1567401893414-76b7b1e5a7a5?auto=format&fit=crop&w=700&q=85',
-  },
-  {
-    slug: 'salwar-suits',
-    name: 'Salwar Suits & Sets',
-    subtitle: 'Regal Patiala pleats & bespoke tunic combinations',
-    image: 'https://images.unsplash.com/photo-1583391733956-3750e0ff4e8b?auto=format&fit=crop&w=700&q=85',
-  },
-];
-
 export default function TailoringStudio() {
-  // State from Admin Store (with fallback)
+  // Main Collections & Tailoring Data from Admin Store (with fallback)
+  const storeCategories = useAdminStore((s) => s.categories);
+  const collections = Array.isArray(storeCategories) && storeCategories.length > 0 ? storeCategories : COLLECTIONS;
+
   const storeDressTypes = useAdminStore((s) => s.dressTypes);
   const storeFabrics = useAdminStore((s) => s.tailoringFabrics);
   const storeFields = useAdminStore((s) => s.measurementFields);
   const storePresets = useAdminStore((s) => s.sizePresets);
-  const storeCategories = useAdminStore((s) => s.categories) || [];
 
   const dressTypes = storeDressTypes && storeDressTypes.length > 0 ? storeDressTypes : DEFAULT_DRESS_TYPES;
   const fabrics = storeFabrics && storeFabrics.length > 0 ? storeFabrics : DEFAULT_FABRICS;
@@ -75,7 +38,7 @@ export default function TailoringStudio() {
 
   // 5-Step Configurator State
   const [step, setStep] = useState<1 | 2 | 3 | 4 | 5>(1);
-  const [selectedCollection, setSelectedCollection] = useState<TailoringCollection | null>(null);
+  const [selectedCollection, setSelectedCollection] = useState<Collection | null>(null);
   const [selectedDressType, setSelectedDressType] = useState<DressType | null>(null);
   const [selectedFabric, setSelectedFabric] = useState<TailoringFabric | null>(null);
   const [unit, setUnit] = useState<'inches' | 'cm'>('inches');
@@ -88,26 +51,13 @@ export default function TailoringStudio() {
     dressTypes.filter(d => d.isActive).sort((a, b) => a.displayOrder - b.displayOrder),
   [dressTypes]);
 
-  // Merge base collections with any custom store categories
-  const collections = useMemo(() => {
-    const list = [...BASE_COLLECTIONS];
-    storeCategories.forEach(cat => {
-      if (!list.some(c => c.slug === cat.slug)) {
-        list.push({
-          slug: cat.slug,
-          name: cat.name,
-          subtitle: cat.description || `Bespoke handcrafted ${cat.name}`,
-          image: cat.heroImage || 'https://images.unsplash.com/photo-1610030469983-98e550d6193c?auto=format&fit=crop&w=700&q=85',
-        });
-      }
-    });
-    return list;
-  }, [storeCategories]);
-
-  // Silhouettes for the selected collection
+  // Silhouettes for the selected collection (matching by collectionSlug or collectionId)
   const collectionSilhouettes = useMemo(() => {
     if (!selectedCollection) return [];
-    return activeDressTypes.filter(d => d.collectionSlug === selectedCollection.slug);
+    return activeDressTypes.filter(d => 
+      d.collectionSlug === selectedCollection.slug || 
+      (d.collectionId && d.collectionId === selectedCollection.id)
+    );
   }, [activeDressTypes, selectedCollection]);
 
   // Compatible fabrics for selected silhouette
@@ -149,7 +99,7 @@ export default function TailoringStudio() {
   }, [selectedDressType, currentSizePresets, currentMeasurementFields]);
 
   // Step 1 -> Select Collection
-  const handleCollectionSelect = (col: TailoringCollection) => {
+  const handleCollectionSelect = (col: Collection) => {
     setSelectedCollection(col);
     setSelectedDressType(null);
     setSelectedFabric(null);
@@ -301,19 +251,22 @@ export default function TailoringStudio() {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
                 {collections.map(col => {
-                  const count = activeDressTypes.filter(d => d.collectionSlug === col.slug).length;
-                  const isSelected = selectedCollection?.slug === col.slug;
+                  const count = activeDressTypes.filter(d => 
+                    d.collectionSlug === col.slug || 
+                    (d.collectionId && d.collectionId === col.id)
+                  ).length;
+                  const isSelected = selectedCollection?.id === col.id || selectedCollection?.slug === col.slug;
 
                   return (
                     <button
-                      key={col.slug}
+                      key={col.id || col.slug}
                       onClick={() => handleCollectionSelect(col)}
                       className={`relative aspect-[3/4] rounded-3xl overflow-hidden group text-left transition-all cursor-pointer shadow-md ${
                         isSelected ? 'ring-4 ring-[#C5A059]' : 'hover:shadow-xl'
                       }`}
                     >
                       <img
-                        src={col.image}
+                        src={col.heroImage}
                         alt={col.name}
                         className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
                       />
@@ -329,16 +282,16 @@ export default function TailoringStudio() {
                       {/* Bottom Collection Information */}
                       <div className="absolute bottom-0 left-0 right-0 p-5 text-white">
                         <span className="text-[9.5px] uppercase tracking-[0.2em] text-[#DFBF77] font-bold block mb-1">
-                          Collection Edit
+                          {col.season || 'Signature Edit'}
                         </span>
                         <h4 className="font-display text-xl font-bold mb-1.5 leading-snug drop-shadow-md">
                           {col.name}
                         </h4>
                         <p className="text-white/80 text-[11px] font-light line-clamp-2 leading-relaxed mb-3">
-                          {col.subtitle}
+                          {col.tagline || col.description}
                         </p>
                         <div className="inline-flex items-center gap-1.5 text-xs font-bold text-[#DFBF77] group-hover:translate-x-1 transition-transform">
-                          <span>Explore Designs</span>
+                          <span>Explore Silhouettes</span>
                           <ChevronRight className="w-3.5 h-3.5" />
                         </div>
                       </div>

@@ -2,17 +2,10 @@ import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Sparkles, Upload, Loader2, RefreshCw, Link as LinkIcon, Check, Ruler, Palette } from 'lucide-react';
 import { useAdminStore } from '@/store/admin';
+import { COLLECTIONS } from '@/lib/data';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import { compressToWebP } from '@/lib/image-compressor';
 import type { DressType, TailoringFabric, MeasurementField, SizePreset } from '@/lib/tailoring';
-
-const DEFAULT_COLLECTION_OPTIONS = [
-  { slug: 'kurties', name: 'Kurties & Tunics' },
-  { slug: 'sarees', name: 'Sarees & Blouses' },
-  { slug: 'tops', name: 'Tops & Bustiers' },
-  { slug: 'lehengas', name: 'Lehengas & Skirts' },
-  { slug: 'salwar-suits', name: 'Salwar Suits & Sets' },
-];
 
 /* ── 1. Dress Type Modal ── */
 interface DressTypeModalProps {
@@ -23,7 +16,8 @@ interface DressTypeModalProps {
 }
 
 export function DressTypeModal({ isOpen, onClose, onSave, initial }: DressTypeModalProps) {
-  const storeCategories = useAdminStore((s) => s.categories) || [];
+  const storeCategories = useAdminStore((s) => s.categories);
+  const categories = Array.isArray(storeCategories) && storeCategories.length > 0 ? storeCategories : COLLECTIONS;
   const [collectionSlug, setCollectionSlug] = useState('kurties');
   const [name, setName] = useState('');
   const [slug, setSlug] = useState('');
@@ -128,7 +122,7 @@ export function DressTypeModal({ isOpen, onClose, onSave, initial }: DressTypeMo
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim() || !coverImage.trim()) return;
-    const matchedCat = storeCategories.find(c => c.slug === collectionSlug);
+    const matchedCat = categories.find(c => c.slug === collectionSlug);
     onSave({
       collectionId: matchedCat ? Number(matchedCat.id) : undefined,
       collectionSlug,
@@ -163,11 +157,8 @@ export function DressTypeModal({ isOpen, onClose, onSave, initial }: DressTypeMo
                 onChange={(e) => setCollectionSlug(e.target.value)}
                 className="w-full px-3.5 py-2.5 rounded-xl bg-[#F7F4EE]/70 border border-[#C5A059]/30 text-xs font-medium text-[#110B0E] focus:border-[#701626] focus:bg-white focus:outline-none"
               >
-                {DEFAULT_COLLECTION_OPTIONS.map(c => (
-                  <option key={c.slug} value={c.slug}>{c.name}</option>
-                ))}
-                {storeCategories.filter(sc => !DEFAULT_COLLECTION_OPTIONS.some(dc => dc.slug === sc.slug)).map(c => (
-                  <option key={c.slug} value={c.slug}>{c.name}</option>
+                {categories.map(c => (
+                  <option key={c.id || c.slug} value={c.slug}>{c.name}</option>
                 ))}
               </select>
             </div>

@@ -4,6 +4,7 @@ import { Ruler, Palette, Settings2, Trash2, Edit2, Plus, Scissors, ToggleLeft, T
 import AdminLayout from '@/components/admin/AdminLayout';
 import PaymentLinkModal from '@/components/admin/PaymentLinkModal';
 import { useAdminStore } from '@/store/admin';
+import { COLLECTIONS } from '@/lib/data';
 import { formatLKR } from '@/lib/tailoring';
 import { DEFAULT_DRESS_TYPES, DEFAULT_FABRICS, DEFAULT_MEASUREMENT_FIELDS, DEFAULT_SIZE_PRESETS } from '@/lib/tailoring';
 import { DressTypeModal, FabricModal, MeasurementFieldModal, SizePresetModal } from '@/components/admin/TailoringModals';
@@ -15,6 +16,9 @@ export default function AdminTailoring() {
   // Try to read from store, fallback to default seed data if undefined or empty
   const store = useAdminStore((s) => s);
   
+  // Main Boutique Collections from Store
+  const categories = Array.isArray(store.categories) && store.categories.length > 0 ? store.categories : COLLECTIONS;
+
   const dressTypes = (store.dressTypes && store.dressTypes.length > 0) ? store.dressTypes : DEFAULT_DRESS_TYPES;
   const fabrics = (store.tailoringFabrics && store.tailoringFabrics.length > 0) ? store.tailoringFabrics : DEFAULT_FABRICS;
   const measurementFields = (store.measurementFields && store.measurementFields.length > 0) ? store.measurementFields : DEFAULT_MEASUREMENT_FIELDS;
@@ -60,23 +64,17 @@ export default function AdminTailoring() {
   };
 
   const getCollectionBadge = (slug: string) => {
-    switch (slug) {
-      case 'kurties': return 'Kurties';
-      case 'sarees': return 'Sarees & Blouses';
-      case 'tops': return 'Tops & Bustiers';
-      case 'lehengas': return 'Lehengas';
-      case 'salwar-suits': return 'Salwar Suits';
-      default: return slug ? slug.charAt(0).toUpperCase() + slug.slice(1) : 'Collection';
-    }
+    const match = categories.find(c => c.slug === slug);
+    return match?.name || (slug ? slug.charAt(0).toUpperCase() + slug.slice(1) : 'Collection');
   };
 
   const collectionTabs = [
     { slug: 'all', label: 'All Collections', count: dressTypes.length },
-    { slug: 'kurties', label: 'Kurties', count: dressTypes.filter(d => d.collectionSlug === 'kurties').length },
-    { slug: 'sarees', label: 'Sarees', count: dressTypes.filter(d => d.collectionSlug === 'sarees').length },
-    { slug: 'tops', label: 'Tops', count: dressTypes.filter(d => d.collectionSlug === 'tops').length },
-    { slug: 'lehengas', label: 'Lehengas', count: dressTypes.filter(d => d.collectionSlug === 'lehengas').length },
-    { slug: 'salwar-suits', label: 'Salwar Suits', count: dressTypes.filter(d => d.collectionSlug === 'salwar-suits').length },
+    ...categories.map(cat => ({
+      slug: cat.slug,
+      label: cat.name,
+      count: dressTypes.filter(d => d.collectionSlug === cat.slug || d.collectionId === cat.id).length,
+    })),
   ];
 
   return (
@@ -256,18 +254,18 @@ export default function AdminTailoring() {
               <div className="flex items-center gap-3">
                 <label className="text-xs font-bold text-[#110B0E] uppercase tracking-wider">Select Silhouette:</label>
                 <select value={selectedDressTypeId} onChange={(e) => setSelectedDressTypeId(Number(e.target.value))} className="px-3 py-2 rounded-xl bg-[#F7F4EE] border border-[#C5A059]/30 text-xs font-medium focus:outline-none focus:border-[#701626]">
-                  {['kurties', 'sarees', 'tops', 'lehengas', 'salwar-suits'].map(catSlug => {
-                    const groupItems = dressTypes.filter(d => d.collectionSlug === catSlug);
+                  {categories.map(cat => {
+                    const groupItems = dressTypes.filter(d => d.collectionSlug === cat.slug || d.collectionId === cat.id);
                     if (groupItems.length === 0) return null;
                     return (
-                      <optgroup key={catSlug} label={getCollectionBadge(catSlug)}>
+                      <optgroup key={cat.id || cat.slug} label={cat.name}>
                         {groupItems.map(dt => <option key={dt.id} value={dt.id}>{dt.name}</option>)}
                       </optgroup>
                     );
                   })}
-                  {dressTypes.filter(d => !['kurties', 'sarees', 'tops', 'lehengas', 'salwar-suits'].includes(d.collectionSlug)).length > 0 && (
+                  {dressTypes.filter(d => !categories.some(c => c.slug === d.collectionSlug || c.id === d.collectionId)).length > 0 && (
                     <optgroup label="Other Collections">
-                      {dressTypes.filter(d => !['kurties', 'sarees', 'tops', 'lehengas', 'salwar-suits'].includes(d.collectionSlug)).map(dt => (
+                      {dressTypes.filter(d => !categories.some(c => c.slug === d.collectionSlug || c.id === d.collectionId)).map(dt => (
                         <option key={dt.id} value={dt.id}>{dt.name}</option>
                       ))}
                     </optgroup>
@@ -321,18 +319,18 @@ export default function AdminTailoring() {
               <div className="flex items-center gap-3">
                 <label className="text-xs font-bold text-[#110B0E] uppercase tracking-wider">Select Silhouette:</label>
                 <select value={selectedDressTypeId} onChange={(e) => setSelectedDressTypeId(Number(e.target.value))} className="px-3 py-2 rounded-xl bg-[#F7F4EE] border border-[#C5A059]/30 text-xs font-medium focus:outline-none focus:border-[#701626]">
-                  {['kurties', 'sarees', 'tops', 'lehengas', 'salwar-suits'].map(catSlug => {
-                    const groupItems = dressTypes.filter(d => d.collectionSlug === catSlug);
+                  {categories.map(cat => {
+                    const groupItems = dressTypes.filter(d => d.collectionSlug === cat.slug || d.collectionId === cat.id);
                     if (groupItems.length === 0) return null;
                     return (
-                      <optgroup key={catSlug} label={getCollectionBadge(catSlug)}>
+                      <optgroup key={cat.id || cat.slug} label={cat.name}>
                         {groupItems.map(dt => <option key={dt.id} value={dt.id}>{dt.name}</option>)}
                       </optgroup>
                     );
                   })}
-                  {dressTypes.filter(d => !['kurties', 'sarees', 'tops', 'lehengas', 'salwar-suits'].includes(d.collectionSlug)).length > 0 && (
+                  {dressTypes.filter(d => !categories.some(c => c.slug === d.collectionSlug || c.id === d.collectionId)).length > 0 && (
                     <optgroup label="Other Collections">
-                      {dressTypes.filter(d => !['kurties', 'sarees', 'tops', 'lehengas', 'salwar-suits'].includes(d.collectionSlug)).map(dt => (
+                      {dressTypes.filter(d => !categories.some(c => c.slug === d.collectionSlug || c.id === d.collectionId)).map(dt => (
                         <option key={dt.id} value={dt.id}>{dt.name}</option>
                       ))}
                     </optgroup>
