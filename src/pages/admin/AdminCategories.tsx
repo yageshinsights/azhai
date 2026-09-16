@@ -131,7 +131,7 @@ export default function AdminCategories() {
                     <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent" />
 
                     <div className="absolute top-3 left-3 bg-[#701626] text-[#DFBF77] font-bold text-[9.5px] uppercase tracking-wider px-2.5 py-0.5 rounded-full border border-[#C5A059]/40 shadow-sm">
-                      {cat.season || 'Core Edit'}
+                      {cat.season || 'Signature Drapes'}
                     </div>
 
                     {/* Hero Featured Badge & Direct Toggle */}
@@ -151,7 +151,7 @@ export default function AdminCategories() {
 
                     <div className="absolute bottom-3 left-3 right-3 text-white">
                       <h4 className="font-display text-lg font-bold">{cat.name}</h4>
-                      <p className="text-[10.5px] text-white/80 line-clamp-1">{cat.tagline}</p>
+                      <p className="text-[10.5px] text-white/80 line-clamp-1 italic font-serif">"{cat.tagline || cat.description || 'Bespoke handloom couture'}"</p>
                     </div>
                   </div>
 

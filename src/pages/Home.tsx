@@ -88,6 +88,18 @@ export default function Home() {
 
   const currentCategory = heroCategories[activeSlide] || heroCategories[0];
 
+  // Dynamic product count calculated from live products assigned to this collection
+  const currentCategoryCount = useMemo(() => {
+    if (!currentCategory) return 0;
+    const count = allProducts.filter((p) =>
+      p.categories?.some((c) => c.slug === currentCategory.slug || c.id === currentCategory.id)
+    ).length;
+    return count > 0 ? count : (currentCategory.count || 8);
+  }, [allProducts, currentCategory]);
+
+  const heroBadgeLabel = currentCategory?.season || 'Signature Drapes';
+  const heroSubtitle = currentCategory?.tagline || currentCategory?.description;
+
   const filteredProducts = allProducts.filter((p) => {
     if (selectedCategory === 'all') return true;
     return p.categories.some((c) => c.slug === selectedCategory);
@@ -183,7 +195,7 @@ export default function Home() {
                 <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
               </span>
               <span className="text-[9px] sm:text-[10.5px] uppercase tracking-[0.25em] text-[#DFBF77] font-bold">
-                Colombo Atelier · {currentCategory?.season || 'Festive Drop'} · {currentCategory?.count || 6} Handcrafted Edits
+                Colombo Atelier · {heroBadgeLabel} · {currentCategoryCount} Handcrafted Edits
               </span>
             </motion.div>
 
@@ -200,9 +212,9 @@ export default function Home() {
                 <h2 className="font-display text-4xl sm:text-6xl md:text-7xl lg:text-[4.75rem] font-bold text-white tracking-tight leading-[1.06] text-balance drop-shadow-md">
                   {currentCategory?.name}
                 </h2>
-                {currentCategory?.description && (
+                {heroSubtitle && (
                   <p className="text-xs sm:text-base text-[#FCFBF8]/90 font-light max-w-xl leading-relaxed border-l-2 border-[#DFBF77]/60 pl-3.5 sm:pl-4 italic font-serif">
-                    "{currentCategory?.description}"
+                    "{heroSubtitle}"
                   </p>
                 )}
               </motion.div>

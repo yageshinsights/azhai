@@ -181,63 +181,67 @@ export default function CategoryModal({ isOpen, onClose, onSave, initialCategory
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
-            {/* Collection Name & Slug */}
+            {/* ── 1. HERO SLIDE HEADLINE & ROUTE ── */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1">
                 <label className="block text-xs font-bold text-[#110B0E] uppercase tracking-wider">
-                  Category Name *
+                  Category Name (Hero Headline) *
                 </label>
                 <input
                   type="text"
                   value={name}
                   onChange={(e) => handleNameChange(e.target.value)}
-                  placeholder="e.g. Bridal Lehengas"
+                  placeholder="e.g. Sarees"
                   required
                   className="w-full px-3.5 py-2.5 rounded-xl bg-[#F7F4EE]/70 border border-[#C5A059]/30 text-xs font-medium focus:border-[#701626] focus:bg-white focus:outline-none"
                 />
+                <p className="text-[10px] text-[#6D6268]">Large headline displayed on homepage slider</p>
               </div>
 
               <div className="space-y-1">
                 <label className="block text-xs font-bold text-[#110B0E] uppercase tracking-wider">
-                  URL Slug
+                  URL Slug *
                 </label>
                 <input
                   type="text"
                   value={slug}
                   onChange={(e) => setSlug(e.target.value)}
-                  placeholder="bridal-lehengas"
+                  placeholder="sarees"
                   required
                   className="w-full px-3.5 py-2.5 rounded-xl bg-[#F7F4EE]/70 border border-[#C5A059]/30 text-xs font-mono text-[#701626] focus:border-[#701626] focus:bg-white focus:outline-none"
                 />
+                <p className="text-[10px] text-[#6D6268]">Catalog URL: /collections/{slug || '...'}</p>
               </div>
             </div>
 
-            {/* Season & Tagline */}
+            {/* ── 2. HERO EYEBROW BADGE & SUBTITLE QUOTE ── */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1">
                 <label className="block text-xs font-bold text-[#110B0E] uppercase tracking-wider">
-                  Season / Badge Label
+                  Season / Eyebrow Badge
                 </label>
                 <input
                   type="text"
                   value={season}
                   onChange={(e) => setSeason(e.target.value)}
-                  placeholder="Bridal Edit 2026"
+                  placeholder="e.g. Signature Drapes"
                   className="w-full px-3.5 py-2.5 rounded-xl bg-[#F7F4EE]/70 border border-[#C5A059]/30 text-xs focus:border-[#701626] focus:bg-white focus:outline-none"
                 />
+                <p className="text-[10px] text-[#6D6268]">In beacon badge: COLOMBO ATELIER · [TAG] · X EDITS</p>
               </div>
 
               <div className="space-y-1">
                 <label className="block text-xs font-bold text-[#110B0E] uppercase tracking-wider">
-                  Short Subtitle / Tagline
+                  Hero Subtitle Quote (Tagline)
                 </label>
                 <input
                   type="text"
                   value={tagline}
                   onChange={(e) => setTagline(e.target.value)}
-                  placeholder="Royal ceremonial silhouettes & zari drape."
+                  placeholder="e.g. Hand-painted organza & pure mulberry silk sarees."
                   className="w-full px-3.5 py-2.5 rounded-xl bg-[#F7F4EE]/70 border border-[#C5A059]/30 text-xs focus:border-[#701626] focus:bg-white focus:outline-none"
                 />
+                <p className="text-[10px] text-[#6D6268]">Italic quotation directly under the headline</p>
               </div>
             </div>
 
@@ -285,45 +289,63 @@ export default function CategoryModal({ isOpen, onClose, onSave, initialCategory
                   />
 
                   {heroImage ? (
-                    /* Image Uploaded Preview Card */
-                    <div className="relative rounded-2xl overflow-hidden border border-[#C5A059]/40 group aspect-[16/9] bg-[#110B0E]">
+                    /* Image Uploaded Preview Card — Mimics Live Hero Slide */
+                    <div className="relative rounded-2xl overflow-hidden border border-[#C5A059]/40 group aspect-[16/10] bg-[#110B0E]">
                       <img
                         src={heroImage}
                         alt="Collection Hero"
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                       />
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent flex flex-col justify-between p-4 text-white">
+                      {/* Live Couture lighting gradients */}
+                      <div className="absolute inset-0 bg-gradient-to-t from-[#0D0709] via-[#0D0709]/60 via-50% to-transparent" />
+                      <div className="absolute inset-0 bg-gradient-to-r from-[#0D0709]/80 via-[#701626]/20 to-transparent" />
+
+                      <div className="absolute inset-0 flex flex-col justify-between p-4 text-white">
                         <div className="flex items-center justify-between">
-                          <span className="text-[10px] bg-[#701626] px-2.5 py-0.5 rounded-full font-bold uppercase tracking-wider border border-[#C5A059]/40">
-                            {season || 'Collection Banner'}
-                          </span>
-                          <span className="text-[10px] bg-black/60 px-2 py-0.5 rounded-md font-mono text-emerald-400 flex items-center gap-1">
-                            <Check className="w-3 h-3" /> Ready
+                          {/* Live Eyebrow Beacon Preview */}
+                          <div className="inline-flex items-center gap-1.5 bg-black/60 backdrop-blur-md px-2.5 py-1 rounded-full border border-[#DFBF77]/50 shadow-md">
+                            <span className="relative flex h-1.5 w-1.5">
+                              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                              <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500" />
+                            </span>
+                            <span className="text-[8.5px] uppercase tracking-[0.2em] text-[#DFBF77] font-bold">
+                              Colombo Atelier · {(season || 'Signature Drapes').toUpperCase()}
+                            </span>
+                          </div>
+
+                          <span className="text-[9.5px] bg-black/60 px-2 py-0.5 rounded-md font-mono text-emerald-400 flex items-center gap-1 border border-emerald-500/30">
+                            <Check className="w-3 h-3" /> Live Mockup
                           </span>
                         </div>
 
-                        <div>
-                          <p className="font-display font-bold text-lg text-white drop-shadow-sm leading-tight">
-                            {name || 'New Collection'}
+                        <div className="space-y-1.5">
+                          <p className="font-display font-bold text-xl sm:text-2xl text-white drop-shadow-md leading-tight">
+                            {name || 'Collection Headline'}
                           </p>
-                          <p className="text-xs text-white/80 line-clamp-1 drop-shadow-sm font-light">
-                            {tagline || 'Bespoke handloom artisan couture'}
-                          </p>
+                          {(tagline || description) && (
+                            <p className="text-[11px] text-[#FCFBF8]/90 italic font-serif border-l-2 border-[#DFBF77]/60 pl-2 line-clamp-2">
+                              "{tagline || description}"
+                            </p>
+                          )}
 
-                          <div className="flex gap-2 pt-2">
+                          <div className="flex items-center gap-2 pt-1.5">
+                            <span className="px-3 py-1 bg-[#701626] text-white text-[9px] uppercase tracking-wider font-bold rounded-full border border-[#DFBF77]/50 flex items-center gap-1">
+                              Explore {name || 'Edit'} →
+                            </span>
+                            <div className="flex-1" />
                             <button
                               type="button"
                               onClick={() => fileInputRef.current?.click()}
                               disabled={isUploading}
-                              className="px-3 py-1.5 bg-white text-[#110B0E] hover:bg-[#F7F4EE] rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-md transition-all cursor-pointer"
+                              className="px-2.5 py-1 bg-white text-[#110B0E] hover:bg-[#F7F4EE] rounded-lg text-[10.5px] font-bold flex items-center gap-1 shadow-md transition-all cursor-pointer"
                             >
-                              {isUploading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
+                              {isUploading ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
                               <span>{isUploading ? 'Uploading...' : 'Change Photo'}</span>
                             </button>
                             <button
                               type="button"
                               onClick={() => setHeroImage('')}
-                              className="px-3 py-1.5 bg-rose-600/90 hover:bg-rose-700 text-white rounded-xl text-xs font-bold transition-all cursor-pointer"
+                              className="px-2.5 py-1 bg-rose-600/90 hover:bg-rose-700 text-white rounded-lg text-[10.5px] font-bold transition-all cursor-pointer"
                             >
                               Remove
                             </button>
