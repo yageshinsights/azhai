@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Sparkles, Check, Mail, ArrowRight } from 'lucide-react';
-import { sendBrevoEmail, buildNewsletterWelcomeHtml } from '@/lib/brevo';
+import { sendBrevoEmail, buildNewsletterWelcomeHtml, createOrUpdateBrevoContact } from '@/lib/brevo';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import { useAuthStore } from '@/store/auth';
 
@@ -60,7 +60,18 @@ export default function NewsletterModal() {
         }
       }
 
-      // 2. Dispatch Welcome Email with ATELIER5 promo code via Brevo
+      // 2. Add/Sync Contact in Brevo Contact List (List ID 2: "Your first list")
+      await createOrUpdateBrevoContact({
+        email: cleanEmail,
+        name: cleanName,
+        attributes: {
+          OPT_IN: true,
+          SIGNUP_SOURCE: 'vip_popup',
+        },
+        listIds: [2],
+      });
+
+      // 3. Dispatch Welcome Email with ATELIER5 promo code via Brevo
       await sendBrevoEmail({
         to: [{ email: cleanEmail, name: cleanName }],
         subject: `✨ Welcome to the Azhai Circle — Enjoy 5% Privilege (Code: ATELIER5)`,

@@ -52,6 +52,43 @@ export default {
       }
     }
 
+    // ── 1b. Brevo Contact Management & Newsletter Sync ─────────
+    if (url.pathname === '/api/create-brevo-contact') {
+      if (request.method === 'POST') {
+        try {
+          const body = await request.json();
+          const apiKey = env.BREVO_API_KEY || env.VITE_BREVO_API_KEY || body.apiKey;
+
+          if (!apiKey) {
+            return new Response(JSON.stringify({ error: 'Brevo API key is not configured.' }), {
+              status: 400,
+              headers: { 'Content-Type': 'application/json', ...corsHeaders },
+            });
+          }
+
+          const brevoRes = await fetch('https://api.brevo.com/v3/contacts', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'api-key': apiKey,
+            },
+            body: JSON.stringify(body.payload),
+          });
+
+          const data = brevoRes.status === 204 ? { updated: true } : await brevoRes.json().catch(() => ({}));
+          return new Response(JSON.stringify(data), {
+            status: brevoRes.status,
+            headers: { 'Content-Type': 'application/json', ...corsHeaders },
+          });
+        } catch (err) {
+          return new Response(JSON.stringify({ error: err.message || 'Internal server error' }), {
+            status: 500,
+            headers: { 'Content-Type': 'application/json', ...corsHeaders },
+          });
+        }
+      }
+    }
+
     // ── 2. Payments.lk Create Checkout Session ─────────────────
     if (url.pathname === '/api/create-payments-lk-checkout') {
       if (request.method === 'POST') {

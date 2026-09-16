@@ -58,6 +58,52 @@ export default defineConfig(({ mode }) => {
             }
           });
 
+          // ── Brevo Contact Dev Server Proxy ──────────────────────────
+          server.middlewares.use('/api/create-brevo-contact', (req, res, next) => {
+            if (req.method === 'OPTIONS') {
+              res.statusCode = 204;
+              res.setHeader('Access-Control-Allow-Origin', '*');
+              res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+              res.setHeader('Access-Control-Allow-Headers', 'Content-Type, api-key');
+              res.end();
+              return;
+            }
+            if (req.method === 'POST') {
+              let body = '';
+              req.on('data', (chunk) => { body += chunk; });
+              req.on('end', async () => {
+                try {
+                  const parsed = JSON.parse(body);
+                  const apiKey = env.VITE_BREVO_API_KEY || parsed.apiKey;
+                  if (!apiKey) {
+                    res.statusCode = 400;
+                    res.setHeader('Content-Type', 'application/json');
+                    res.end(JSON.stringify({ error: 'Brevo API key is not set in .env' }));
+                    return;
+                  }
+                  const brevoRes = await fetch('https://api.brevo.com/v3/contacts', {
+                    method: 'POST',
+                    headers: {
+                      'Content-Type': 'application/json',
+                      'api-key': apiKey,
+                    },
+                    body: JSON.stringify(parsed.payload),
+                  });
+                  const data = brevoRes.status === 204 ? { updated: true } : await brevoRes.json().catch(() => ({}));
+                  res.statusCode = brevoRes.status;
+                  res.setHeader('Content-Type', 'application/json');
+                  res.end(JSON.stringify(data));
+                } catch (err: any) {
+                  res.statusCode = 500;
+                  res.setHeader('Content-Type', 'application/json');
+                  res.end(JSON.stringify({ error: err.message || 'Internal dev server proxy error' }));
+                }
+              });
+            } else {
+              next();
+            }
+          });
+
           // ── Payments.lk Dev Server Proxy ────────────────────────────
           const paymentsLkSecret = env.PAYMENTS_LK_SECRET_KEY || 'sk_test_A9ybTZkoMw9HrgiAvcAlFNdKqp6Kp7hm';
 

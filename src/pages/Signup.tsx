@@ -4,7 +4,7 @@ import { motion } from 'framer-motion';
 import { User, Mail, Phone, Lock, Eye, EyeOff, UserPlus, Sparkles, ArrowRight, ShieldCheck, Check } from 'lucide-react';
 import { useAuthStore } from '@/store/auth';
 import { validateEmail, validatePhone, getPasswordStrength } from '@/lib/auth-utils';
-import { sendBrevoEmail, buildWelcomeEmailHtml } from '@/lib/brevo';
+import { sendBrevoEmail, buildWelcomeEmailHtml, createOrUpdateBrevoContact } from '@/lib/brevo';
 import SEOHead from '@/components/SEOHead';
 
 export default function Signup() {
@@ -70,6 +70,18 @@ export default function Signup() {
     setLoading(false);
 
     if (res.success) {
+      // Sync customer to Brevo Contacts list (List ID 2: "Your first list")
+      createOrUpdateBrevoContact({
+        email: email.trim(),
+        name: fullName.trim(),
+        attributes: {
+          OPT_IN: newsletter,
+          SIGNUP_SOURCE: 'account_registration',
+          SMS: phone.trim() !== '+94' ? phone.trim() : undefined,
+        },
+        listIds: [2],
+      }).catch((err) => console.error('[Brevo Contact Sync Error]:', err));
+
       // Trigger Welcome Email to Customer
       sendBrevoEmail({
         to: [{ email: email.trim(), name: fullName.trim() }],

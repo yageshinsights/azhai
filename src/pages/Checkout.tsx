@@ -23,7 +23,7 @@ import { useAuthStore } from '@/store/auth';
 import { useAdminStore } from '@/store/admin';
 import BankBadge from '@/components/BankBadge';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
-import { sendBrevoEmail, buildOrderConfirmationHtml, buildAdminOrderAlertHtml } from '@/lib/brevo';
+import { sendBrevoEmail, buildOrderConfirmationHtml, buildAdminOrderAlertHtml, createOrUpdateBrevoContact } from '@/lib/brevo';
 import { initiatePaymentsLkCheckout } from '@/lib/payments-lk';
 import SEOHead from '@/components/SEOHead';
 import { 
@@ -298,6 +298,19 @@ export default function Checkout() {
         paymentMethod: orderData.paymentMethod,
         bankTransferDetails: orderData.bankTransferDetails,
       });
+
+      // Sync customer to Brevo Contacts list (List ID 2: "Your first list")
+      createOrUpdateBrevoContact({
+        email,
+        name: fullName,
+        attributes: {
+          CITY: city,
+          DISTRICT: district,
+          SMS: phone,
+          LAST_ORDER_ID: orderData.orderId,
+        },
+        listIds: [2],
+      }).catch((err) => console.error('[Brevo Contact Sync Error]:', err));
 
       await sendBrevoEmail({
         to: [{ email, name: fullName }],

@@ -90,6 +90,89 @@ export async function sendBrevoEmail(payload: SendEmailPayload): Promise<{ succe
   }
 }
 
+export interface BrevoContactPayload {
+  email: string;
+  name?: string;
+  attributes?: Record<string, any>;
+  listIds?: number[];
+}
+
+/**
+ * Creates or updates a subscriber in Brevo's master Contact list & CRM
+ */
+export async function createOrUpdateBrevoContact(
+  payload: BrevoContactPayload
+): Promise<{ success: boolean; error?: string }> {
+  const cleanEmail = payload.email.trim().toLowerCase();
+  const contactBody: Record<string, any> = {
+    email: cleanEmail,
+    updateEnabled: true,
+    listIds: payload.listIds || [2], // Default to List 2 ("Your first list")
+  };
+
+  const attributes: Record<string, any> = { ...payload.attributes };
+  if (payload.name) {
+    const parts = payload.name.trim().split(/\s+/);
+    attributes.FIRSTNAME = parts[0];
+    if (parts.length > 1) {
+      attributes.LASTNAME = parts.slice(1).join(' ');
+    }
+  }
+  if (Object.keys(attributes).length > 0) {
+    contactBody.attributes = attributes;
+  }
+
+  // 1. Try server-side proxy endpoint (/api/create-brevo-contact)
+  try {
+    const proxyRes = await fetch('/api/create-brevo-contact', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        apiKey: BREVO_API_KEY || undefined,
+        payload: contactBody,
+      }),
+    });
+
+    if (proxyRes.ok || proxyRes.status === 204) {
+      console.log(`[Brevo Contact Synced via Proxy]: ${cleanEmail}`);
+      return { success: true };
+    }
+
+    const errData = await proxyRes.json().catch(() => ({}));
+    console.warn('[Brevo Contact Proxy Non-200]:', errData);
+  } catch (proxyErr) {
+    console.warn('[Brevo Contact Proxy Unreachable, attempting direct fetch]:', proxyErr);
+  }
+
+  // 2. Direct fallback (if client has direct API key)
+  if (!BREVO_API_KEY) {
+    return { success: false, error: 'Brevo API key not configured' };
+  }
+
+  try {
+    const response = await fetch('https://api.brevo.com/v3/contacts', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'api-key': BREVO_API_KEY,
+      },
+      body: JSON.stringify(contactBody),
+    });
+
+    if (response.ok || response.status === 204) {
+      console.log(`[Brevo Contact Synced Direct]: ${cleanEmail}`);
+      return { success: true };
+    }
+
+    const errData = await response.json().catch(() => ({}));
+    console.error('[Brevo Contact Direct Error]:', errData);
+    return { success: false, error: errData.message || 'Failed to sync contact with Brevo' };
+  } catch (err: any) {
+    console.error('[Brevo Contact Fetch Exception]:', err);
+    return { success: false, error: err?.message || 'Network error syncing contact' };
+  }
+}
+
 // ── SHARED LUXURY EMAIL WRAPPER WITH EXACT BRAND LOGO & GOLD TRIM ──
 function wrapEmailLayout(title: string, bodyContent: string): string {
   return `

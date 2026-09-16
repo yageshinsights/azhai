@@ -4,7 +4,7 @@ import { motion } from 'framer-motion';
 import { Mail, MessageCircle, MapPin, Phone, Sparkles, Check, ArrowRight } from 'lucide-react';
 import { useAdminStore, cleanWhatsAppDigits } from '@/store/admin';
 import { STORE_INSTAGRAM_URL, STORE_EMAIL, STORE_ADDRESS_FULL, STORE_PHONE } from '@/lib/constants';
-import { sendBrevoEmail, buildNewsletterWelcomeHtml } from '@/lib/brevo';
+import { sendBrevoEmail, buildNewsletterWelcomeHtml, createOrUpdateBrevoContact } from '@/lib/brevo';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 
 function NewsletterFooterForm() {
@@ -35,6 +35,17 @@ function NewsletterFooterForm() {
           // fallback
         }
       }
+
+      // Add/Sync Contact in Brevo Contact List (List ID 2: "Your first list")
+      await createOrUpdateBrevoContact({
+        email: cleanEmail,
+        name: 'Valued Patron',
+        attributes: {
+          OPT_IN: true,
+          SIGNUP_SOURCE: 'footer_form',
+        },
+        listIds: [2],
+      });
 
       await sendBrevoEmail({
         to: [{ email: cleanEmail, name: 'Valued Patron' }],
