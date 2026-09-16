@@ -4,7 +4,7 @@ import { motion } from 'framer-motion';
 import { User, Mail, Phone, Lock, Eye, EyeOff, UserPlus, Sparkles, ArrowRight, ShieldCheck, Check } from 'lucide-react';
 import { useAuthStore } from '@/store/auth';
 import { validateEmail, validatePhone, getPasswordStrength } from '@/lib/auth-utils';
-import { sendBrevoEmail, buildWelcomeEmailHtml, createOrUpdateBrevoContact } from '@/lib/brevo';
+import { sendBrevoEmail, buildWelcomeEmailHtml, createOrUpdateBrevoContact, BREVO_LISTS } from '@/lib/brevo';
 import SEOHead from '@/components/SEOHead';
 
 export default function Signup() {
@@ -79,7 +79,7 @@ export default function Signup() {
           SIGNUP_SOURCE: 'account_registration',
           SMS: phone.trim() !== '+94' ? phone.trim() : undefined,
         },
-        listIds: [2],
+        listIds: [BREVO_LISTS.MEMBERS],
       }).catch((err) => console.error('[Brevo Contact Sync Error]:', err));
 
       // Trigger Welcome Email to Customer

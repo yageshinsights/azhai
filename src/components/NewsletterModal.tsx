@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Sparkles, Check, Mail, ArrowRight } from 'lucide-react';
-import { sendBrevoEmail, buildNewsletterWelcomeHtml, createOrUpdateBrevoContact } from '@/lib/brevo';
+import { sendBrevoEmail, buildNewsletterWelcomeHtml, createOrUpdateBrevoContact, BREVO_LISTS } from '@/lib/brevo';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import { useAuthStore } from '@/store/auth';
 
@@ -68,7 +68,7 @@ export default function NewsletterModal() {
           OPT_IN: true,
           SIGNUP_SOURCE: 'vip_popup',
         },
-        listIds: [2],
+        listIds: [BREVO_LISTS.NEWSLETTER],
       });
 
       // 3. Dispatch Welcome Email with ATELIER5 promo code via Brevo

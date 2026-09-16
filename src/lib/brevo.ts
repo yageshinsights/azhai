@@ -90,6 +90,12 @@ export async function sendBrevoEmail(payload: SendEmailPayload): Promise<{ succe
   }
 }
 
+export const BREVO_LISTS = {
+  NEWSLETTER: 5, // "VIP Newsletter Subscribers"
+  CUSTOMERS: 6,  // "Atelier Customers & Orders"
+  MEMBERS: 7,    // "Registered Members"
+} as const;
+
 export interface BrevoContactPayload {
   email: string;
   name?: string;
@@ -107,7 +113,7 @@ export async function createOrUpdateBrevoContact(
   const contactBody: Record<string, any> = {
     email: cleanEmail,
     updateEnabled: true,
-    listIds: payload.listIds || [2], // Default to List 2 ("Your first list")
+    listIds: payload.listIds || [BREVO_LISTS.NEWSLETTER],
   };
 
   const attributes: Record<string, any> = { ...payload.attributes };

@@ -23,7 +23,7 @@ import { useAuthStore } from '@/store/auth';
 import { useAdminStore } from '@/store/admin';
 import BankBadge from '@/components/BankBadge';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
-import { sendBrevoEmail, buildOrderConfirmationHtml, buildAdminOrderAlertHtml, createOrUpdateBrevoContact } from '@/lib/brevo';
+import { sendBrevoEmail, buildOrderConfirmationHtml, buildAdminOrderAlertHtml, createOrUpdateBrevoContact, BREVO_LISTS } from '@/lib/brevo';
 import { initiatePaymentsLkCheckout } from '@/lib/payments-lk';
 import SEOHead from '@/components/SEOHead';
 import { 
@@ -309,7 +309,7 @@ export default function Checkout() {
           SMS: phone,
           LAST_ORDER_ID: orderData.orderId,
         },
-        listIds: [2],
+        listIds: [BREVO_LISTS.CUSTOMERS],
       }).catch((err) => console.error('[Brevo Contact Sync Error]:', err));
 
       await sendBrevoEmail({
