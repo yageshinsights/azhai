@@ -181,24 +181,8 @@ export default function Home() {
 
         {/* Content Area */}
         <div className="relative z-20 px-4 sm:px-8 max-w-7xl mx-auto w-full my-auto py-2 sm:py-6">
-          <div className="max-w-2xl text-left space-y-3.5 sm:space-y-4">
+          <div className="max-w-3xl text-left space-y-4 sm:space-y-5">
             
-            {/* Season Badge with Live Beacon */}
-            <motion.div 
-              initial={{ opacity: 0, y: 15 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5 }}
-              className="inline-flex items-center gap-2.5 bg-black/45 backdrop-blur-md px-4 py-1.5 rounded-full border border-[#DFBF77]/50 shadow-xl"
-            >
-              <span className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
-              </span>
-              <span className="text-[9px] sm:text-[10.5px] uppercase tracking-[0.25em] text-[#DFBF77] font-bold">
-                Colombo Atelier · {heroBadgeLabel} · {currentCategoryCount} Handcrafted Edits
-              </span>
-            </motion.div>
-
             {/* Dynamic Collection Title & Storyline */}
             <AnimatePresence mode="wait">
               <motion.div
@@ -207,13 +191,13 @@ export default function Home() {
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -15 }}
                 transition={{ duration: 0.55, ease: [0.16, 1, 0.3, 1] }}
-                className="space-y-3"
+                className="space-y-3.5 sm:space-y-4"
               >
-                <h2 className="font-display text-4xl sm:text-6xl md:text-7xl lg:text-[4.75rem] font-bold text-white tracking-tight leading-[1.06] text-balance drop-shadow-md">
+                <h2 className="font-display text-5xl sm:text-7xl md:text-8xl lg:text-[5.5rem] xl:text-[6.5rem] font-bold text-white tracking-tight leading-[0.98] sm:leading-[1.02] text-balance drop-shadow-xl">
                   {currentCategory?.name}
                 </h2>
                 {heroSubtitle && (
-                  <p className="text-xs sm:text-base text-[#FCFBF8]/90 font-light max-w-xl leading-relaxed border-l-2 border-[#DFBF77]/60 pl-3.5 sm:pl-4 italic font-serif">
+                  <p className="text-sm sm:text-lg text-[#FCFBF8]/95 font-light max-w-xl leading-relaxed border-l-2 border-[#DFBF77]/70 pl-3.5 sm:pl-4 italic font-serif">
                     "{heroSubtitle}"
                   </p>
                 )}

@@ -301,25 +301,14 @@ export default function CategoryModal({ isOpen, onClose, onSave, initialCategory
                       <div className="absolute inset-0 bg-gradient-to-r from-[#0D0709]/80 via-[#701626]/20 to-transparent" />
 
                       <div className="absolute inset-0 flex flex-col justify-between p-4 text-white">
-                        <div className="flex items-center justify-between">
-                          {/* Live Eyebrow Beacon Preview */}
-                          <div className="inline-flex items-center gap-1.5 bg-black/60 backdrop-blur-md px-2.5 py-1 rounded-full border border-[#DFBF77]/50 shadow-md">
-                            <span className="relative flex h-1.5 w-1.5">
-                              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-                              <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500" />
-                            </span>
-                            <span className="text-[8.5px] uppercase tracking-[0.2em] text-[#DFBF77] font-bold">
-                              Colombo Atelier · {(season || 'Signature Drapes').toUpperCase()}
-                            </span>
-                          </div>
-
+                        <div className="flex items-center justify-end">
                           <span className="text-[9.5px] bg-black/60 px-2 py-0.5 rounded-md font-mono text-emerald-400 flex items-center gap-1 border border-emerald-500/30">
                             <Check className="w-3 h-3" /> Live Mockup
                           </span>
                         </div>
 
                         <div className="space-y-1.5">
-                          <p className="font-display font-bold text-xl sm:text-2xl text-white drop-shadow-md leading-tight">
+                          <p className="font-display font-bold text-2xl sm:text-3xl text-white drop-shadow-md leading-tight">
                             {name || 'Collection Headline'}
                           </p>
                           {(tagline || description) && (
