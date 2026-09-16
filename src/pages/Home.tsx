@@ -270,7 +270,7 @@ export default function Home() {
             </div>
 
             {/* Right side: Category Pills Strip (Horizontal scrolling on mobile, no-scrollbar, snap-x) */}
-            <div className="flex items-center gap-2 overflow-x-auto no-scrollbar w-full sm:w-auto py-1 snap-x scroll-smooth">
+            <div className="flex items-center gap-2 overflow-x-auto no-scrollbar w-full sm:w-auto py-1 pr-14 sm:pr-0 snap-x scroll-smooth">
               {heroCategories.map((col: Collection, idx: number) => {
                 const isActive = activeSlide === idx;
                 return (

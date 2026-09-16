@@ -41,7 +41,7 @@ export default function WhatsAppConcierge() {
   };
 
   return (
-    <div className={`fixed ${isProductPage ? 'bottom-36 lg:bottom-20' : 'bottom-24 lg:bottom-20'} right-4 sm:right-6 z-50 print:hidden transition-all duration-300`}>
+    <div className={`fixed ${isProductPage ? 'bottom-36 lg:bottom-8' : 'bottom-20 lg:bottom-6'} right-3.5 sm:right-6 z-50 print:hidden transition-all duration-300`}>
       <AnimatePresence>
         {isOpen && (
           <motion.div

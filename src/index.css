@@ -45,7 +45,7 @@
     letter-spacing: -0.01em;
   }
 
-  ::-webkit-scrollbar { width: 5px; }
+  ::-webkit-scrollbar { width: 5px; height: 5px; }
   ::-webkit-scrollbar-track { background: #FCFBF8; }
   ::-webkit-scrollbar-thumb { background: #C5A059; border-radius: 4px; }
 
@@ -53,6 +53,17 @@
     background: #701626;
     color: #FFFFFF;
   }
+}
+
+/* Hide scrollbar utility for sleek horizontal strips */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;  /* Firefox */
 }
 
 /* Haute Couture Luxury Glass & Cards */
