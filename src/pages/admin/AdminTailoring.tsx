@@ -27,6 +27,9 @@ export default function AdminTailoring() {
   const [isDressTypeModalOpen, setIsDressTypeModalOpen] = useState(false);
   const [editDressType, setEditDressType] = useState<DressType | null>(null);
 
+  // Tab 1 Collection Filter
+  const [collectionFilter, setCollectionFilter] = useState<string>('all');
+
   const [isFabricModalOpen, setIsFabricModalOpen] = useState(false);
   const [editFabric, setEditFabric] = useState<TailoringFabric | null>(null);
 
@@ -38,6 +41,11 @@ export default function AdminTailoring() {
 
   // Payments.lk Bespoke Payment Link Modal
   const [isPaymentLinkModalOpen, setIsPaymentLinkModalOpen] = useState(false);
+
+  // Filtered dress types for Tab 1
+  const filteredDressTypes = collectionFilter === 'all'
+    ? dressTypes
+    : dressTypes.filter(d => (d.collectionSlug || '').toLowerCase() === collectionFilter.toLowerCase());
 
   // Filtered fields/presets for sub-tabs
   const currentFields = measurementFields.filter(f => f.dressTypeId === selectedDressTypeId).sort((a, b) => a.displayOrder - b.displayOrder);
@@ -51,6 +59,26 @@ export default function AdminTailoring() {
     }
   };
 
+  const getCollectionBadge = (slug: string) => {
+    switch (slug) {
+      case 'kurties': return 'Kurties';
+      case 'sarees': return 'Sarees & Blouses';
+      case 'tops': return 'Tops & Bustiers';
+      case 'lehengas': return 'Lehengas';
+      case 'salwar-suits': return 'Salwar Suits';
+      default: return slug ? slug.charAt(0).toUpperCase() + slug.slice(1) : 'Collection';
+    }
+  };
+
+  const collectionTabs = [
+    { slug: 'all', label: 'All Collections', count: dressTypes.length },
+    { slug: 'kurties', label: 'Kurties', count: dressTypes.filter(d => d.collectionSlug === 'kurties').length },
+    { slug: 'sarees', label: 'Sarees', count: dressTypes.filter(d => d.collectionSlug === 'sarees').length },
+    { slug: 'tops', label: 'Tops', count: dressTypes.filter(d => d.collectionSlug === 'tops').length },
+    { slug: 'lehengas', label: 'Lehengas', count: dressTypes.filter(d => d.collectionSlug === 'lehengas').length },
+    { slug: 'salwar-suits', label: 'Salwar Suits', count: dressTypes.filter(d => d.collectionSlug === 'salwar-suits').length },
+  ];
+
   return (
     <AdminLayout>
       <div className="space-y-8">
@@ -60,7 +88,7 @@ export default function AdminTailoring() {
               <Scissors className="w-8 h-8 text-[#701626]" /> Custom Tailoring
             </h1>
             <p className="text-xs text-[#6D6268] font-light pt-1">
-              Manage bespoke dress types, fabric inventory, measurements, and size charts.
+              Manage bespoke garment collections, silhouettes, fabric inventory, measurements, and size charts.
             </p>
           </div>
 
@@ -76,7 +104,7 @@ export default function AdminTailoring() {
         {/* Tabs (Horizontally Scrollable on Mobile) */}
         <div className="flex items-center gap-2 border-b border-[#C5A059]/20 pb-2 overflow-x-auto scrollbar-none -mx-3 px-3 sm:mx-0 sm:px-0">
           {[
-            { id: 'dressTypes', label: 'Dress Types', icon: Ruler },
+            { id: 'dressTypes', label: 'Design Silhouettes', icon: Ruler },
             { id: 'fabrics', label: 'Fabrics Inventory', icon: Palette },
             { id: 'fields', label: 'Measurement Fields', icon: Settings2 },
             { id: 'presets', label: 'Size Charts', icon: Check }
@@ -97,43 +125,71 @@ export default function AdminTailoring() {
           })}
         </div>
 
-        {/* Tab 1: Dress Types */}
+        {/* Tab 1: Dress Types / Design Silhouettes */}
         {activeTab === 'dressTypes' && (
           <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
-            <div className="flex justify-end">
+            {/* Collection Filter & Add Button */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
+                {collectionTabs.map(c => (
+                  <button
+                    key={c.slug}
+                    onClick={() => setCollectionFilter(c.slug)}
+                    className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all shrink-0 cursor-pointer ${
+                      collectionFilter === c.slug
+                        ? 'bg-[#701626] text-white shadow-sm font-bold'
+                        : 'bg-[#F7F4EE] text-[#6D6268] hover:text-[#110B0E] hover:bg-[#DFBF77]/20'
+                    }`}
+                  >
+                    {c.label} ({c.count})
+                  </button>
+                ))}
+              </div>
               <button
                 onClick={() => { setEditDressType(null); setIsDressTypeModalOpen(true); }}
-                className="px-5 py-2.5 bg-[#701626] hover:bg-[#8E1E34] text-white text-xs font-bold uppercase tracking-wider rounded-2xl shadow-sm transition-all flex items-center gap-2"
+                className="px-5 py-2.5 bg-[#701626] hover:bg-[#8E1E34] text-white text-xs font-bold uppercase tracking-wider rounded-2xl shadow-sm transition-all flex items-center gap-2 shrink-0 self-start sm:self-auto cursor-pointer"
               >
-                <Plus className="w-4 h-4" /> Add New Dress Type
+                <Plus className="w-4 h-4" /> Add Design Silhouette
               </button>
             </div>
+
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5">
-              {dressTypes.map(dt => (
+              {filteredDressTypes.map(dt => (
                 <div key={dt.id} className="bg-white rounded-3xl overflow-hidden border border-[#C5A059]/30 shadow-sm flex flex-col group">
                   <div className="relative aspect-[3/4] w-full bg-gray-100">
                     <img src={dt.coverImage} alt={dt.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
-                    <div className="absolute top-3 left-3">
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
+                    
+                    {/* Top status & collection badges */}
+                    <div className="absolute top-3 left-3 right-3 flex items-center justify-between gap-2">
                       <span className={`text-[9.5px] font-bold px-2.5 py-0.5 rounded-full border shadow-sm ${dt.isActive ? 'bg-emerald-500 text-white border-emerald-300' : 'bg-gray-500 text-white border-gray-400'}`}>
                         {dt.isActive ? 'Active' : 'Inactive'}
                       </span>
+                      <span className="text-[9.5px] font-bold px-2.5 py-0.5 rounded-full bg-black/60 text-[#DFBF77] border border-[#DFBF77]/40 backdrop-blur-sm">
+                        {getCollectionBadge(dt.collectionSlug)}
+                      </span>
                     </div>
+
                     <div className="absolute bottom-3 left-3 right-3 text-white">
-                      <h4 className="font-display text-lg font-bold drop-shadow-md">{dt.name}</h4>
+                      <h4 className="font-display text-lg font-bold drop-shadow-md leading-snug">{dt.name}</h4>
                     </div>
                   </div>
                   <div className="p-4 space-y-3 flex-1 flex flex-col justify-between">
-                    <div className="space-y-1">
-                      <p className="text-xs text-[#6D6268] font-medium flex justify-between"><span>Fee:</span> <span className="text-[#110B0E]">{formatLKR(dt.stitchingFee)}</span></p>
-                      <p className="text-[11px] text-[#6D6268] flex justify-between"><span>Lead:</span> <span>{dt.leadTime}</span></p>
+                    <div className="space-y-1.5">
+                      {dt.description && (
+                        <p className="text-[11px] text-[#6D6268] line-clamp-2 leading-relaxed">
+                          {dt.description}
+                        </p>
+                      )}
+                      <p className="text-xs text-[#6D6268] font-medium flex justify-between pt-1"><span>Stitching:</span> <span className="text-[#110B0E] font-bold">{formatLKR(dt.stitchingFee)}</span></p>
+                      <p className="text-[11px] text-[#6D6268] flex justify-between"><span>Lead Time:</span> <span>{dt.leadTime}</span></p>
                     </div>
                     <div className="pt-3 border-t border-[#C5A059]/15 flex justify-end gap-2">
-                      <button onClick={() => safeCall(store.toggleDressTypeActive, dt.id)} className="p-1.5 text-gray-500 hover:text-emerald-600 bg-gray-50 hover:bg-emerald-50 rounded-lg transition-colors" title="Toggle Status">
+                      <button onClick={() => safeCall(store.toggleDressTypeActive, dt.id)} className="p-1.5 text-gray-500 hover:text-emerald-600 bg-gray-50 hover:bg-emerald-50 rounded-lg transition-colors cursor-pointer" title="Toggle Status">
                         {dt.isActive ? <ToggleRight className="w-4 h-4 text-emerald-600" /> : <ToggleLeft className="w-4 h-4" />}
                       </button>
-                      <button onClick={() => { setEditDressType(dt); setIsDressTypeModalOpen(true); }} className="p-1.5 text-gray-500 hover:text-[#701626] hover:bg-[#F7F4EE] rounded-lg transition-colors"><Edit2 className="w-4 h-4" /></button>
-                      <button onClick={() => safeCall(store.deleteDressType, dt.id)} className="p-1.5 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"><Trash2 className="w-4 h-4" /></button>
+                      <button onClick={() => { setEditDressType(dt); setIsDressTypeModalOpen(true); }} className="p-1.5 text-gray-500 hover:text-[#701626] hover:bg-[#F7F4EE] rounded-lg transition-colors cursor-pointer"><Edit2 className="w-4 h-4" /></button>
+                      <button onClick={() => safeCall(store.deleteDressType, dt.id)} className="p-1.5 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"><Trash2 className="w-4 h-4" /></button>
                     </div>
                   </div>
                 </div>
@@ -198,9 +254,24 @@ export default function AdminTailoring() {
           <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
             <div className="flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center bg-white p-4 rounded-3xl border border-[#C5A059]/30 shadow-sm">
               <div className="flex items-center gap-3">
-                <label className="text-xs font-bold text-[#110B0E] uppercase tracking-wider">Select Dress Type:</label>
+                <label className="text-xs font-bold text-[#110B0E] uppercase tracking-wider">Select Silhouette:</label>
                 <select value={selectedDressTypeId} onChange={(e) => setSelectedDressTypeId(Number(e.target.value))} className="px-3 py-2 rounded-xl bg-[#F7F4EE] border border-[#C5A059]/30 text-xs font-medium focus:outline-none focus:border-[#701626]">
-                  {dressTypes.map(dt => <option key={dt.id} value={dt.id}>{dt.name}</option>)}
+                  {['kurties', 'sarees', 'tops', 'lehengas', 'salwar-suits'].map(catSlug => {
+                    const groupItems = dressTypes.filter(d => d.collectionSlug === catSlug);
+                    if (groupItems.length === 0) return null;
+                    return (
+                      <optgroup key={catSlug} label={getCollectionBadge(catSlug)}>
+                        {groupItems.map(dt => <option key={dt.id} value={dt.id}>{dt.name}</option>)}
+                      </optgroup>
+                    );
+                  })}
+                  {dressTypes.filter(d => !['kurties', 'sarees', 'tops', 'lehengas', 'salwar-suits'].includes(d.collectionSlug)).length > 0 && (
+                    <optgroup label="Other Collections">
+                      {dressTypes.filter(d => !['kurties', 'sarees', 'tops', 'lehengas', 'salwar-suits'].includes(d.collectionSlug)).map(dt => (
+                        <option key={dt.id} value={dt.id}>{dt.name}</option>
+                      ))}
+                    </optgroup>
+                  )}
                 </select>
               </div>
               <button
@@ -248,9 +319,24 @@ export default function AdminTailoring() {
           <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
             <div className="flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center bg-white p-4 rounded-3xl border border-[#C5A059]/30 shadow-sm">
               <div className="flex items-center gap-3">
-                <label className="text-xs font-bold text-[#110B0E] uppercase tracking-wider">Select Dress Type:</label>
+                <label className="text-xs font-bold text-[#110B0E] uppercase tracking-wider">Select Silhouette:</label>
                 <select value={selectedDressTypeId} onChange={(e) => setSelectedDressTypeId(Number(e.target.value))} className="px-3 py-2 rounded-xl bg-[#F7F4EE] border border-[#C5A059]/30 text-xs font-medium focus:outline-none focus:border-[#701626]">
-                  {dressTypes.map(dt => <option key={dt.id} value={dt.id}>{dt.name}</option>)}
+                  {['kurties', 'sarees', 'tops', 'lehengas', 'salwar-suits'].map(catSlug => {
+                    const groupItems = dressTypes.filter(d => d.collectionSlug === catSlug);
+                    if (groupItems.length === 0) return null;
+                    return (
+                      <optgroup key={catSlug} label={getCollectionBadge(catSlug)}>
+                        {groupItems.map(dt => <option key={dt.id} value={dt.id}>{dt.name}</option>)}
+                      </optgroup>
+                    );
+                  })}
+                  {dressTypes.filter(d => !['kurties', 'sarees', 'tops', 'lehengas', 'salwar-suits'].includes(d.collectionSlug)).length > 0 && (
+                    <optgroup label="Other Collections">
+                      {dressTypes.filter(d => !['kurties', 'sarees', 'tops', 'lehengas', 'salwar-suits'].includes(d.collectionSlug)).map(dt => (
+                        <option key={dt.id} value={dt.id}>{dt.name}</option>
+                      ))}
+                    </optgroup>
+                  )}
                 </select>
               </div>
               <button

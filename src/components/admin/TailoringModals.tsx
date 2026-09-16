@@ -1,9 +1,18 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Sparkles, Upload, Loader2, RefreshCw, Link as LinkIcon, Check, Ruler, Palette } from 'lucide-react';
+import { useAdminStore } from '@/store/admin';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import { compressToWebP } from '@/lib/image-compressor';
 import type { DressType, TailoringFabric, MeasurementField, SizePreset } from '@/lib/tailoring';
+
+const DEFAULT_COLLECTION_OPTIONS = [
+  { slug: 'kurties', name: 'Kurties & Tunics' },
+  { slug: 'sarees', name: 'Sarees & Blouses' },
+  { slug: 'tops', name: 'Tops & Bustiers' },
+  { slug: 'lehengas', name: 'Lehengas & Skirts' },
+  { slug: 'salwar-suits', name: 'Salwar Suits & Sets' },
+];
 
 /* ── 1. Dress Type Modal ── */
 interface DressTypeModalProps {
@@ -14,8 +23,11 @@ interface DressTypeModalProps {
 }
 
 export function DressTypeModal({ isOpen, onClose, onSave, initial }: DressTypeModalProps) {
+  const storeCategories = useAdminStore((s) => s.categories) || [];
+  const [collectionSlug, setCollectionSlug] = useState('kurties');
   const [name, setName] = useState('');
   const [slug, setSlug] = useState('');
+  const [description, setDescription] = useState('');
   const [stitchingFee, setStitchingFee] = useState<number>(0);
   const [leadTime, setLeadTime] = useState('');
   const [coverImage, setCoverImage] = useState('');
@@ -28,8 +40,10 @@ export function DressTypeModal({ isOpen, onClose, onSave, initial }: DressTypeMo
 
   useEffect(() => {
     if (initial) {
+      setCollectionSlug(initial.collectionSlug || 'kurties');
       setName(initial.name);
       setSlug(initial.slug);
+      setDescription(initial.description || '');
       setStitchingFee(initial.stitchingFee);
       setLeadTime(initial.leadTime);
       setCoverImage(initial.coverImage);
@@ -37,8 +51,10 @@ export function DressTypeModal({ isOpen, onClose, onSave, initial }: DressTypeMo
       setDisplayOrder(initial.displayOrder);
       setShowUrlFallback(false);
     } else {
+      setCollectionSlug('kurties');
       setName('');
       setSlug('');
+      setDescription('');
       setStitchingFee(0);
       setLeadTime('');
       setCoverImage('');
@@ -112,12 +128,16 @@ export function DressTypeModal({ isOpen, onClose, onSave, initial }: DressTypeMo
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim() || !coverImage.trim()) return;
+    const matchedCat = storeCategories.find(c => c.slug === collectionSlug);
     onSave({
+      collectionId: matchedCat ? Number(matchedCat.id) : undefined,
+      collectionSlug,
       name: name.trim(),
       slug: slug.trim() || name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, ''),
       coverImage: coverImage.trim(),
       stitchingFee,
       leadTime: leadTime.trim(),
+      description: description.trim(),
       isActive,
       displayOrder,
     });
@@ -131,20 +151,45 @@ export function DressTypeModal({ isOpen, onClose, onSave, initial }: DressTypeMo
           <div className="flex items-center justify-between border-b border-[#C5A059]/20 pb-4">
             <div className="flex items-center gap-2">
               <Ruler className="w-5 h-5 text-[#C5A059]" />
-              <h3 className="font-display text-xl font-bold text-[#110B0E]">{initial ? 'Edit Dress Type' : 'Add Dress Type'}</h3>
+              <h3 className="font-display text-xl font-bold text-[#110B0E]">{initial ? 'Edit Design Silhouette' : 'Add Design Silhouette'}</h3>
             </div>
             <button onClick={onClose} className="w-8 h-8 rounded-full bg-[#F7F4EE] hover:bg-gray-200 flex items-center justify-center text-[#110B0E] transition-colors"><X className="w-4 h-4" /></button>
           </div>
           <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="space-y-1">
+              <label className="block text-xs font-bold text-[#110B0E] uppercase tracking-wider">Garment Collection / Category *</label>
+              <select
+                value={collectionSlug}
+                onChange={(e) => setCollectionSlug(e.target.value)}
+                className="w-full px-3.5 py-2.5 rounded-xl bg-[#F7F4EE]/70 border border-[#C5A059]/30 text-xs font-medium text-[#110B0E] focus:border-[#701626] focus:bg-white focus:outline-none"
+              >
+                {DEFAULT_COLLECTION_OPTIONS.map(c => (
+                  <option key={c.slug} value={c.slug}>{c.name}</option>
+                ))}
+                {storeCategories.filter(sc => !DEFAULT_COLLECTION_OPTIONS.some(dc => dc.slug === sc.slug)).map(c => (
+                  <option key={c.slug} value={c.slug}>{c.name}</option>
+                ))}
+              </select>
+            </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1">
-                <label className="block text-xs font-bold text-[#110B0E] uppercase tracking-wider">Dress Type Name *</label>
-                <input type="text" value={name} onChange={(e) => handleNameChange(e.target.value)} required className="w-full px-3.5 py-2.5 rounded-xl bg-[#F7F4EE]/70 border border-[#C5A059]/30 text-xs font-medium focus:border-[#701626] focus:bg-white focus:outline-none" />
+                <label className="block text-xs font-bold text-[#110B0E] uppercase tracking-wider">Design Silhouette Name *</label>
+                <input type="text" value={name} onChange={(e) => handleNameChange(e.target.value)} placeholder="e.g. Anarkali Flared Silhouette" required className="w-full px-3.5 py-2.5 rounded-xl bg-[#F7F4EE]/70 border border-[#C5A059]/30 text-xs font-medium focus:border-[#701626] focus:bg-white focus:outline-none" />
               </div>
               <div className="space-y-1">
                 <label className="block text-xs font-bold text-[#110B0E] uppercase tracking-wider">URL Slug</label>
                 <input type="text" value={slug} onChange={(e) => setSlug(e.target.value)} required className="w-full px-3.5 py-2.5 rounded-xl bg-[#F7F4EE]/70 border border-[#C5A059]/30 text-xs font-mono text-[#701626] focus:border-[#701626] focus:bg-white focus:outline-none" />
               </div>
+            </div>
+            <div className="space-y-1">
+              <label className="block text-xs font-bold text-[#110B0E] uppercase tracking-wider">Design & Cut Details</label>
+              <textarea
+                rows={2}
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="e.g. Flowing 12-kali flared silhouette with deep pockets and tailored sweetheart neckline."
+                className="w-full px-3.5 py-2 rounded-xl bg-[#F7F4EE]/70 border border-[#C5A059]/30 text-xs focus:border-[#701626] focus:bg-white focus:outline-none"
+              />
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1">

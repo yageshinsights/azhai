@@ -665,11 +665,14 @@ export const useAdminStore = create<AdminState>()(
               set({
                 dressTypes: dbDressTypes.map((dt: any) => ({
                   id: dt.id,
+                  collectionId: dt.collection_id || undefined,
+                  collectionSlug: dt.collection_slug || '',
                   name: dt.name,
                   slug: dt.slug,
                   coverImage: dt.cover_image || dt.icon || '',
                   stitchingFee: Number(dt.stitching_fee || 0),
                   leadTime: dt.lead_time || '5–7 working days',
+                  description: dt.description || '',
                   isActive: dt.is_active !== false,
                   displayOrder: Number(dt.display_order || 0),
                 })),
@@ -1444,11 +1447,14 @@ export const useAdminStore = create<AdminState>()(
         if (isSupabaseConfigured()) {
           try {
             const { data } = await supabase.from('tailoring_dress_types').insert({
+              collection_id: dt.collectionId || null,
+              collection_slug: dt.collectionSlug || '',
               name: dt.name,
               slug: dt.slug,
               cover_image: dt.coverImage,
               stitching_fee: dt.stitchingFee,
               lead_time: dt.leadTime,
+              description: dt.description || '',
               is_active: dt.isActive,
               display_order: dt.displayOrder,
             }).select().single();
@@ -1472,11 +1478,14 @@ export const useAdminStore = create<AdminState>()(
         if (isSupabaseConfigured()) {
           try {
             const dbPayload: any = {};
+            if (updates.collectionId !== undefined) dbPayload.collection_id = updates.collectionId;
+            if (updates.collectionSlug !== undefined) dbPayload.collection_slug = updates.collectionSlug;
             if (updates.name !== undefined) dbPayload.name = updates.name;
             if (updates.slug !== undefined) dbPayload.slug = updates.slug;
             if (updates.coverImage !== undefined) dbPayload.cover_image = updates.coverImage;
             if (updates.stitchingFee !== undefined) dbPayload.stitching_fee = updates.stitchingFee;
             if (updates.leadTime !== undefined) dbPayload.lead_time = updates.leadTime;
+            if (updates.description !== undefined) dbPayload.description = updates.description;
             if (updates.isActive !== undefined) dbPayload.is_active = updates.isActive;
             if (updates.displayOrder !== undefined) dbPayload.display_order = updates.displayOrder;
 

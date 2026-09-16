@@ -365,18 +365,26 @@ ON CONFLICT DO NOTHING;
 -- Add custom_measurements column to order_items if missing
 ALTER TABLE public.order_items ADD COLUMN IF NOT EXISTS custom_measurements JSONB;
 
--- Dress Types Table
+-- Dress Types Table (Hierarchical: Category/Collection -> Design Silhouette)
 CREATE TABLE IF NOT EXISTS public.tailoring_dress_types (
   id SERIAL PRIMARY KEY,
+  collection_id INTEGER REFERENCES public.categories(id) ON DELETE SET NULL,
+  collection_slug TEXT DEFAULT '',
   name TEXT NOT NULL,
   slug TEXT NOT NULL UNIQUE,
   cover_image TEXT DEFAULT '',
   stitching_fee INTEGER NOT NULL DEFAULT 0,
   lead_time TEXT DEFAULT '5–7 working days',
+  description TEXT DEFAULT '',
   is_active BOOLEAN DEFAULT true,
   display_order INTEGER DEFAULT 0,
   created_at TIMESTAMPTZ DEFAULT now()
 );
+
+-- Migration support for existing database installations
+ALTER TABLE public.tailoring_dress_types ADD COLUMN IF NOT EXISTS collection_id INTEGER REFERENCES public.categories(id) ON DELETE SET NULL;
+ALTER TABLE public.tailoring_dress_types ADD COLUMN IF NOT EXISTS collection_slug TEXT DEFAULT '';
+ALTER TABLE public.tailoring_dress_types ADD COLUMN IF NOT EXISTS description TEXT DEFAULT '';
 
 -- Fabrics Inventory Table
 CREATE TABLE IF NOT EXISTS public.tailoring_fabrics (
@@ -438,21 +446,43 @@ CREATE POLICY "Public Read Tailoring Presets" ON public.tailoring_size_presets F
 DROP POLICY IF EXISTS "Admin Full Tailoring Presets" ON public.tailoring_size_presets;
 CREATE POLICY "Admin Modify Tailoring Presets" ON public.tailoring_size_presets FOR ALL USING (auth.role() IN ('authenticated', 'service_role', 'anon')) WITH CHECK (auth.role() IN ('authenticated', 'service_role', 'anon'));
 
--- Initial Dress Types Seed
-INSERT INTO public.tailoring_dress_types (id, name, slug, cover_image, stitching_fee, lead_time, is_active, display_order) VALUES
-(1, 'Kurti Set', 'kurti-set', 'https://images.unsplash.com/photo-1610030469983-98e550d6193c?auto=format&fit=crop&w=600&q=85', 3500, '5–7 working days', true, 1),
-(2, 'Saree Blouse', 'saree-blouse', 'https://images.unsplash.com/photo-1583391733956-3750e0ff4e8b?auto=format&fit=crop&w=600&q=85', 2500, '3–5 working days', true, 2),
-(3, 'Salwar Suit', 'salwar-suit', 'https://images.unsplash.com/photo-1617627143750-d86bc21e42bb?auto=format&fit=crop&w=600&q=85', 4000, '7–10 working days', true, 3),
-(4, 'Lehenga Choli', 'lehenga-choli', 'https://images.unsplash.com/photo-1567401893414-76b7b1e5a7a5?auto=format&fit=crop&w=600&q=85', 5000, '10–14 working days', true, 4),
-(5, 'Top / Bustier', 'top-bustier', 'https://images.unsplash.com/photo-1594938298603-c8148c4dae35?auto=format&fit=crop&w=600&q=85', 2000, '3–5 working days', true, 5)
-ON CONFLICT (slug) DO NOTHING;
+-- Initial Dress Types Seed (10 Curated Silhouettes across 5 Garment Collections)
+INSERT INTO public.tailoring_dress_types (id, collection_slug, name, slug, cover_image, stitching_fee, lead_time, description, is_active, display_order) VALUES
+(1, 'kurties', 'Anarkali Flared Silhouette', 'anarkali-flared-kurti', 'https://images.unsplash.com/photo-1610030469983-98e550d6193c?auto=format&fit=crop&w=600&q=85', 3800, '5–7 working days', 'Flowing 12-kali flared silhouette with deep pockets and tailored sweetheart neckline.', true, 1),
+(2, 'kurties', 'Straight-Cut Slit Kurti Set', 'straight-cut-slit-kurti', 'https://images.unsplash.com/photo-1583391733956-3750e0ff4e8b?auto=format&fit=crop&w=600&q=85', 3200, '5–7 working days', 'Crisp contemporary straight cut with high side-slits, Mandarin collar, and cigarette pant pairing.', true, 2),
+(3, 'kurties', 'Corset Fitted Peplum Kurti', 'corset-fitted-peplum-kurti', 'https://images.unsplash.com/photo-1594938298603-c8148c4dae35?auto=format&fit=crop&w=600&q=85', 4200, '7–10 working days', 'Artisanal boned corset bodice tapering into a pleated peplum flare with silk churidar.', true, 3),
+(4, 'sarees', 'Sweetheart Padded Blouse', 'sweetheart-padded-blouse', 'https://images.unsplash.com/photo-1617627143750-d86bc21e42bb?auto=format&fit=crop&w=600&q=85', 2800, '3–5 working days', 'Sculpted sweetheart neckline with lightweight breathable padded cups and gold piping.', true, 4),
+(5, 'sarees', 'Princess Cut Deep-U Blouse', 'princess-cut-deep-u-blouse', 'https://images.unsplash.com/photo-1583391733956-3750e0ff4e8b?auto=format&fit=crop&w=600&q=85', 2500, '3–5 working days', 'Classic contoured princess darting with an artisanal deep-U back and handmade latkan tassels.', true, 5),
+(6, 'sarees', 'High-Neck Temple Border Blouse', 'high-neck-temple-blouse', 'https://images.unsplash.com/photo-1567401893414-76b7b1e5a7a5?auto=format&fit=crop&w=600&q=85', 3200, '5–7 working days', 'Regal Mandarin high collar tailored with elbow-length sleeves and antique border accents.', true, 6),
+(7, 'tops', 'Structured Corset Bustier', 'structured-corset-bustier', 'https://images.unsplash.com/photo-1594938298603-c8148c4dae35?auto=format&fit=crop&w=600&q=85', 2600, '3–5 working days', 'Architectural boned bustier crafted for luxury evening wear and fusion saree drapes.', true, 7),
+(8, 'tops', 'Balloon-Sleeve Organza Peplum', 'balloon-sleeve-organza-peplum', 'https://images.unsplash.com/photo-1610030469983-98e550d6193c?auto=format&fit=crop&w=600&q=85', 3100, '5–7 working days', 'Dramatic sheer bishop sleeves with button cuffs and a cinched waistline.', true, 8),
+(9, 'lehengas', 'Flared Royal Kalidar Lehenga', 'flared-royal-kalidar-lehenga', 'https://images.unsplash.com/photo-1567401893414-76b7b1e5a7a5?auto=format&fit=crop&w=600&q=85', 5500, '10–14 working days', 'Full 16-kali sweeping circle skirt with double cancan under-lining and heavy waistband.', true, 9),
+(10, 'salwar-suits', 'Patiala Royal Salwar Suit', 'patiala-royal-salwar-suit', 'https://images.unsplash.com/photo-1617627143750-d86bc21e42bb?auto=format&fit=crop&w=600&q=85', 4000, '7–10 working days', 'Full pleated traditional Patiala bottom paired with a knee-length tailored tunic.', true, 10)
+ON CONFLICT (slug) DO UPDATE SET
+  collection_slug = EXCLUDED.collection_slug,
+  name = EXCLUDED.name,
+  cover_image = EXCLUDED.cover_image,
+  stitching_fee = EXCLUDED.stitching_fee,
+  lead_time = EXCLUDED.lead_time,
+  description = EXCLUDED.description,
+  is_active = EXCLUDED.is_active,
+  display_order = EXCLUDED.display_order;
 
--- Initial Fabrics Seed
+-- Initial Fabrics Seed (Compatible with Silhouettes 1-10)
 INSERT INTO public.tailoring_fabrics (id, name, slug, swatch_image, price_per_unit, unit, weight, compatible_dress_type_ids, in_stock, display_order) VALUES
-(1, 'Kanjivaram Mulberry Silk', 'kanjivaram-mulberry-silk', 'https://images.unsplash.com/photo-1610030469983-98e550d6193c?auto=format&fit=crop&w=400&q=80', 4200, 'meter', '85 GSM · Heavy Fall', '{1,2,3,4}', true, 1),
-(2, 'Featherlight Sheer Organza', 'featherlight-sheer-organza', 'https://images.unsplash.com/photo-1583391733956-3750e0ff4e8b?auto=format&fit=crop&w=400&q=80', 3200, 'meter', '28 GSM · Ultra Light', '{1,2,4,5}', true, 2),
-(3, 'Zari-Embroidered Pure Silk', 'zari-embroidered-pure-silk', 'https://images.unsplash.com/photo-1617627143750-d86bc21e42bb?auto=format&fit=crop&w=400&q=80', 5500, 'meter', '75 GSM · Fluid Wrap', '{1,2,3,4}', true, 3),
-(4, 'Handloom Cotton-Silk Chanderi', 'handloom-cotton-silk-chanderi', 'https://images.unsplash.com/photo-1567401893414-76b7b1e5a7a5?auto=format&fit=crop&w=400&q=80', 2800, 'meter', '45 GSM · Breathable', '{1,3,5}', true, 4)
+(1, 'Kanjivaram Mulberry Silk', 'kanjivaram-mulberry-silk', 'https://images.unsplash.com/photo-1610030469983-98e550d6193c?auto=format&fit=crop&w=400&q=80', 4200, 'meter', '85 GSM · Heavy Fall', '{1,2,3,4,5,6,9,10}', true, 1),
+(2, 'Featherlight Sheer Organza', 'featherlight-sheer-organza', 'https://images.unsplash.com/photo-1583391733956-3750e0ff4e8b?auto=format&fit=crop&w=400&q=80', 3200, 'meter', '28 GSM · Ultra Light', '{1,3,4,7,8,9}', true, 2),
+(3, 'Zari-Embroidered Pure Silk', 'zari-embroidered-pure-silk', 'https://images.unsplash.com/photo-1617627143750-d86bc21e42bb?auto=format&fit=crop&w=400&q=80', 5500, 'meter', '75 GSM · Fluid Wrap', '{1,2,3,4,5,6,7,9,10}', true, 3),
+(4, 'Handloom Cotton-Silk Chanderi', 'handloom-cotton-silk-chanderi', 'https://images.unsplash.com/photo-1567401893414-76b7b1e5a7a5?auto=format&fit=crop&w=400&q=80', 2800, 'meter', '45 GSM · Breathable', '{1,2,7,8,10}', true, 4)
+ON CONFLICT (slug) DO UPDATE SET
+  name = EXCLUDED.name,
+  swatch_image = EXCLUDED.swatch_image,
+  price_per_unit = EXCLUDED.price_per_unit,
+  unit = EXCLUDED.unit,
+  weight = EXCLUDED.weight,
+  compatible_dress_type_ids = EXCLUDED.compatible_dress_type_ids,
+  in_stock = EXCLUDED.in_stock,
+  display_order = EXCLUDED.display_order;
 -- ══════════════════════════════════════════════════════════════
 -- 7. BRAND ASSETS STORAGE BUCKET & PUBLIC ACCESS
 -- ══════════════════════════════════════════════════════════════
