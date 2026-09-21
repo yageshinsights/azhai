@@ -47,43 +47,6 @@ interface AbandonedCart {
   emailSent: boolean;
 }
 
-const SAMPLE_ABANDONED_CARTS: AbandonedCart[] = [
-  {
-    id: 'cart-1',
-    customerName: 'Ananya S.',
-    customerEmail: 'ananya.desilva@gmail.com',
-    items: [
-      { name: 'Sacred Crimson Kanjivaram Silk Saree', size: 'Standard (6.25m)', price: 'LKR 48,500', image: 'https://images.unsplash.com/photo-1610030469983-98e550d6193c?auto=format&fit=crop&w=400&q=80' },
-      { name: 'Gold Bullion Latkan Tassels Add-on', size: 'Pair', price: 'LKR 2,400', image: 'https://images.unsplash.com/photo-1583391733956-3750e0ff4e8b?auto=format&fit=crop&w=400&q=80' },
-    ],
-    totalValue: 50900,
-    abandonedAt: '2 hours ago',
-    emailSent: false,
-  },
-  {
-    id: 'cart-2',
-    customerName: 'Dilhani P.',
-    customerEmail: 'dilhani.perera@yahoo.com',
-    items: [
-      { name: 'Ivory Lotus Handloom Kurta & Shawl Set', size: 'M', price: 'LKR 32,000', image: 'https://images.unsplash.com/photo-1594938298603-c8148c4dae35?auto=format&fit=crop&w=400&q=80' },
-    ],
-    totalValue: 32000,
-    abandonedAt: '6 hours ago',
-    emailSent: true,
-  },
-  {
-    id: 'cart-3',
-    customerName: 'Menaka J.',
-    customerEmail: 'menaka.j@outlook.com',
-    items: [
-      { name: 'Peacock Emerald Banarasi Brocade Saree', size: 'Standard (6.25m)', price: 'LKR 54,000', image: 'https://images.unsplash.com/photo-1617627143750-d86bc21e42bb?auto=format&fit=crop&w=400&q=80' },
-    ],
-    totalValue: 54000,
-    abandonedAt: '1 day ago',
-    emailSent: false,
-  }
-];
-
 export default function AdminMarketing() {
   const { coupons, addCoupon, toggleCoupon, deleteCoupon, settings, updateSettings } = useAdminStore();
   const [activeTab, setActiveTab] = useState<'coupons' | 'abandoned' | 'templates'>('coupons');
@@ -93,63 +56,62 @@ export default function AdminMarketing() {
   const [savedToast, setSavedToast] = useState<string | null>(null);
 
   // Abandoned Carts State
-  const [abandonedCarts, setAbandonedCarts] = useState<AbandonedCart[]>(SAMPLE_ABANDONED_CARTS);
+  const [abandonedCarts, setAbandonedCarts] = useState<AbandonedCart[]>([]);
+  const [isLoadingCarts, setIsLoadingCarts] = useState(false);
   const [sendingCartId, setSendingCartId] = useState<string | null>(null);
 
   // Test Email State
   const [testEmailAddress, setTestEmailAddress] = useState('yagesh.xtreme@gmail.com');
   const [sendingTestType, setSendingTestType] = useState<string | null>(null);
 
-  // Sync live abandoned carts from Supabase
-  useEffect(() => {
-    if (!isSupabaseConfigured()) return;
-    let isMounted = true;
-
-    async function fetchAbandoned() {
-      try {
-        const { data, error } = await supabase
-          .from('abandoned_carts')
-          .select('*')
-          .order('updated_at', { ascending: false });
-
-        if (error) {
-          console.warn('[Supabase Abandoned Carts Warning]:', error.message);
-          return;
-        }
-
-        if (isMounted && data && data.length > 0) {
-          const mapped: AbandonedCart[] = data.map((d: any) => ({
-            id: d.id,
-            customerName: d.customer_name || 'Valued Patron',
-            customerEmail: d.customer_email,
-            items: (d.items || []).map((i: any) => ({
-              name: i.name || 'Bespoke Garment',
-              size: i.size || (i.tailoring ? 'Tailored' : 'Standard'),
-              price: typeof i.price === 'number' ? `LKR ${i.price.toLocaleString('en-LK')}` : i.price,
-              image: i.image || '',
-            })),
-            totalValue: Number(d.total_value) || 0,
-            abandonedAt: d.updated_at
-              ? new Date(d.updated_at).toLocaleDateString('en-US', {
-                  month: 'short',
-                  day: 'numeric',
-                  hour: '2-digit',
-                  minute: '2-digit',
-                })
-              : 'Recently',
-            emailSent: !!d.email_sent,
-          }));
-          setAbandonedCarts(mapped);
-        }
-      } catch (e) {
-        console.warn('[Supabase Fetch Abandoned Carts Exception]:', e);
-      }
+  // Sync live abandoned carts strictly from Supabase
+  const fetchAbandoned = async () => {
+    if (!isSupabaseConfigured()) {
+      setAbandonedCarts([]);
+      return;
     }
+    setIsLoadingCarts(true);
+    try {
+      const { data, error } = await supabase
+        .from('abandoned_carts')
+        .select('*')
+        .order('updated_at', { ascending: false });
 
+      if (error) {
+        console.warn('[Supabase Abandoned Carts Warning]:', error.message);
+      } else if (data) {
+        const mapped: AbandonedCart[] = data.map((d: any) => ({
+          id: d.id,
+          customerName: d.customer_name || 'Valued Patron',
+          customerEmail: d.customer_email,
+          items: (d.items || []).map((i: any) => ({
+            name: i.name || 'Bespoke Garment',
+            size: i.size || (i.tailoring ? 'Tailored' : 'Standard'),
+            price: typeof i.price === 'number' ? `LKR ${i.price.toLocaleString('en-LK')}` : (i.price || 'LKR 0'),
+            image: i.image || '',
+          })),
+          totalValue: Number(d.total_value) || 0,
+          abandonedAt: d.updated_at
+            ? new Date(d.updated_at).toLocaleDateString('en-US', {
+                month: 'short',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
+              })
+            : 'Recently',
+          emailSent: !!d.email_sent,
+        }));
+        setAbandonedCarts(mapped);
+      }
+    } catch (e) {
+      console.warn('[Supabase Fetch Abandoned Carts Exception]:', e);
+    } finally {
+      setIsLoadingCarts(false);
+    }
+  };
+
+  useEffect(() => {
     fetchAbandoned();
-    return () => {
-      isMounted = false;
-    };
   }, []);
 
   const showToast = (msg: string) => {
@@ -189,12 +151,29 @@ export default function AdminMarketing() {
     
     setAbandonedCarts(prev => prev.map(c => c.id === cart.id ? { ...c, emailSent: true } : c));
 
-    if (isSupabaseConfigured() && cart.id.length > 30) {
-      supabase.from('abandoned_carts').update({ email_sent: true }).eq('id', cart.id).then();
+    if (isSupabaseConfigured()) {
+      try {
+        await supabase.from('abandoned_carts').update({ email_sent: true }).eq('id', cart.id);
+      } catch (err) {
+        console.warn('[Supabase Update Abandoned Cart Error]:', err);
+      }
     }
 
     setSendingCartId(null);
     showToast(`Recovery email dispatched to ${cart.customerEmail}!`);
+  };
+
+  // Dismiss / Delete Abandoned Cart Record
+  const handleDeleteAbandonedCart = async (cartId: string) => {
+    setAbandonedCarts(prev => prev.filter(c => c.id !== cartId));
+    if (isSupabaseConfigured()) {
+      try {
+        await supabase.from('abandoned_carts').delete().eq('id', cartId);
+      } catch (err) {
+        console.warn('[Supabase Delete Abandoned Cart Error]:', err);
+      }
+    }
+    showToast('Abandoned bag record dismissed.');
   };
 
   // Send Test Email Template to Admin
@@ -425,7 +404,7 @@ export default function AdminMarketing() {
                     type="text"
                     value={tickerText}
                     onChange={(e) => setTickerText(e.target.value)}
-                    placeholder="✨ Festive Drop Live: Complimentary Island-wide Delivery on Orders over LKR 15,000..."
+                    placeholder="✨ Festive Drop Live: Handcrafted Heirloom Silks by Preethi | Use Code AZHAI10..."
                     className="w-full px-4 py-3 rounded-2xl bg-[#F7F4EE]/70 border border-[#C5A059]/30 text-xs focus:border-[#701626] focus:bg-white focus:outline-none"
                   />
                 </div>
@@ -532,73 +511,109 @@ export default function AdminMarketing() {
                     Shoppers who left handcrafted items in their bag without completing payment.
                   </p>
                 </div>
-                <div className="text-xs bg-[#701626]/10 text-[#701626] font-bold px-3 py-1.5 rounded-xl self-start sm:self-auto">
-                  Total Value: LKR {abandonedCarts.reduce((acc, c) => acc + c.totalValue, 0).toLocaleString()}
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={fetchAbandoned}
+                    disabled={isLoadingCarts}
+                    className="px-3 py-1.5 bg-white border border-[#C5A059]/30 hover:border-[#701626] rounded-xl text-[#701626] hover:bg-[#F7F4EE] transition-all cursor-pointer flex items-center gap-1.5 text-xs font-semibold shadow-xs"
+                    title="Refresh live abandoned bags from database"
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 ${isLoadingCarts ? 'animate-spin' : ''}`} />
+                    <span>{isLoadingCarts ? 'Refreshing...' : 'Refresh'}</span>
+                  </button>
+                  <div className="text-xs bg-[#701626]/10 text-[#701626] font-bold px-3 py-1.5 rounded-xl self-start sm:self-auto">
+                    Total Value: LKR {abandonedCarts.reduce((acc, c) => acc + c.totalValue, 0).toLocaleString()}
+                  </div>
                 </div>
               </div>
 
               <div className="space-y-4 pt-2">
-                {abandonedCarts.map((cart) => (
-                  <div
-                    key={cart.id}
-                    className="p-4 sm:p-5 rounded-2xl bg-[#FCFBF8] border border-[#DFBF77] flex flex-col lg:flex-row lg:items-center justify-between gap-4 shadow-xs"
-                  >
-                    <div className="space-y-2">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="font-bold text-sm text-[#110B0E]">{cart.customerName}</span>
-                        <span className="text-xs text-[#6D6268] break-all">({cart.customerEmail})</span>
-                        <span className="text-[10px] bg-amber-50 text-amber-800 border border-amber-200 px-2 py-0.5 rounded-full font-bold flex items-center gap-1">
-                          <Clock className="w-3 h-3" /> {cart.abandonedAt}
-                        </span>
-                      </div>
-
-                      {/* Items Preview */}
-                      <div className="flex flex-wrap items-center gap-2">
-                        {cart.items.map((it, idx) => (
-                          <div key={idx} className="flex items-center gap-2 bg-white px-2.5 py-1.5 rounded-xl border border-[#C5A059]/30 text-xs">
-                            <img src={it.image} alt="" className="w-6 h-6 object-cover rounded-md shrink-0" />
-                            <span className="font-medium text-[#110B0E] truncate max-w-[150px] sm:max-w-[220px]">{it.name}</span>
-                            <span className="text-[#701626] font-bold shrink-0">{it.price}</span>
-                          </div>
-                        ))}
-                      </div>
+                {abandonedCarts.length === 0 ? (
+                  <div className="p-8 sm:p-14 text-center bg-[#FCFBF8] border border-[#DFBF77]/40 rounded-2xl space-y-3">
+                    <div className="w-12 h-12 rounded-2xl bg-[#701626]/10 text-[#701626] mx-auto flex items-center justify-center">
+                      <ShoppingCart className="w-6 h-6 text-[#701626]" />
                     </div>
-
-                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between lg:justify-end gap-3 pt-3 lg:pt-0 border-t border-[#C5A059]/20 lg:border-t-0 shrink-0">
-                      <div className="text-left sm:text-right">
-                        <p className="text-[10px] uppercase text-[#6D6268] font-bold">Cart Total</p>
-                        <p className="font-display text-base font-bold text-[#701626]">
-                          LKR {cart.totalValue.toLocaleString()}
-                        </p>
-                      </div>
-
-                      <button
-                        type="button"
-                        disabled={sendingCartId === cart.id || cart.emailSent}
-                        onClick={() => handleSendRecoveryEmail(cart)}
-                        className={`w-full sm:w-auto px-4 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
-                          cart.emailSent
-                            ? 'bg-emerald-50 text-emerald-800 border border-emerald-200 cursor-default'
-                            : 'bg-[#701626] hover:bg-[#8E1E34] text-white shadow-sm'
-                        }`}
-                      >
-                        {sendingCartId === cart.id ? (
-                          <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                        ) : cart.emailSent ? (
-                          <>
-                            <Check className="w-3.5 h-3.5 text-emerald-600" />
-                            <span>Email Dispatched</span>
-                          </>
-                        ) : (
-                          <>
-                            <Send className="w-3.5 h-3.5" />
-                            <span>Send Recovery Email (5% Off)</span>
-                          </>
-                        )}
-                      </button>
+                    <div className="space-y-1">
+                      <h4 className="font-display text-base font-bold text-[#110B0E]">No Abandoned Carts Found</h4>
+                      <p className="text-xs text-[#6D6268] max-w-md mx-auto leading-relaxed">
+                        All patron shopping bags are currently completed or active. Live unrecovered carts will automatically appear here whenever a patron leaves without completing checkout.
+                      </p>
                     </div>
                   </div>
-                ))}
+                ) : (
+                  abandonedCarts.map((cart) => (
+                    <div
+                      key={cart.id}
+                      className="p-4 sm:p-5 rounded-2xl bg-[#FCFBF8] border border-[#DFBF77] flex flex-col lg:flex-row lg:items-center justify-between gap-4 shadow-xs hover:border-[#701626]/50 transition-colors"
+                    >
+                      <div className="space-y-2 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="font-bold text-sm text-[#110B0E]">{cart.customerName}</span>
+                          <span className="text-xs text-[#6D6268] break-all">({cart.customerEmail})</span>
+                          <span className="text-[10px] bg-amber-50 text-amber-800 border border-amber-200 px-2 py-0.5 rounded-full font-bold flex items-center gap-1">
+                            <Clock className="w-3 h-3" /> {cart.abandonedAt}
+                          </span>
+                        </div>
+
+                        {/* Items Preview */}
+                        <div className="flex flex-wrap items-center gap-2">
+                          {cart.items.map((it, idx) => (
+                            <div key={idx} className="flex items-center gap-2 bg-white px-2.5 py-1.5 rounded-xl border border-[#C5A059]/30 text-xs">
+                              {it.image && <img src={it.image} alt="" className="w-6 h-6 object-cover rounded-md shrink-0" />}
+                              <span className="font-medium text-[#110B0E] truncate max-w-[150px] sm:max-w-[220px]">{it.name}</span>
+                              <span className="text-[#701626] font-bold shrink-0">{it.price}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between lg:justify-end gap-3 pt-3 lg:pt-0 border-t border-[#C5A059]/20 lg:border-t-0 shrink-0">
+                        <div className="text-left sm:text-right">
+                          <p className="text-[10px] uppercase text-[#6D6268] font-bold">Cart Total</p>
+                          <p className="font-display text-base font-bold text-[#701626]">
+                            LKR {cart.totalValue.toLocaleString()}
+                          </p>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            disabled={sendingCartId === cart.id || cart.emailSent}
+                            onClick={() => handleSendRecoveryEmail(cart)}
+                            className={`flex-1 sm:flex-initial px-4 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                              cart.emailSent
+                                ? 'bg-emerald-50 text-emerald-800 border border-emerald-200 cursor-default'
+                                : 'bg-[#701626] hover:bg-[#8E1E34] text-white shadow-sm'
+                            }`}
+                          >
+                            {sendingCartId === cart.id ? (
+                              <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                            ) : cart.emailSent ? (
+                              <>
+                                <Check className="w-3.5 h-3.5 text-emerald-600" />
+                                <span>Email Dispatched</span>
+                              </>
+                            ) : (
+                              <>
+                                <Send className="w-3.5 h-3.5" />
+                                <span>Send Recovery Email (5% Off)</span>
+                              </>
+                            )}
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteAbandonedCart(cart.id)}
+                            className="p-2.5 rounded-xl text-gray-400 hover:text-red-600 hover:bg-red-50 border border-transparent hover:border-red-200 transition-colors cursor-pointer"
+                            title="Dismiss this abandoned bag"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                )}
               </div>
             </div>
           </div>

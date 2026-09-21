@@ -186,12 +186,81 @@ export default function OrderSuccess() {
       return dbOrder;
     }
 
+    // Demo/Audit mode preview for test routes (e.g. /order-success/test)
+    if (orderId === 'test' || orderId === 'preview') {
+      return {
+        orderId: 'AZ-TEST-8840',
+        items: [
+          {
+            id: 901,
+            name: 'Lotus Embroidered Anarkali Set — Deep Burgundy',
+            price: 'LKR 14,500',
+            image: 'https://images.unsplash.com/photo-1583391733956-3750e0ff4e8b?q=80&w=800',
+            quantity: 1,
+            size: 'M',
+          },
+          {
+            id: 902,
+            name: 'Custom Bespoke Kurti — Pure Tussar Silk',
+            price: 'LKR 8,200',
+            image: 'https://images.unsplash.com/photo-1610030469983-98e550d6193c?q=80&w=800',
+            quantity: 1,
+            size: 'Custom Fit',
+            tailoring: {
+              collectionName: 'Kurties',
+              dressTypeName: 'A-Line Kurti with Slits',
+              fabricName: 'Pure Handloom Silk Scarlet',
+              fabricPrice: 4700,
+              stitchingFee: 3500,
+              sizeLabel: 'Custom',
+              leadTime: '4-6 working days',
+              measurements: {
+                bust: 36,
+                waist: 30,
+                hip: 38,
+                length: 44,
+                shoulderWidth: 14.5,
+                sleeveLength: 17
+              }
+            }
+          }
+        ],
+        subtotal: 22700,
+        discount: 1000,
+        shipping: 0,
+        total: 21700,
+        customer: {
+          fullName: 'Ananya Senanayake',
+          email: 'ananya.senanayake@example.lk',
+          phone: '077 123 4567',
+          address: 'No. 42, Flower Road',
+          city: 'Colombo 07',
+          district: 'Colombo',
+          postalCode: '00700',
+        },
+        deliveryMethod: 'Sri Lanka Post (Speed Post Courier)',
+        paymentMethod: 'Direct Bank Transfer',
+        placedAt: new Date().toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' }),
+        paymentStatus: 'pending_bank',
+        bankTransferDetails: {
+          bankName: 'Commercial Bank of Ceylon',
+          accountName: 'Azhai Clothing (Pvt) Ltd',
+          accountNumber: '8009234567',
+          branchName: 'Colombo 07 Boutique Branch',
+          bankLogo: undefined,
+          swiftCode: 'CCEYLKLY',
+          customInstructions: 'Please state Order ID AZ-TEST-8840 as deposit reference.',
+        },
+        status: 'pending',
+      };
+    }
+
     return lastOrder || null;
   }, [orderId, lastOrder, authOrders, adminOrders, dbOrder]);
 
   if (!order) {
     return (
-      <div className="min-h-screen bg-[#FCFBF8] pt-32 sm:pt-36 xl:pt-40 pb-20 text-[#110B0E]">
+      <div className="min-h-screen bg-[#FCFBF8] pt-32 sm:pt-36 xl:pt-40 pb-32 sm:pb-24 text-[#110B0E]">
         <SEOHead title="Order Status" noindex={true} />
         <div className="max-w-xl mx-auto px-4 text-center space-y-6">
           <div className="w-16 h-16 rounded-full bg-amber-50 border border-amber-200 text-amber-600 flex items-center justify-center mx-auto">
@@ -225,7 +294,7 @@ export default function OrderSuccess() {
   }
 
   return (
-    <div className="min-h-screen bg-[#FCFBF8] pt-32 sm:pt-36 xl:pt-40 pb-20 text-[#110B0E]">
+    <div className="min-h-screen bg-[#FCFBF8] pt-32 sm:pt-36 xl:pt-40 pb-32 sm:pb-24 text-[#110B0E]">
       <SEOHead title="Order Confirmed" noindex={true} />
       <div className="max-w-3xl mx-auto px-4 sm:px-8">
         

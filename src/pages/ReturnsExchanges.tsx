@@ -11,8 +11,8 @@ export default function ReturnsExchanges() {
   return (
     <div className="min-h-screen bg-[#FCFBF8] pt-32 sm:pt-36 pb-20 text-[#110B0E]">
       <SEOHead
-        title="14-Day Exchanges & Returns Policy — Azhai Guarantee"
-        description="Experience hassle-free sizing exchanges with Azhai. 14-day doorstep courier exchange service across Sri Lanka for unworn festive pieces."
+        title="Returns & Exchanges Policy — Azhai Guarantee"
+        description="Experience personalized sizing support with Azhai. Seamless courier exchange service across Sri Lanka for unworn festive pieces."
         canonicalUrl="https://azhaiclothing.lk/returns-exchanges"
         url="https://azhaiclothing.lk/returns-exchanges"
       />
@@ -32,17 +32,17 @@ export default function ReturnsExchanges() {
             Patron Guarantee
           </span>
           <h1 className="font-display text-4xl sm:text-5xl font-bold text-[#110B0E]">
-            14-Day Doorstep Exchange Policy
+            Atelier Exchange & Returns Policy
           </h1>
           <p className="text-xs sm:text-sm text-[#6D6268] font-light leading-relaxed">
-            We want every Azhai handloom silhouette to feel made just for you. If the fit or sizing is not perfect, we offer seamless doorstep exchanges across Sri Lanka.
+            We want every Azhai handloom silhouette to feel made just for you. If the fit or sizing is not perfect, we offer seamless exchange assistance across Sri Lanka.
           </p>
         </div>
 
         {/* 3-Step Exchange Process */}
         <div className="bg-white rounded-3xl p-6 sm:p-8 border border-[#C5A059]/35 shadow-sm space-y-6">
           <h2 className="font-display text-2xl font-bold text-[#110B0E]">
-            How Doorstep Exchanges Work
+            How Atelier Exchanges Work
           </h2>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -50,7 +50,7 @@ export default function ReturnsExchanges() {
               <span className="w-7 h-7 rounded-full bg-[#701626] text-white text-xs font-bold flex items-center justify-center">1</span>
               <h3 className="font-display text-base font-bold text-[#110B0E]">Notify Concierge</h3>
               <p className="text-xs text-[#6D6268] font-light leading-relaxed">
-                Contact Preethi on WhatsApp with your Order ID and desired replacement size within 14 days of delivery.
+                Contact Preethi on WhatsApp with your Order ID and desired replacement size.
               </p>
             </div>
 
@@ -82,7 +82,7 @@ export default function ReturnsExchanges() {
             </li>
             <li className="flex items-start gap-2">
               <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-              <span>Exchange requests must be submitted within 14 days from parcel delivery date.</span>
+              <span>Exchange requests must be submitted promptly upon receiving your delivery.</span>
             </li>
             <li className="flex items-start gap-2">
               <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
@@ -94,7 +94,7 @@ export default function ReturnsExchanges() {
         {/* WhatsApp Button */}
         <div className="text-center pt-2">
           <a
-            href={`https://wa.me/${activeWhatsAppDigits}?text=${encodeURIComponent('Hi Preethi! I would like to request a 14-day exchange for my order.')}`}
+            href={`https://wa.me/${activeWhatsAppDigits}?text=${encodeURIComponent('Hi Preethi! I would like to request an exchange for my order.')}`}
             target="_blank"
             rel="noreferrer"
             className="inline-flex items-center gap-2 px-8 py-4 bg-[#701626] hover:bg-[#8E1E34] text-white text-xs font-bold uppercase tracking-[0.2em] rounded-2xl shadow-lg transition-all"

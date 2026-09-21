@@ -146,7 +146,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         if (ordersErr) {
           console.warn('[AuthProvider Sync Orders Warning]:', ordersErr.message);
-        } else if (dbOrders && dbOrders.length > 0) {
+        } else if (dbOrders) {
           const mappedOrders = dbOrders.map((o: any) => ({
             orderId: o.order_code,
             items: (o.order_items || []).map((item: any) => ({
@@ -178,16 +178,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             shippingBreakdown: o.shipping_breakdown || undefined,
           }));
 
-          const currentOrders = useAuthStore.getState().orders || [];
-          const mergedMap = new Map<string, any>();
-          mappedOrders.forEach((o: any) => mergedMap.set(o.orderId, o));
-          currentOrders.forEach((o: any) => {
-            if (!mergedMap.has(o.orderId)) {
-              mergedMap.set(o.orderId, o);
-            }
-          });
-
-          useAuthStore.setState({ orders: Array.from(mergedMap.values()) });
+          useAuthStore.setState({ orders: mappedOrders });
         }
       }
     } catch (err) {

@@ -20,7 +20,8 @@ import {
   Crown,
   ChevronRight,
   Layers,
-  Scissors
+  Scissors,
+  Mail
 } from 'lucide-react';
 import { useAdminStore } from '@/store/admin';
 import SEOHead from '@/components/SEOHead';
@@ -30,7 +31,7 @@ interface AdminLayoutProps {
 }
 
 export default function AdminLayout({ children }: AdminLayoutProps) {
-  const { adminUser, adminLogout, orders, settings, toggleCOD, fetchSupabaseData } = useAdminStore();
+  const { adminUser, adminLogout, orders, inquiries, settings, toggleCOD, fetchSupabaseData } = useAdminStore();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
@@ -46,10 +47,12 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
   };
 
   const pendingOrdersCount = orders.filter((o) => o.status === 'pending' || o.status === 'confirmed').length;
+  const unreadInquiriesCount = (inquiries || []).filter((i) => i.status === 'unread').length;
 
   const NAV_ITEMS = [
     { label: 'Executive Overview', path: '/admin', icon: LayoutDashboard },
     { label: 'Orders & Dispatch', path: '/admin/orders', icon: Package, badge: pendingOrdersCount },
+    { label: 'Client Inquiries', path: '/admin/inquiries', icon: Mail, badge: unreadInquiriesCount },
     { label: 'Products & Stock', path: '/admin/products', icon: Sparkles },
     { label: 'Categories & Tags', path: '/admin/categories', icon: Layers },
     { label: 'Custom Tailoring', path: '/admin/tailoring', icon: Scissors },

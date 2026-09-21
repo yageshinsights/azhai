@@ -625,7 +625,7 @@ export default function InteractiveMannequin({
           className="space-y-6"
         >
           {/* Preset Cards Grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5 sm:gap-3.5">
             {presets.map((preset) => {
               const isSelected = sizeLabel === preset.sizeLabel;
               const bust = preset.measurements['bust'];
@@ -637,30 +637,30 @@ export default function InteractiveMannequin({
                 <button
                   key={preset.id || preset.sizeLabel}
                   onClick={() => handleSelectPreset(preset)}
-                  className={`p-4 rounded-3xl text-left transition-all relative overflow-hidden border-2 cursor-pointer flex flex-col justify-between min-h-[160px] group ${
+                  className={`p-3 sm:p-4 rounded-2xl sm:rounded-3xl text-left transition-all relative overflow-hidden border-2 cursor-pointer flex flex-col justify-between min-h-[140px] sm:min-h-[160px] group ${
                     isSelected
                       ? 'bg-[#701626] text-white border-[#DFBF77] shadow-xl shadow-[#701626]/20 scale-[1.02]'
                       : 'bg-white hover:bg-[#FCFBF8] text-[#110B0E] border-[#C5A059]/30 hover:border-[#C5A059]/60 shadow-sm'
                   }`}
                 >
                   {isSelected && (
-                    <div className="absolute top-3 right-3 w-6 h-6 rounded-full bg-[#DFBF77] text-[#701626] flex items-center justify-center font-bold shadow-sm">
-                      <Check className="w-3.5 h-3.5" />
+                    <div className="absolute top-2.5 right-2.5 sm:top-3 sm:right-3 w-5 h-5 sm:w-6 sm:h-6 rounded-full bg-[#DFBF77] text-[#701626] flex items-center justify-center font-bold shadow-sm">
+                      <Check className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
                     </div>
                   )}
 
                   <div>
-                    <span className={`text-[10px] uppercase tracking-widest font-bold block ${
+                    <span className={`text-[9px] sm:text-[10px] uppercase tracking-widest font-bold block ${
                       isSelected ? 'text-[#DFBF77]' : 'text-[#6D6268]'
                     }`}>
                       Standard Fit
                     </span>
-                    <h4 className="font-display text-3xl font-bold tracking-tight mt-0.5">
+                    <h4 className="font-display text-2xl sm:text-3xl font-bold tracking-tight mt-0.5">
                       {preset.sizeLabel}
                     </h4>
                   </div>
 
-                  <div className={`space-y-1 text-xs pt-3 border-t ${
+                  <div className={`space-y-0.5 sm:space-y-1 text-[11px] sm:text-xs pt-2 sm:pt-3 border-t ${
                     isSelected ? 'border-white/15 text-white/90' : 'border-[#C5A059]/15 text-[#6D6268]'
                   }`}>
                     {bust && (

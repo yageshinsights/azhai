@@ -101,7 +101,7 @@ export default function ProductModal({ isOpen, onClose, onSave, initialProduct }
       );
       setShippingNote(
         initialProduct.shippingNote ||
-          '• Dispatched within 24–48 business hours via Sri Lanka Post Speed Post.\n• Official weight-based postage & island-wide COD.\n• 14-Day doorstep exchange permitted.'
+          '• Dispatched within 24–48 business hours via Sri Lanka Post Speed Post.\n• Official weight-based postage & island-wide COD.\n• Sizing exchanges supported in accordance with atelier policy.'
       );
       setPairingProductIds(initialProduct.pairingProductIds || []);
 
@@ -136,7 +136,7 @@ export default function ProductModal({ isOpen, onClose, onSave, initialProduct }
       setFabricYarn('100% Handloom Mulberry Silk & Zari');
       setCraftedFor('Festive Celebrations, Sangeet Nights & Receptions');
       setCareGuide('• Dry clean recommended to preserve handloom natural dyes & zari brilliance.\n• Store folded in a breathable cotton muslin bag.');
-      setShippingNote('• Dispatched within 24–48 business hours via Sri Lanka Post Speed Post.\n• Island-wide COD & 14-day doorstep exchange.');
+      setShippingNote('• Dispatched within 24–48 business hours via Sri Lanka Post Speed Post.\n• Island-wide COD & atelier sizing exchange support.');
       setPairingProductIds([]);
 
       setMetaTitle('');

@@ -195,7 +195,7 @@ export default function CollectionDetail() {
       </section>
 
       {/* Main Content Area */}
-      <div className="max-w-7xl mx-auto px-5 sm:px-8 py-10">
+      <div className="max-w-7xl mx-auto px-4 sm:px-8 pt-8 pb-28 sm:py-10">
         {/* Navigation & Controls Bar */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 mb-8 border-b border-[#C5A059]/30">
           <Link
@@ -410,7 +410,7 @@ export default function CollectionDetail() {
 
         {/* Products Grid */}
         {filteredProducts.length > 0 ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-7">
+          <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-6">
             {filteredProducts.map((p, i) => (
               <ProductCard key={p.id} product={p} index={i} />
             ))}

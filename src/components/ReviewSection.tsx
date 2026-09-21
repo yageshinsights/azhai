@@ -17,51 +17,9 @@ interface Review {
   likes: number;
 }
 
-const INITIAL_REVIEWS: Review[] = [
-  {
-    id: 'rev-1',
-    author: 'Ananya S.',
-    location: 'Colombo 07',
-    rating: 5,
-    date: '3 weeks ago',
-    title: 'Exquisite handloom drape and stitching',
-    comment:
-      'The silk is featherlight and the maroon hue is truly royal. Wore this for my cousin’s engagement in Colombo and received endless compliments. Sizing was spot-on.',
-    fit: 'True to Size',
-    verified: true,
-    likes: 12,
-  },
-  {
-    id: 'rev-2',
-    author: 'Tharushi W.',
-    location: 'Kandy',
-    rating: 5,
-    date: '1 month ago',
-    title: 'Prompt delivery and heirloom packaging',
-    comment:
-      'Arrived in Kandy within 48 hours via Sri Lanka Post Speed Post. The gold zari weaving is breathtaking and the fabric breathes beautifully in our climate.',
-    fit: 'True to Size',
-    verified: true,
-    likes: 8,
-  },
-  {
-    id: 'rev-3',
-    author: 'Preethi K.',
-    location: 'Jaffna',
-    rating: 5,
-    date: '2 months ago',
-    title: 'Authentic craftsmanship by Preethi',
-    comment:
-      'You can feel the artisan touch in every border detail. The lining is soft pure cotton, making it extremely comfortable for all-day wear.',
-    fit: 'True to Size',
-    verified: true,
-    likes: 15,
-  },
-];
-
 export default function ReviewSection({ productName }: { productName: string }) {
   const user = useAuthStore((s) => s.user);
-  const [reviews, setReviews] = useState<Review[]>(INITIAL_REVIEWS);
+  const [reviews, setReviews] = useState<Review[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [likedIds, setLikedIds] = useState<string[]>([]);
 
@@ -94,26 +52,30 @@ export default function ReviewSection({ productName }: { productName: string }) 
           return;
         }
 
-        if (isMounted && data && data.length > 0) {
-          const mapped: Review[] = data.map((r: any) => ({
-            id: r.id,
-            author: r.author_name,
-            location: r.location || 'Sri Lanka',
-            rating: r.rating,
-            date: r.created_at
-              ? new Date(r.created_at).toLocaleDateString('en-US', {
-                  month: 'short',
-                  day: 'numeric',
-                  year: 'numeric',
-                })
-              : 'Recently',
-            title: r.title || 'Azhai Couture Experience',
-            comment: r.comment,
-            fit: r.fit || 'True to Size',
-            verified: !!r.is_verified,
-            likes: r.likes || 0,
-          }));
-          setReviews(mapped);
+        if (isMounted) {
+          if (data && data.length > 0) {
+            const mapped: Review[] = data.map((r: any) => ({
+              id: r.id,
+              author: r.author_name,
+              location: r.location || 'Sri Lanka',
+              rating: r.rating,
+              date: r.created_at
+                ? new Date(r.created_at).toLocaleDateString('en-US', {
+                    month: 'short',
+                    day: 'numeric',
+                    year: 'numeric',
+                  })
+                : 'Recently',
+              title: r.title || 'Azhai Couture Experience',
+              comment: r.comment,
+              fit: r.fit || 'True to Size',
+              verified: !!r.is_verified,
+              likes: r.likes || 0,
+            }));
+            setReviews(mapped);
+          } else {
+            setReviews([]);
+          }
         }
       } catch (err) {
         console.warn('[Supabase Review Load Exception]:', err);
@@ -245,62 +207,82 @@ export default function ReviewSection({ productName }: { productName: string }) 
       </div>
 
       {/* Review List */}
-      <div className="space-y-4">
-        {reviews.map((rev) => (
-          <div
-            key={rev.id}
-            className="bg-white rounded-3xl p-6 border border-[#C5A059]/25 shadow-sm space-y-3"
-          >
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-              <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-2xl bg-[#701626]/10 text-[#701626] flex items-center justify-center font-bold text-xs font-display">
-                  {rev.author.charAt(0)}
-                </div>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <h4 className="text-xs font-bold text-[#110B0E]">{rev.author}</h4>
-                    {rev.verified && (
-                      <span className="inline-flex items-center gap-1 text-[9.5px] bg-emerald-50 text-emerald-800 font-bold px-2 py-0.2 rounded-full border border-emerald-200">
-                        <CheckCircle2 className="w-3 h-3 text-emerald-600" /> Verified Buyer
-                      </span>
-                    )}
-                  </div>
-                  <p className="text-[10px] text-[#6D6268] font-light">
-                    {rev.location} · {rev.date}
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-2 self-start sm:self-auto">
-                <div className="flex gap-0.5 text-amber-500">
-                  {[...Array(rev.rating)].map((_, i) => (
-                    <Star key={i} className="w-3.5 h-3.5 fill-amber-500" />
-                  ))}
-                </div>
-                <span className="text-[10px] bg-[#F7F4EE] text-[#701626] font-bold px-2.5 py-0.5 rounded-full border border-[#C5A059]/25">
-                  {rev.fit}
-                </span>
-              </div>
-            </div>
-
-            <div className="space-y-1 pt-1">
-              <h5 className="font-display text-base font-bold text-[#110B0E]">{rev.title}</h5>
-              <p className="text-xs text-[#6D6268] font-light leading-relaxed">{rev.comment}</p>
-            </div>
-
-            <div className="flex items-center justify-end pt-2 border-t border-[#C5A059]/15">
-              <button
-                onClick={() => handleLike(rev.id)}
-                className={`inline-flex items-center gap-1.5 text-[11px] font-medium transition-colors ${
-                  likedIds.includes(rev.id) ? 'text-[#701626] font-bold' : 'text-[#6D6268] hover:text-[#701626]'
-                }`}
-              >
-                <ThumbsUp className="w-3.5 h-3.5" /> Helpful ({rev.likes})
-              </button>
-            </div>
+      {reviews.length === 0 ? (
+        <div className="bg-white rounded-3xl p-10 border border-[#C5A059]/25 shadow-sm text-center space-y-4">
+          <div className="w-12 h-12 rounded-2xl bg-[#701626]/10 text-[#701626] mx-auto flex items-center justify-center">
+            <MessageSquare className="w-6 h-6 text-[#701626]" />
           </div>
-        ))}
-      </div>
+          <div className="space-y-1">
+            <h4 className="font-display text-lg font-bold text-[#110B0E]">No Patron Reviews Yet</h4>
+            <p className="text-xs text-[#6D6268] max-w-md mx-auto">
+              Be the first patron to share your styling experience with this bespoke creation.
+            </p>
+          </div>
+          <button
+            onClick={() => setIsModalOpen(true)}
+            className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#701626] text-white text-xs font-bold uppercase tracking-wider rounded-xl hover:bg-[#8E1E34] transition-colors cursor-pointer shadow-sm"
+          >
+            <Plus className="w-4 h-4" /> Share Your Review
+          </button>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {reviews.map((rev) => (
+            <div
+              key={rev.id}
+              className="bg-white rounded-3xl p-6 border border-[#C5A059]/25 shadow-sm space-y-3"
+            >
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-2xl bg-[#701626]/10 text-[#701626] flex items-center justify-center font-bold text-xs font-display">
+                    {rev.author.charAt(0)}
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h4 className="text-xs font-bold text-[#110B0E]">{rev.author}</h4>
+                      {rev.verified && (
+                        <span className="inline-flex items-center gap-1 text-[9.5px] bg-emerald-50 text-emerald-800 font-bold px-2 py-0.2 rounded-full border border-emerald-200">
+                          <CheckCircle2 className="w-3 h-3 text-emerald-600" /> Verified Buyer
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-[10px] text-[#6D6268] font-light">
+                      {rev.location} · {rev.date}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 self-start sm:self-auto">
+                  <div className="flex gap-0.5 text-amber-500">
+                    {[...Array(rev.rating)].map((_, i) => (
+                      <Star key={i} className="w-3.5 h-3.5 fill-amber-500" />
+                    ))}
+                  </div>
+                  <span className="text-[10px] bg-[#F7F4EE] text-[#701626] font-bold px-2.5 py-0.5 rounded-full border border-[#C5A059]/25">
+                    {rev.fit}
+                  </span>
+                </div>
+              </div>
+
+              <div className="space-y-1 pt-1">
+                <h5 className="font-display text-base font-bold text-[#110B0E]">{rev.title}</h5>
+                <p className="text-xs text-[#6D6268] font-light leading-relaxed">{rev.comment}</p>
+              </div>
+
+              <div className="flex items-center justify-end pt-2 border-t border-[#C5A059]/15">
+                <button
+                  onClick={() => handleLike(rev.id)}
+                  className={`inline-flex items-center gap-1.5 text-[11px] font-medium transition-colors ${
+                    likedIds.includes(rev.id) ? 'text-[#701626] font-bold' : 'text-[#6D6268] hover:text-[#701626]'
+                  }`}
+                >
+                  <ThumbsUp className="w-3.5 h-3.5" /> Helpful ({rev.likes})
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Write a Review Modal */}
       <AnimatePresence>

@@ -137,7 +137,7 @@ export default function Home() {
       
       {/* ── FIT-TO-SCREEN EDITORIAL CATEGORY HERO ── */}
       <section 
-        className="relative w-full h-[100svh] min-h-[640px] pt-20 sm:pt-24 pb-22 sm:pb-8 flex flex-col justify-between overflow-hidden bg-[#0D0709]"
+        className="relative w-full h-[100svh] min-h-[600px] pt-20 sm:pt-24 pb-24 sm:pb-8 flex flex-col justify-between overflow-hidden bg-[#0D0709]"
         onMouseEnter={() => { isHovered.current = true; }}
         onMouseLeave={() => { isHovered.current = false; }}
         onTouchStart={(e) => { touchStartX.current = e.touches[0].clientX; }}
@@ -180,7 +180,7 @@ export default function Home() {
         </AnimatePresence>
 
         {/* Content Area */}
-        <div className="relative z-20 px-4 sm:px-8 max-w-7xl mx-auto w-full my-auto py-2 sm:py-6 translate-y-8 sm:translate-y-0">
+        <div className="relative z-20 px-4 sm:px-8 max-w-7xl mx-auto w-full my-auto py-2 sm:py-6">
           <div className="max-w-3xl text-left space-y-4 sm:space-y-5">
             
             {/* Dynamic Collection Title & Storyline */}
@@ -193,11 +193,11 @@ export default function Home() {
                 transition={{ duration: 0.55, ease: [0.16, 1, 0.3, 1] }}
                 className="space-y-3.5 sm:space-y-4"
               >
-                <h2 className="font-display text-6xl sm:text-7xl md:text-8xl lg:text-[6rem] xl:text-[7rem] font-bold text-white tracking-tight leading-[0.96] sm:leading-[1.0] text-balance drop-shadow-xl">
+                <h2 className="font-display text-4xl sm:text-7xl md:text-8xl lg:text-[6rem] xl:text-[7rem] font-bold text-white tracking-tight leading-[0.98] sm:leading-[1.0] text-balance drop-shadow-xl">
                   {currentCategory?.name}
                 </h2>
                 {heroSubtitle && (
-                  <p className="text-base sm:text-xl md:text-2xl text-[#FCFBF8]/95 font-light max-w-xl leading-relaxed border-l-2 border-[#DFBF77]/70 pl-3.5 sm:pl-4 italic font-serif">
+                  <p className="text-sm sm:text-xl md:text-2xl text-[#FCFBF8]/95 font-light max-w-xl leading-relaxed border-l-2 border-[#DFBF77]/70 pl-3 sm:pl-4 italic font-serif">
                     "{heroSubtitle}"
                   </p>
                 )}
@@ -303,7 +303,7 @@ export default function Home() {
       <section className="border-y border-[#C5A059]/30 bg-[#F7F4EE]/60 backdrop-blur-md py-8 sm:py-12 px-4 sm:px-8 relative z-10">
         <div className="max-w-7xl mx-auto grid grid-cols-2 lg:grid-cols-4 gap-3.5 sm:gap-6">
           {[
-            { icon: Sparkles, title: 'Island-wide Express Delivery', desc: 'Free on all orders over LKR 15,000 across Sri Lanka' },
+            { icon: Sparkles, title: 'Island-wide Express Delivery', desc: 'Island-wide postal dispatch with tracking across all 25 districts' },
             { icon: Feather, title: 'Cloud-Light Mulberry Silks', desc: 'Zero synthetic blends · Pure handloom drape' },
             { icon: Sun, title: 'Made for Aesthetic Memories', desc: 'Flattering cuts designed for golden hour radiance' },
             { icon: Crown, title: 'Bespoke Craft by Preethi', desc: 'Limited curated runs · Handcrafted with love' },
@@ -372,7 +372,7 @@ export default function Home() {
 
         {/* Product Grid */}
         {filteredProducts.length > 0 ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+          <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-6">
             {filteredProducts.map((prod, i) => (
               <ProductCard key={prod.id} product={prod} index={i} />
             ))}
@@ -424,7 +424,7 @@ export default function Home() {
                 <Link
                   key={col.id || col.slug}
                   to={`/collections/${col.slug}`}
-                  className="group block relative rounded-[2rem] overflow-hidden aspect-[16/10] sm:aspect-[16/9] bg-[#110B0E] border border-[#C5A059]/30 shadow-lg hover:shadow-2xl hover:border-[#C5A059] transition-all duration-500"
+                  className="group block relative rounded-[2rem] overflow-hidden aspect-[4/3] xs:aspect-[16/10] sm:aspect-[16/9] bg-[#110B0E] border border-[#C5A059]/30 shadow-lg hover:shadow-2xl hover:border-[#C5A059] transition-all duration-500"
                 >
                   {/* Landscape Hero Image */}
                   <img

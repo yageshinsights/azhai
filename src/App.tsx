@@ -171,6 +171,14 @@ function AnimatedRoutes() {
               }
             />
             <Route
+              path="/admin/inquiries"
+              element={
+                <AdminGuard>
+                  <AdminCustomers />
+                </AdminGuard>
+              }
+            />
+            <Route
               path="/admin/customers"
               element={
                 <AdminGuard>

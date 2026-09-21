@@ -242,7 +242,7 @@ export default function AdminOrders() {
                         <div className="flex items-center justify-end gap-1.5">
                           <button
                             onClick={() => setPrintOrder(order)}
-                            className="p-2 text-[#6D6268] hover:text-[#701626] hover:bg-[#F7F4EE] rounded-xl transition-colors"
+                            className="p-2 text-[#6D6268] hover:text-[#701626] hover:bg-[#F7F4EE] rounded-xl transition-colors cursor-pointer"
                             title="Print Waybill"
                           >
                             <Printer className="w-4 h-4" />

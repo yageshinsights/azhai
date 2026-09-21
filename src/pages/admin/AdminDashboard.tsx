@@ -14,14 +14,16 @@ import {
   AlertTriangle,
   ArrowRight,
   ShoppingBag,
-  Banknote
+  Banknote,
+  Mail,
+  MessageCircle
 } from 'lucide-react';
 import AdminLayout from '@/components/admin/AdminLayout';
-import { useAdminStore, type AdminOrder } from '@/store/admin';
+import { useAdminStore, type AdminOrder, cleanWhatsAppDigits } from '@/store/admin';
 import OrderDetailDrawer from '@/components/admin/OrderDetailDrawer';
 
 export default function AdminDashboard() {
-  const { orders, products, customers, settings } = useAdminStore();
+  const { orders, products, customers, inquiries, settings } = useAdminStore();
   const [selectedOrder, setSelectedOrder] = useState<AdminOrder | null>(null);
 
   // Financial Metrics Calculations
@@ -438,6 +440,104 @@ export default function AdminDashboard() {
               </tbody>
             </table>
           </div>
+        </div>
+
+        {/* ── CLIENT INQUIRIES & CONTACT FORMS ── */}
+        <div className="bg-white rounded-3xl p-6 sm:p-8 border border-[#C5A059]/30 shadow-sm space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div className="flex items-center gap-2 text-[#701626]">
+              <Mail className="w-5 h-5" />
+              <div>
+                <div className="flex items-center gap-2">
+                  <h3 className="font-display text-xl font-bold text-[#110B0E]">Recent Client Inquiries</h3>
+                  {(inquiries || []).filter(i => i.status === 'unread').length > 0 && (
+                    <span className="text-[10px] font-bold bg-[#701626] text-white px-2.5 py-0.5 rounded-full">
+                      {(inquiries || []).filter(i => i.status === 'unread').length} unread
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs text-[#6D6268] font-light">Submissions from the online boutique Contact Us form.</p>
+              </div>
+            </div>
+            <Link
+              to="/admin/inquiries"
+              className="text-xs font-bold text-[#701626] hover:underline inline-flex items-center gap-1 self-start sm:self-auto"
+            >
+              <span>Open Inquiries Inbox ({(inquiries || []).length})</span> <ArrowRight className="w-3.5 h-3.5" />
+            </Link>
+          </div>
+
+          {(inquiries || []).length === 0 ? (
+            <div className="p-8 text-center bg-[#FCFBF8] rounded-2xl border border-[#C5A059]/20 space-y-2">
+              <Mail className="w-8 h-8 text-[#C5A059] mx-auto opacity-70" />
+              <p className="text-xs text-[#6D6268] font-medium">No contact inquiries yet. New submissions will automatically appear here in real time.</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 pt-1">
+              {(inquiries || []).slice(0, 3).map((inq) => {
+                const isUnread = inq.status === 'unread';
+                const waPhone = inq.phone ? cleanWhatsAppDigits(inq.phone) : null;
+                return (
+                  <div
+                    key={inq.id}
+                    className={`p-4 rounded-2xl border transition-all flex flex-col justify-between space-y-3 ${
+                      isUnread 
+                        ? 'bg-[#FCFBF8] border-[#701626]/30 shadow-xs' 
+                        : 'bg-white border-[#C5A059]/20'
+                    }`}
+                  >
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className={`text-[9.5px] font-bold px-2 py-0.5 rounded-full uppercase ${
+                          isUnread
+                            ? 'bg-[#701626] text-[#F3E8CE]'
+                            : inq.status === 'resolved'
+                            ? 'bg-emerald-100 text-emerald-800'
+                            : 'bg-stone-100 text-stone-600'
+                        }`}>
+                          {inq.status}
+                        </span>
+                        <span className="text-[10px] text-[#6D6268]">
+                          {new Date(inq.createdAt || Date.now()).toLocaleDateString('en-US', {
+                            month: 'short',
+                            day: 'numeric',
+                          })}
+                        </span>
+                      </div>
+
+                      <div>
+                        <h4 className="font-bold text-xs text-[#110B0E] truncate">{inq.name || 'Patron'}</h4>
+                        <p className="text-[10.5px] text-[#701626] font-medium">{inq.topic || 'Atelier Inquiry'}</p>
+                      </div>
+
+                      <p className="text-xs text-[#6D6268] line-clamp-2 italic bg-white/60 p-2 rounded-xl border border-[#C5A059]/15">
+                        "{inq.message}"
+                      </p>
+                    </div>
+
+                    <div className="flex items-center justify-between gap-2 pt-2 border-t border-[#C5A059]/20">
+                      <Link
+                        to="/admin/inquiries"
+                        className="text-[11px] text-[#701626] hover:underline font-bold"
+                      >
+                        View Details →
+                      </Link>
+                      {waPhone && (
+                        <a
+                          href={`https://wa.me/${waPhone}?text=${encodeURIComponent(`Hi ${inq.name || ''}! Thank you for contacting Azhai Clothing atelier regarding: ${inq.topic || 'your inquiry'}.`)}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center gap-1 text-[10.5px] font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 px-2 py-1 rounded-lg border border-emerald-200 transition-colors"
+                        >
+                          <MessageCircle className="w-3 h-3" /> WhatsApp
+                        </a>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       </div>
 

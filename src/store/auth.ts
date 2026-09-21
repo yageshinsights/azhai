@@ -231,14 +231,8 @@ export const useAuthStore = create<AuthState>()(
               const passwordHash = await hashPassword(password);
               const existingAccount = accountIdx >= 0 ? existingAccounts[accountIdx] : null;
 
-              // Merge Supabase orders with existing local orders
-              const localOrders = existingAccount?.orders || get().orders || [];
-              const mergedOrdersMap = new Map<string, PlacedOrder>();
-              mappedOrders.forEach((o) => mergedOrdersMap.set(o.orderId, o));
-              localOrders.forEach((o) => {
-                if (!mergedOrdersMap.has(o.orderId)) mergedOrdersMap.set(o.orderId, o);
-              });
-              const finalOrders = Array.from(mergedOrdersMap.values());
+              // Supabase is the single source of truth for orders
+              const finalOrders = mappedOrders;
 
               const finalFamilyProfiles =
                 familyProfilesFromDb.length > 0
@@ -1106,6 +1100,26 @@ export const useAuthStore = create<AuthState>()(
     {
       name: 'azhai-auth-store-v2',
       storage: createJSONStorage(() => localStorage),
+      partialize: (state) => ({
+        user: state.user,
+        isAuthenticated: state.isAuthenticated,
+        sessionToken: state.sessionToken,
+      }),
     }
   )
 );
+
+// Purge legacy cached orders or accounts from auth storage
+if (typeof window !== 'undefined') {
+  try {
+    const oldAuth = localStorage.getItem('azhai-auth-store-v2');
+    if (oldAuth) {
+      const parsed = JSON.parse(oldAuth);
+      if (parsed?.state?.orders || parsed?.state?.accounts) {
+        delete parsed.state.orders;
+        delete parsed.state.accounts;
+        localStorage.setItem('azhai-auth-store-v2', JSON.stringify(parsed));
+      }
+    }
+  } catch {}
+}

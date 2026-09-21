@@ -302,7 +302,7 @@ export default function ProductDetail() {
   const bundleTotal = prodPriceNum + compPriceNum;
 
   return (
-    <div className="min-h-screen bg-[#FCFBF8] pt-32 sm:pt-36 pb-20 text-[#110B0E]">
+    <div className="min-h-screen bg-[#FCFBF8] pt-32 sm:pt-36 pb-36 sm:pb-24 text-[#110B0E]">
       <SEOHead
         title={product.name}
         description={product.shortDescription || product.description}
@@ -472,22 +472,24 @@ export default function ProductDetail() {
                     type="button"
                     onClick={() => setQuantity((q) => Math.max(1, q - 1))}
                     disabled={quantity <= 1 || isOutOfStock}
-                    className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-[#F7F4EE] text-[#701626] disabled:opacity-40 disabled:hover:bg-transparent transition-colors cursor-pointer"
+                    className="w-9 h-9 sm:w-8 sm:h-8 flex items-center justify-center rounded-full hover:bg-[#F7F4EE] text-[#701626] disabled:opacity-40 disabled:hover:bg-transparent transition-colors cursor-pointer"
                     title="Decrease quantity"
+                    aria-label="Decrease quantity"
                   >
-                    <Minus className="w-3.5 h-3.5" />
+                    <Minus className="w-4 h-4" />
                   </button>
-                  <span className="w-8 text-center font-bold font-mono text-sm text-[#110B0E]">
+                  <span className="w-9 sm:w-8 text-center font-bold font-mono text-sm text-[#110B0E]">
                     {quantity}
                   </span>
                   <button
                     type="button"
                     onClick={() => setQuantity((q) => Math.min(availableStock || 99, q + 1))}
                     disabled={isOutOfStock || (availableStock > 0 && quantity >= availableStock)}
-                    className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-[#F7F4EE] text-[#701626] disabled:opacity-40 disabled:hover:bg-transparent transition-colors cursor-pointer"
+                    className="w-9 h-9 sm:w-8 sm:h-8 flex items-center justify-center rounded-full hover:bg-[#F7F4EE] text-[#701626] disabled:opacity-40 disabled:hover:bg-transparent transition-colors cursor-pointer"
                     title="Increase quantity"
+                    aria-label="Increase quantity"
                   >
-                    <Plus className="w-3.5 h-3.5" />
+                    <Plus className="w-4 h-4" />
                   </button>
                 </div>
               </div>
@@ -622,7 +624,7 @@ export default function ProductDetail() {
                   onClick={() => toggleAccordion('shipping')}
                   className="w-full px-4 py-3.5 flex items-center justify-between text-left text-xs font-bold text-[#110B0E]"
                 >
-                  <span>Sri Lanka Delivery & 14-Day Exchanges</span>
+                  <span>Sri Lanka Delivery & Exchanges</span>
                   {openAccordion === 'shipping' ? <ChevronUp className="w-4 h-4 text-[#701626]" /> : <ChevronDown className="w-4 h-4" />}
                 </button>
                 <AnimatePresence>
@@ -640,7 +642,7 @@ export default function ProductDetail() {
                           <p>• Official Sri Lanka Post Speed Post delivery (24h Western Province / 48h Island-wide).</p>
                           <p>• Weight-based postage calculation &amp; island-wide Cash on Delivery (COD) supported.</p>
                           <p>• Dispatched in signature Azhai protective keepsake packaging within 24 hours.</p>
-                          <p>• 14-Day doorstep exchanges permitted.</p>
+                          <p>• Sizing exchanges supported in accordance with atelier policy.</p>
                         </>
                       )}
                     </motion.div>
@@ -867,7 +869,7 @@ export default function ProductDetail() {
               animate={{ y: 0, opacity: 1 }}
               exit={{ y: 80, opacity: 0 }}
               transition={{ duration: 0.25 }}
-              className="lg:hidden fixed bottom-[calc(58px+env(safe-area-inset-bottom,0px))] left-0 right-0 p-3 bg-white/95 backdrop-blur-xl border-t border-[#C5A059]/40 shadow-[0_-10px_25px_rgba(112,22,38,0.08)] z-40 flex items-center justify-between gap-3"
+              className="lg:hidden fixed bottom-[calc(58px+env(safe-area-inset-bottom,0px))] left-0 right-0 p-3 bg-white/95 backdrop-blur-xl border-t border-[#C5A059]/40 shadow-[0_-10px_25px_rgba(112,22,38,0.08)] z-[9980] flex items-center justify-between gap-3"
             >
               <div className="flex items-center gap-2.5 min-w-0">
                 <img

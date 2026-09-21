@@ -89,11 +89,11 @@ export default function A2HSPrompt() {
           </button>
 
           <div className="flex items-start gap-3.5">
-            <div className="w-12 h-12 rounded-xl bg-[#701626] flex-shrink-0 flex items-center justify-center p-2 shadow-md border border-[#C5A059]/40">
+            <div className="w-12 h-12 rounded-xl bg-[#701626] flex-shrink-0 flex items-center justify-center shadow-md border border-[#C5A059]/40 overflow-hidden">
               <img
-                src="/logo-gold.png"
+                src="/pwa-192.png"
                 alt="Azhai Emblem"
-                className="w-full h-full object-contain"
+                className="w-full h-full object-cover"
                 onError={(e) => {
                   // Fallback to text icon if logo image fails
                   (e.target as HTMLElement).style.display = 'none';

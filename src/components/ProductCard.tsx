@@ -61,7 +61,7 @@ export default function ProductCard({ product, index = 0 }: { product: Product; 
           <div className="relative aspect-[4/5] overflow-hidden bg-[#F7F4EE]">
             
             {/* Hairline Gold Vignette Accent */}
-            <div className="absolute inset-0 border border-[#C5A059]/20 rounded-t-3xl pointer-events-none z-10" />
+            <div className="absolute inset-0 border border-[#C5A059]/20 rounded-t-2xl sm:rounded-t-3xl pointer-events-none z-10" />
 
             <motion.img
               src={product.images[0]?.src}
@@ -72,9 +72,9 @@ export default function ProductCard({ product, index = 0 }: { product: Product; 
             />
 
             {/* Top Luxury Badges */}
-            <div className="absolute top-3.5 left-3.5 right-3.5 flex items-center justify-between z-20 pointer-events-none">
+            <div className="absolute top-2 sm:top-3.5 left-2 sm:left-3.5 right-2 sm:right-3.5 flex items-center justify-between z-20 pointer-events-none">
               {product.tag ? (
-                <div className="bg-[#701626]/90 backdrop-blur-md text-[#F3E8CE] text-[9px] uppercase tracking-[0.18em] font-semibold px-3 py-1 rounded-full shadow-sm border border-[#C5A059]/30">
+                <div className="bg-[#701626]/90 backdrop-blur-md text-[#F3E8CE] text-[8px] sm:text-[9px] uppercase tracking-[0.14em] sm:tracking-[0.18em] font-semibold px-2 sm:px-3 py-0.5 sm:py-1 rounded-full shadow-sm border border-[#C5A059]/30">
                   {product.tag}
                 </div>
               ) : <div />}
@@ -83,28 +83,28 @@ export default function ProductCard({ product, index = 0 }: { product: Product; 
               <button
                 type="button"
                 onClick={handleToggleWishlist}
-                className="w-8 h-8 rounded-full bg-white/90 backdrop-blur-md flex items-center justify-center text-[#110B0E]/70 hover:text-rose-500 transition-all shadow-sm border border-[#C5A059]/20 pointer-events-auto cursor-pointer"
+                className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-white/90 backdrop-blur-md flex items-center justify-center text-[#110B0E]/70 hover:text-rose-500 transition-all shadow-sm border border-[#C5A059]/20 pointer-events-auto cursor-pointer"
                 title="Save to Wishlist"
               >
-                <Heart className={`w-3.5 h-3.5 ${isWishlisted ? 'fill-rose-500 text-rose-500' : ''}`} />
+                <Heart className={`w-3 h-3 sm:w-3.5 sm:h-3.5 ${isWishlisted ? 'fill-rose-500 text-rose-500' : ''}`} />
               </button>
             </div>
 
-            {/* Occasion Pill (fades out gracefully on hover so action overlay doesn't collide) */}
+            {/* Occasion Pill (Desktop only to prevent clutter on mobile) */}
             {product.occasion && (
               <motion.div
                 animate={{ opacity: hovered ? 0 : 1 }}
                 transition={{ duration: 0.2 }}
-                className="absolute bottom-3.5 left-3.5 z-20 bg-[#110B0E]/70 backdrop-blur-md px-3 py-1 rounded-full text-[9px] font-medium text-[#DFBF77] border border-[#C5A059]/30 shadow-sm flex items-center gap-1.5 pointer-events-none"
+                className="hidden sm:flex absolute bottom-3.5 left-3.5 z-20 bg-[#110B0E]/70 backdrop-blur-md px-3 py-1 rounded-full text-[9px] font-medium text-[#DFBF77] border border-[#C5A059]/30 shadow-sm items-center gap-1.5 pointer-events-none"
               >
                 <Sparkles className="w-2.5 h-2.5 text-[#DFBF77]" />
                 <span>{product.occasion}</span>
               </motion.div>
             )}
 
-            {/* Slide-Up Quick Action Overlay */}
+            {/* Slide-Up Quick Action Overlay (Desktop hover only) */}
             <motion.div
-              className="absolute inset-x-0 bottom-0 p-3.5 bg-gradient-to-t from-white via-white/95 to-transparent z-30 flex flex-col gap-2"
+              className="hidden sm:flex absolute inset-x-0 bottom-0 p-3.5 bg-gradient-to-t from-white via-white/95 to-transparent z-30 flex-col gap-2"
               initial={{ opacity: 0, y: 15 }}
               animate={{ opacity: hovered ? 1 : 0, y: hovered ? 0 : 15 }}
               transition={{ duration: 0.25 }}
@@ -168,27 +168,27 @@ export default function ProductCard({ product, index = 0 }: { product: Product; 
           </div>
 
           {/* Luxury Typography & Details */}
-          <div className="p-4 sm:p-5 space-y-1.5 bg-white border-t border-[#C5A059]/15">
-            <div className="flex items-center justify-between">
-              <span className="text-[9px] uppercase tracking-[0.25em] text-[#6D6268] font-bold">
+          <div className="p-3 sm:p-5 space-y-1 sm:space-y-1.5 bg-white border-t border-[#C5A059]/15">
+            <div className="flex items-center justify-between gap-1">
+              <span className="text-[8.5px] sm:text-[9px] uppercase tracking-[0.2em] sm:tracking-[0.25em] text-[#6D6268] font-bold truncate">
                 {product.categories[0]?.name}
               </span>
               {product.rating && (
-                <div className="flex items-center gap-1 text-[10px] text-[#C5A059] font-bold">
-                  <Star className="w-3 h-3 fill-[#C5A059]" />
+                <div className="flex items-center gap-1 text-[9.5px] sm:text-[10px] text-[#C5A059] font-bold shrink-0">
+                  <Star className="w-2.5 h-2.5 sm:w-3 sm:h-3 fill-[#C5A059]" />
                   <span>{product.rating}</span>
                 </div>
               )}
             </div>
 
-            <h3 className="font-display text-lg font-bold text-[#110B0E] group-hover:text-[#701626] transition-colors line-clamp-1">
+            <h3 className="font-display text-xs sm:text-lg font-bold text-[#110B0E] group-hover:text-[#701626] transition-colors line-clamp-1 leading-snug">
               {product.name}
             </h3>
 
-            <div className="flex items-baseline gap-2 pt-0.5">
-              <span className="font-display text-xl font-bold text-[#701626]">{product.price}</span>
+            <div className="flex items-baseline gap-1.5 sm:gap-2 pt-0.5">
+              <span className="font-display text-sm sm:text-xl font-bold text-[#701626]">{product.price}</span>
               {product.salePrice && product.regularPrice !== product.price && (
-                <span className="text-xs text-[#6D6268] line-through">{product.regularPrice}</span>
+                <span className="text-[10px] sm:text-xs text-[#6D6268] line-through">{product.regularPrice}</span>
               )}
             </div>
           </div>

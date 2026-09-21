@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useLocation, useNavigate, Link } from 'react-router-dom';
 import { 
   ShoppingBag, 
@@ -16,7 +16,8 @@ import {
   Building2,
   Calendar,
   Copy,
-  AlertCircle
+  AlertCircle,
+  ChevronDown
 } from 'lucide-react';
 import { useCartStore, type PlacedOrder } from '@/store/cart';
 import { useAuthStore } from '@/store/auth';
@@ -25,6 +26,7 @@ import BankBadge from '@/components/BankBadge';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import { sendBrevoEmail, buildOrderConfirmationHtml, buildAdminOrderAlertHtml, createOrUpdateBrevoContact, BREVO_LISTS } from '@/lib/brevo';
 import { initiatePaymentsLkCheckout } from '@/lib/payments-lk';
+import { isUUID } from '@/lib/auth-utils';
 import SEOHead from '@/components/SEOHead';
 import { 
   calculateSLPostShipping, 
@@ -98,6 +100,7 @@ export default function Checkout() {
   const [saveAddressToAccount, setSaveAddressToAccount] = useState(false);
   const [selectedAddrId, setSelectedAddrId] = useState<string>(defaultAddr?.id || '');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showMobileSummary, setShowMobileSummary] = useState(false);
   const searchParams = new URLSearchParams(location.search);
   const isCancelledPayment = searchParams.get('status') === 'cancelled';
   const cancelledOrderId = searchParams.get('order_id');
@@ -148,6 +151,7 @@ export default function Checkout() {
   });
 
   const isFreeDeliveryEligible = Boolean(
+    settings.enableFreeShippingThreshold &&
     settings.freeShippingThreshold &&
     settings.freeShippingThreshold > 0 &&
     (rawTotal - discount) >= settings.freeShippingThreshold
@@ -183,6 +187,32 @@ export default function Checkout() {
       setCity(found.city);
       setDistrict(found.district);
       setPostalCode(found.postalCode || '');
+    }
+  };
+
+  const handleEmailBlur = () => {
+    if (isSupabaseConfigured() && email.trim().includes('@') && items.length > 0) {
+      supabase
+        .from('abandoned_carts')
+        .upsert(
+          {
+            user_id: user?.id && isUUID(user.id) ? user.id : null,
+            customer_name: fullName.trim() || 'Valued Patron',
+            customer_email: email.toLowerCase().trim(),
+            items: items.map((i) => ({
+              name: i.name,
+              size: i.size || 'Standard',
+              price: i.price,
+              image: i.image,
+              quantity: i.quantity,
+            })),
+            total_value: finalTotal,
+            email_sent: false,
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: 'customer_email' }
+        )
+        .then();
     }
   };
 
@@ -345,6 +375,9 @@ export default function Checkout() {
 
     setLastOrder(orderData);
     clearCart();
+    if (isSupabaseConfigured() && email) {
+      supabase.from('abandoned_carts').delete().eq('customer_email', email.toLowerCase().trim()).then();
+    }
     setIsSubmitting(false);
     navigate(`/order-success/${orderData.orderId}`);
   };
@@ -517,7 +550,7 @@ export default function Checkout() {
   };
 
   return (
-    <div className="min-h-screen bg-[#FCFBF8] pt-32 sm:pt-36 xl:pt-40 pb-20 text-[#110B0E]">
+    <div className="min-h-screen bg-[#FCFBF8] pt-32 sm:pt-36 xl:pt-40 pb-32 sm:pb-24 text-[#110B0E]">
       <SEOHead title="Secure Checkout" noindex={true} />
       <div className="max-w-7xl mx-auto px-4 sm:px-8">
         
@@ -557,6 +590,96 @@ export default function Checkout() {
           </motion.div>
         )}
 
+        {/* Mobile Collapsible Order Summary Bar */}
+        <div className="lg:hidden mb-6 rounded-2xl bg-white border border-[#C5A059]/35 shadow-sm overflow-hidden">
+          <button
+            type="button"
+            onClick={() => setShowMobileSummary(!showMobileSummary)}
+            className="w-full px-4 py-3.5 flex items-center justify-between text-left bg-[#FCFBF8] border-b border-[#C5A059]/20 cursor-pointer"
+          >
+            <div className="flex items-center gap-2 text-xs font-bold text-[#110B0E]">
+              <ShoppingBag className="w-4 h-4 text-[#701626]" />
+              <span>{showMobileSummary ? 'Hide Order Summary' : 'Show Order Summary'}</span>
+              <span className="text-[10px] bg-[#701626]/10 text-[#701626] px-2 py-0.5 rounded-full font-bold">
+                {items.reduce((a, b) => a + b.quantity, 0)} Pieces
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="font-display text-base font-bold text-[#701626]">
+                LKR {finalTotal.toLocaleString('en-US')}
+              </span>
+              <ChevronDown className={`w-4 h-4 text-[#6D6268] transition-transform duration-200 ${showMobileSummary ? 'rotate-180' : ''}`} />
+            </div>
+          </button>
+
+          <AnimatePresence>
+            {showMobileSummary && (
+              <motion.div
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: 'auto', opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                transition={{ duration: 0.25 }}
+                className="overflow-hidden p-4 space-y-4 bg-white"
+              >
+                {/* Mobile Item List */}
+                <div className="space-y-3 max-h-64 overflow-y-auto pr-1">
+                  {items.map(item => (
+                    <div key={`m-${item.id}-${item.size}`} className="flex gap-3 items-start">
+                      <div className="w-14 h-16 rounded-xl overflow-hidden bg-[#F7F4EE] shrink-0 border border-[#C5A059]/30">
+                        <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
+                      </div>
+                      <div className="flex-1 min-w-0 space-y-0.5">
+                        {item.tailoring && (
+                          <span className="inline-block text-[8.5px] font-bold uppercase tracking-wider text-[#701626] bg-[#701626]/10 px-1.5 py-0.2 rounded-full">
+                            ✂️ Custom Tailored
+                          </span>
+                        )}
+                        <h4 className="font-display text-sm font-bold text-[#110B0E] leading-tight line-clamp-1">{item.name}</h4>
+                        {item.tailoring ? (
+                          <p className="text-[9.5px] text-[#6D6268]">
+                            Fabric: {item.tailoring.fabricName} · Size: {item.tailoring.sizeLabel}
+                          </p>
+                        ) : (
+                          <p className="text-[9.5px] text-[#6D6268] uppercase tracking-wider">
+                            Size: {item.size} · Qty: {item.quantity}
+                          </p>
+                        )}
+                        <p className="font-display text-xs font-bold text-[#701626]">{item.price}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Mobile Breakdown */}
+                <div className="pt-3 border-t border-[#C5A059]/20 space-y-1.5 text-xs">
+                  <div className="flex justify-between text-[#6D6268]">
+                    <span>Subtotal</span>
+                    <span>LKR {rawTotal.toLocaleString('en-US')}</span>
+                  </div>
+                  {discount > 0 && (
+                    <div className="flex justify-between text-emerald-700 font-semibold">
+                      <span>Discount ({state.appliedCoupon})</span>
+                      <span>- LKR {discount.toLocaleString('en-US')}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between text-[#6D6268]">
+                    <span>Courier Postage</span>
+                    <span className="text-[#701626] font-semibold">
+                      {shippingFee === 0 ? 'FREE' : `LKR ${shippingFee.toLocaleString('en-US')}`}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-baseline pt-2 border-t border-[#C5A059]/30">
+                    <span className="text-xs uppercase tracking-wider text-[#110B0E] font-bold">Total to Pay</span>
+                    <span className="font-display text-xl font-bold text-[#701626]">
+                      LKR {finalTotal.toLocaleString('en-US')}
+                    </span>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-14">
           
           {/* ── Left Column: Checkout Form (7 cols) ── */}
@@ -581,6 +704,7 @@ export default function Checkout() {
                       placeholder="name@example.com"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
+                      onBlur={handleEmailBlur}
                       className="w-full px-4 py-3 text-xs bg-[#FCFBF8] border border-[#C5A059]/50 rounded-xl text-[#110B0E] focus:outline-none focus:border-[#701626]"
                     />
                   </div>
@@ -1228,7 +1352,7 @@ export default function Checkout() {
                 </div>
                 <div className="p-2.5 rounded-xl bg-[#F7F4EE]">
                   <ShieldCheck className="w-4 h-4 text-[#701626] mx-auto mb-1" />
-                  <span>14-Day Exchanges</span>
+                  <span>Atelier Guarantee</span>
                 </div>
               </div>
 

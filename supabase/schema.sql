@@ -278,6 +278,8 @@ CREATE POLICY "Admin Tags Write" ON public.tags FOR ALL USING (auth.role() IN ('
 CREATE POLICY "Admin Products Write" ON public.products FOR ALL USING (auth.role() IN ('authenticated', 'service_role', 'anon')) WITH CHECK (auth.role() IN ('authenticated', 'service_role', 'anon'));
 CREATE POLICY "Admin Store Settings Write" ON public.store_settings FOR ALL USING (auth.role() IN ('authenticated', 'service_role', 'anon')) WITH CHECK (auth.role() IN ('authenticated', 'service_role', 'anon'));
 CREATE POLICY "Admin Coupons Write" ON public.coupons FOR ALL USING (auth.role() IN ('authenticated', 'service_role', 'anon')) WITH CHECK (auth.role() IN ('authenticated', 'service_role', 'anon'));
+CREATE POLICY "Public Product Categories Read" ON public.product_categories FOR SELECT USING (true);
+CREATE POLICY "Admin Product Categories Write" ON public.product_categories FOR ALL USING (auth.role() IN ('authenticated', 'service_role', 'anon')) WITH CHECK (auth.role() IN ('authenticated', 'service_role', 'anon'));
 
 -- 4. User Profiles, Addresses & Wishlist
 CREATE POLICY "Public Profiles All" ON public.profiles FOR ALL USING (true) WITH CHECK (true);

@@ -3,6 +3,10 @@ import { createRoot } from 'react-dom/client';
 import './index.css';
 import App from './App.tsx';
 import { AuthProvider } from '@/lib/auth-provider';
+import { initGTM } from '@/lib/gtm';
+
+// Initialize Google Tag Manager if VITE_GTM_ID is provided
+initGTM();
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

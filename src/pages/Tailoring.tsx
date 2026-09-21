@@ -37,7 +37,7 @@ export default function Tailoring() {
   }), []);
 
   return (
-    <div className="min-h-screen bg-[#FCFBF8] pt-32 sm:pt-36 xl:pt-40 pb-20">
+    <div className="min-h-screen bg-[#FCFBF8] pt-32 sm:pt-36 xl:pt-40 pb-32 sm:pb-24">
       <SEOHead
         title="Custom Tailoring Studio & 2D Saree Blouse Customizer"
         description="Design your custom saree blouse or bespoke handloom outfit with Azhai. Real-time 2D neckline & sleeve customizer, fitting vault, and express island-wide delivery."
@@ -196,7 +196,7 @@ export default function Tailoring() {
             },
             {
               q: 'What if the garment needs a minor adjustment after delivery?',
-              a: 'All our tailored garments include a 1.5-inch inner seam margin for easy future adjustments, and our boutique offers free tailoring adjustments within 14 days of delivery.',
+              a: 'All our tailored garments include a 1.5-inch inner seam margin for easy future adjustments, and our boutique offers complimentary tailoring adjustments promptly upon delivery.',
             },
             {
               q: 'How long does custom stitching take?',

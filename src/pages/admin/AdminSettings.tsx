@@ -43,6 +43,7 @@ export default function AdminSettings() {
 
   const [enableCOD, setEnableCOD] = useState(settings.enableCOD);
   const [maxCODAmount, setMaxCODAmount] = useState(settings.maxCODAmount);
+  const [enableFreeShippingThreshold, setEnableFreeShippingThreshold] = useState(Boolean(settings.enableFreeShippingThreshold));
   const [freeShippingThreshold, setFreeShippingThreshold] = useState(settings.freeShippingThreshold);
   const [standardShippingFee, setStandardShippingFee] = useState(settings.standardShippingFee);
   const [expressShippingFee, setExpressShippingFee] = useState(settings.expressShippingFee);
@@ -83,6 +84,7 @@ export default function AdminSettings() {
     if (settings) {
       setEnableCOD(settings.enableCOD);
       setMaxCODAmount(settings.maxCODAmount);
+      setEnableFreeShippingThreshold(Boolean(settings.enableFreeShippingThreshold));
       setFreeShippingThreshold(settings.freeShippingThreshold);
       setStandardShippingFee(settings.standardShippingFee);
       setExpressShippingFee(settings.expressShippingFee);
@@ -115,6 +117,7 @@ export default function AdminSettings() {
     updateSettings({
       enableCOD,
       maxCODAmount: Number(maxCODAmount),
+      enableFreeShippingThreshold,
       freeShippingThreshold: Number(freeShippingThreshold),
       standardShippingFee: Number(standardShippingFee),
       expressShippingFee: Number(expressShippingFee),
@@ -507,25 +510,71 @@ export default function AdminSettings() {
           </div>
 
           {/* ── 3. LOGISTICS & DELIVERY THRESHOLDS ── */}
-          <div className="bg-white rounded-3xl p-6 sm:p-8 border border-[#C5A059]/30 shadow-sm space-y-5">
-            <div className="flex items-center gap-2 text-[#701626]">
-              <Truck className="w-5 h-5" />
-              <h3 className="font-display text-xl font-bold text-[#110B0E]">
-                Shipping Rates & Free Delivery Threshold
-              </h3>
+          <div className="bg-white rounded-3xl p-6 sm:p-8 border border-[#C5A059]/30 shadow-sm space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-[#C5A059]/20">
+              <div className="flex items-center gap-2 text-[#701626]">
+                <Truck className="w-5 h-5" />
+                <div>
+                  <h3 className="font-display text-xl font-bold text-[#110B0E]">
+                    Shipping Rates & Free Delivery Threshold
+                  </h3>
+                  <p className="text-xs text-[#6D6268]">
+                    Configure island-wide courier fees and choose whether to enable free shipping when patrons reach a minimum spend.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3 self-start sm:self-auto">
+                <span className={`text-[11px] font-bold uppercase tracking-wider px-3 py-1 rounded-full ${
+                  enableFreeShippingThreshold 
+                    ? 'bg-emerald-50 text-emerald-800 border border-emerald-300' 
+                    : 'bg-stone-100 text-stone-600 border border-stone-300'
+                }`}>
+                  Free Delivery {enableFreeShippingThreshold ? 'Active' : 'Disabled'}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setEnableFreeShippingThreshold(!enableFreeShippingThreshold)}
+                  className={`w-12 h-6 flex items-center rounded-full p-1 transition-colors duration-200 ease-in-out cursor-pointer ${
+                    enableFreeShippingThreshold ? 'bg-[#701626]' : 'bg-stone-300'
+                  }`}
+                  aria-label="Toggle Free Delivery Threshold"
+                >
+                  <div
+                    className={`bg-white w-4 h-4 rounded-full shadow-md transform transition duration-200 ease-in-out ${
+                      enableFreeShippingThreshold ? 'translate-x-6' : 'translate-x-0'
+                    }`}
+                  />
+                </button>
+              </div>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div className="space-y-1">
-                <label className="block text-xs font-bold text-[#110B0E] uppercase tracking-wider">
-                  Free Shipping Minimum (LKR)
-                </label>
+                <div className="flex items-center justify-between">
+                  <label className="block text-xs font-bold text-[#110B0E] uppercase tracking-wider">
+                    Free Shipping Minimum (LKR)
+                  </label>
+                  {!enableFreeShippingThreshold && (
+                    <span className="text-[10px] text-stone-400 font-medium">Disabled</span>
+                  )}
+                </div>
                 <input
                   type="number"
                   value={freeShippingThreshold}
+                  disabled={!enableFreeShippingThreshold}
                   onChange={(e) => setFreeShippingThreshold(Number(e.target.value))}
-                  className="w-full px-4 py-3 rounded-2xl bg-[#F7F4EE]/70 border border-[#C5A059]/30 text-xs font-bold focus:border-[#701626] focus:bg-white focus:outline-none"
+                  className={`w-full px-4 py-3 rounded-2xl border text-xs font-bold focus:outline-none transition-all ${
+                    enableFreeShippingThreshold
+                      ? 'bg-[#F7F4EE]/70 border-[#C5A059]/30 text-[#110B0E] focus:border-[#701626] focus:bg-white'
+                      : 'bg-stone-100 border-stone-200 text-stone-400 cursor-not-allowed'
+                  }`}
                 />
+                <p className="text-[10.5px] text-[#6D6268]">
+                  {enableFreeShippingThreshold 
+                    ? 'Orders equal to or exceeding this subtotal qualify for complimentary postage.' 
+                    : 'Threshold is inactive. Regular standard courier postage will apply to all orders.'}
+                </p>
               </div>
 
               <div className="space-y-1">
@@ -538,6 +587,9 @@ export default function AdminSettings() {
                   onChange={(e) => setStandardShippingFee(Number(e.target.value))}
                   className="w-full px-4 py-3 rounded-2xl bg-[#F7F4EE]/70 border border-[#C5A059]/30 text-xs font-bold focus:border-[#701626] focus:bg-white focus:outline-none"
                 />
+                <p className="text-[10.5px] text-[#6D6268]">
+                  Baseline SL Post / courier postage for standard orders.
+                </p>
               </div>
 
               <div className="space-y-1">
@@ -550,6 +602,9 @@ export default function AdminSettings() {
                   onChange={(e) => setExpressShippingFee(Number(e.target.value))}
                   className="w-full px-4 py-3 rounded-2xl bg-[#F7F4EE]/70 border border-[#C5A059]/30 text-xs font-bold focus:border-[#701626] focus:bg-white focus:outline-none"
                 />
+                <p className="text-[10.5px] text-[#6D6268]">
+                  Same-day / next-day priority express delivery within Colombo districts.
+                </p>
               </div>
             </div>
           </div>

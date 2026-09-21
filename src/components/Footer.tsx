@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Mail, MessageCircle, MapPin, Phone, Sparkles, Check, ArrowRight } from 'lucide-react';
+import { Mail, MessageCircle, MapPin, Phone, Sparkles, Check, ArrowRight, Heart } from 'lucide-react';
 import { useAdminStore, cleanWhatsAppDigits } from '@/store/admin';
 import { STORE_INSTAGRAM_URL, STORE_EMAIL, STORE_ADDRESS_FULL, STORE_PHONE } from '@/lib/constants';
 import { sendBrevoEmail, buildNewsletterWelcomeHtml, createOrUpdateBrevoContact, BREVO_LISTS } from '@/lib/brevo';
@@ -230,7 +230,7 @@ export default function Footer() {
               </li>
               <li>
                 <Link to="/returns-exchanges" className="text-[#6D6268] hover:text-[#701626] transition-colors">
-                  14-Day Doorstep Exchanges
+                  Atelier Returns & Exchanges
                 </Link>
               </li>
               <li>
@@ -248,9 +248,6 @@ export default function Footer() {
                   Terms & Conditions
                 </Link>
               </li>
-              <li className="text-[#701626] font-semibold pt-1">
-                Free Shipping Over LKR 15,000
-              </li>
             </ul>
           </div>
 
@@ -266,7 +263,7 @@ export default function Footer() {
               Enjoy 5% Privilege on Your First Handloom Saree or Kurti
             </h4>
             <p className="text-xs text-[#6D6268]">
-              Be the first to receive artisanal silk drop notifications, couture private viewings, and code <strong>ATELIER5</strong>.
+              Be the first to receive artisanal silk drop notifications and couture private viewings.
             </p>
           </div>
 
@@ -275,7 +272,19 @@ export default function Footer() {
 
         <div className="mt-14 pt-6 border-t border-[#C5A059]/30 flex flex-col sm:flex-row items-center justify-between gap-3 text-[11px] text-[#6D6268]">
           <p>© 2026 Azhai Clothing by Preethi (Sri Lanka). All rights reserved.</p>
-          <p className="flex items-center gap-1 text-[#701626] font-medium">Crafted with 🪷 in Sri Lanka & Tamil Nadu</p>
+          <p className="flex items-center gap-1.5 text-[#701626] font-medium">
+            <span>Build with</span>
+            <Heart className="w-3.5 h-3.5 fill-[#701626] text-[#701626] inline-block shrink-0" />
+            <span>by</span>
+            <a
+              href="https://yageshinsights.com/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="underline hover:text-[#8E1E34] transition-colors font-semibold"
+            >
+              Yagesh insights
+            </a>
+          </p>
         </div>
       </div>
     </footer>

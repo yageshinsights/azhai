@@ -138,6 +138,7 @@ export interface StoreSettings {
   tagline: string;
   enableCOD: boolean;
   maxCODAmount: number;
+  enableFreeShippingThreshold?: boolean;
   freeShippingThreshold: number;
   standardShippingFee: number;
   expressShippingFee: number;
@@ -185,6 +186,8 @@ interface AdminState {
     trackingNumber?: string,
     notes?: string
   ) => void;
+  deleteOrder: (orderId: string) => Promise<void>;
+  clearAllOrders: () => Promise<void>;
   syncNewOrder: (placedOrder: PlacedOrder) => void;
   syncCustomerFromAuth: (user: { fullName: string; email: string; phone?: string; district?: string; city?: string; createdAt?: string }) => void;
   updateCustomerNotesAndTier: (email: string, notes: string, vipTier: 'Gold Patron' | 'Silver Patron' | 'Standard') => Promise<void>;
@@ -284,6 +287,7 @@ const INITIAL_SETTINGS: StoreSettings = {
   tagline: 'Handcrafted Festive & Bridal Silk Couture',
   enableCOD: true,
   maxCODAmount: 45000,
+  enableFreeShippingThreshold: false,
   freeShippingThreshold: 15000,
   standardShippingFee: 450,
   expressShippingFee: 850,
@@ -292,7 +296,7 @@ const INITIAL_SETTINGS: StoreSettings = {
   atelierAddress: '42/A Temple Road, Kollupitiya, Colombo 03, Sri Lanka',
   announcementTicker: {
     enabled: true,
-    text: '✨ Festive Drop Live: Complimentary Island-wide Delivery on Orders over LKR 15,000 | Use Code AZHAI10',
+    text: '✨ Festive Drop Live: Handcrafted Heirloom Silks by Preethi | Use Code AZHAI10',
     link: '/collections',
   },
   seo: {
@@ -371,10 +375,10 @@ export const useAdminStore = create<AdminState>()(
       adminUser: null,
       isAdminAuthenticated: false,
       orders: INITIAL_ORDERS,
-      products: PRODUCTS,
-      categories: COLLECTIONS,
-      tags: INITIAL_TAGS,
-      coupons: INITIAL_COUPONS,
+      products: isSupabaseConfigured() ? [] : PRODUCTS,
+      categories: isSupabaseConfigured() ? [] : COLLECTIONS,
+      tags: isSupabaseConfigured() ? [] : INITIAL_TAGS,
+      coupons: isSupabaseConfigured() ? [] : INITIAL_COUPONS,
       customers: INITIAL_CUSTOMERS,
       inquiries: [],
       settings: getInitialSettings(),
@@ -389,37 +393,64 @@ export const useAdminStore = create<AdminState>()(
         if (!isSupabaseConfigured()) return;
         try {
           // 1. Fetch Categories
-          const { data: dbCategories } = await supabase.from('categories').select('*').order('id', { ascending: true });
-          if (dbCategories && dbCategories.length > 0) {
-            const currentCats = get().categories || [];
-            set({
-              categories: dbCategories.map((c) => {
-                const existing = currentCats.find((ec) => ec.id === c.id || ec.slug === c.slug);
-                const isFeaturedVal = 
-                  c.is_featured !== undefined && c.is_featured !== null 
-                    ? Boolean(c.is_featured) 
-                    : (existing?.isFeatured !== undefined ? existing.isFeatured : true);
+          const { data: dbCategories, error: catErr } = await supabase
+            .from('categories')
+            .select('*')
+            .order('id', { ascending: true });
 
-                return {
-                  id: c.id,
-                  name: c.name,
-                  slug: c.slug,
-                  description: c.description || '',
-                  heroImage: c.hero_image || '',
-                  count: c.count || 0,
-                  season: c.season || undefined,
-                  tagline: c.tagline || undefined,
-                  isFeatured: isFeaturedVal,
-                };
-              }),
+          let resolvedCategories: Collection[] = [];
+          if (!catErr && dbCategories) {
+            resolvedCategories = dbCategories.map((c) => {
+              const isFeaturedVal = 
+                c.is_featured !== undefined && c.is_featured !== null 
+                  ? Boolean(c.is_featured) 
+                  : true;
+
+              return {
+                id: c.id,
+                name: c.name,
+                slug: c.slug,
+                description: c.description || '',
+                heroImage: c.hero_image || '',
+                count: c.count || 0,
+                season: c.season || undefined,
+                tagline: c.tagline || undefined,
+                isFeatured: isFeaturedVal,
+              };
             });
+            set({ categories: resolvedCategories });
           }
 
-          // 2. Fetch Products
-          const { data: dbProducts } = await supabase.from('products').select('*').order('id', { ascending: true });
-          if (dbProducts && dbProducts.length > 0) {
-            set({
-              products: dbProducts.map((p) => ({
+          // 2. Fetch Product-to-Category Junction links
+          const { data: dbProductCats } = await supabase
+            .from('product_categories')
+            .select('product_id, category_id');
+
+          // 3. Fetch Products and attach matched categories
+          const { data: dbProducts, error: prodErr } = await supabase
+            .from('products')
+            .select('*')
+            .order('id', { ascending: true });
+
+          if (!prodErr && dbProducts) {
+            const mappedProducts = dbProducts.map((p) => {
+              // Find category IDs linked to this product from junction table
+              const linkedCatIds = (dbProductCats || [])
+                .filter((pc: any) => Number(pc.product_id) === Number(p.id))
+                .map((pc: any) => Number(pc.category_id));
+
+              const matchedCategories = resolvedCategories.filter((c) =>
+                linkedCatIds.includes(Number(c.id))
+              );
+
+              const finalCategories =
+                matchedCategories.length > 0
+                  ? matchedCategories
+                  : Array.isArray(p.categories) && p.categories.length > 0
+                  ? p.categories
+                  : [];
+
+              return {
                 id: p.id,
                 name: p.name,
                 slug: p.slug,
@@ -435,27 +466,37 @@ export const useAdminStore = create<AdminState>()(
                 shippingNote: p.shipping_note || undefined,
                 pairingProductIds: p.pairing_product_ids || undefined,
                 images: p.images || [],
-                categories: p.categories || [],
+                categories: finalCategories,
                 attributes: p.attributes || [],
                 isFeatured: p.is_featured,
                 tag: p.tag || undefined,
+                occasion: p.occasion || undefined,
                 stockQuantity: p.stock_quantity !== undefined && p.stock_quantity !== null ? Number(p.stock_quantity) : 15,
                 weightGrams: p.weight_grams !== undefined && p.weight_grams !== null ? Number(p.weight_grams) : 400,
                 rating: Number(p.rating) || 5.0,
                 reviewsCount: p.reviews_count || 0,
-              })),
+              };
             });
+            set({ products: mappedProducts });
           }
 
-          // 3. Fetch Tags
-          const { data: dbTags } = await supabase.from('tags').select('*').order('id', { ascending: true });
-          if (dbTags && dbTags.length > 0) {
+          // 3b. Fetch Tags
+          const { data: dbTags, error: tagsErr } = await supabase
+            .from('tags')
+            .select('*')
+            .order('id', { ascending: true });
+
+          if (!tagsErr && dbTags) {
             set({ tags: dbTags.map((t) => t.name) });
           }
 
           // 4. Fetch Coupons
-          const { data: dbCoupons } = await supabase.from('coupons').select('*').order('created_at', { ascending: false });
-          if (dbCoupons && dbCoupons.length > 0) {
+          const { data: dbCoupons, error: couponsErr } = await supabase
+            .from('coupons')
+            .select('*')
+            .order('created_at', { ascending: false });
+
+          if (!couponsErr && dbCoupons) {
             set({
               coupons: dbCoupons.map((c) => ({
                 id: c.id,
@@ -492,6 +533,7 @@ export const useAdminStore = create<AdminState>()(
               tagline: dbSettings.tagline ?? current.tagline,
               enableCOD: dbSettings.enable_cod ?? current.enableCOD,
               maxCODAmount: Number(dbSettings.max_cod_amount ?? current.maxCODAmount),
+              enableFreeShippingThreshold: Boolean(tickerData.enableFreeShippingThreshold ?? (dbSettings as any).enable_free_shipping_threshold ?? current.enableFreeShippingThreshold ?? false),
               freeShippingThreshold: Number(dbSettings.free_shipping_threshold ?? current.freeShippingThreshold),
               standardShippingFee: Number(dbSettings.standard_shipping_fee ?? current.standardShippingFee),
               expressShippingFee: Number(dbSettings.express_shipping_fee ?? current.expressShippingFee),
@@ -560,34 +602,20 @@ export const useAdminStore = create<AdminState>()(
               costPrice: o.cost_price ? Number(o.cost_price) : Math.round(Number(o.subtotal) * 0.45),
             }));
 
-            // Merge Supabase orders with local orders so nothing is lost
-            const currentOrders = get().orders || [];
-            const mergedMap = new Map<string, AdminOrder>();
-
-            mappedOrders.forEach((o) => mergedMap.set(o.orderId, o));
-            currentOrders.forEach((o) => {
-              if (!mergedMap.has(o.orderId)) {
-                mergedMap.set(o.orderId, o);
-              }
-            });
-
-            set({ orders: Array.from(mergedMap.values()) });
+            // Supabase is the single source of truth for orders
+            set({ orders: mappedOrders });
           }
 
-          // 6b. Fetch Customer Profiles & Sync CRM Registry
+          // 6b. Fetch Customer Profiles & Sync CRM Registry strictly from DB
           try {
             const { data: dbProfiles } = await supabase
               .from('profiles')
               .select('*')
               .order('created_at', { ascending: false });
 
-            const currentCustomers = get().customers || [];
             const customerMap = new Map<string, CustomerRecord>();
 
-            // 1. Preload existing/seed customers
-            currentCustomers.forEach((c) => customerMap.set(c.email.toLowerCase().trim(), c));
-
-            // 2. Hydrate from Supabase registered user profiles
+            // 1. Hydrate from Supabase registered user profiles
             if (dbProfiles && dbProfiles.length > 0) {
               dbProfiles.forEach((p: any) => {
                 const email = p.email?.toLowerCase().trim();
@@ -600,28 +628,27 @@ export const useAdminStore = create<AdminState>()(
                 const totalSpent = customerOrders.reduce((sum: number, o: any) => sum + (Number(o.total) || 0), 0);
                 const latestOrder = customerOrders[0];
 
-                const existing = customerMap.get(email);
                 const vipTier: 'Gold Patron' | 'Silver Patron' | 'Standard' =
                   totalSpent >= 50000 ? 'Gold Patron' : totalSpent >= 25000 ? 'Silver Patron' : 'Standard';
 
                 customerMap.set(email, {
-                  id: p.id || existing?.id || 'cust-' + Math.random().toString(36).substring(2, 8),
-                  fullName: p.full_name || existing?.fullName || email.split('@')[0],
+                  id: p.id || 'cust-' + Math.random().toString(36).substring(2, 8),
+                  fullName: p.full_name || email.split('@')[0],
                   email,
-                  phone: p.phone || existing?.phone || latestOrder?.customer_details?.phone || '',
-                  district: p.preferences?.district || existing?.district || latestOrder?.customer_details?.district || 'Colombo',
-                  city: p.preferences?.city || existing?.city || latestOrder?.customer_details?.city || 'Colombo',
-                  totalOrders: Math.max(totalOrders, existing?.totalOrders || 0),
-                  totalSpent: Math.max(totalSpent, existing?.totalSpent || 0),
-                  firstJoined: p.created_at || existing?.firstJoined || new Date().toISOString(),
-                  lastOrderDate: latestOrder?.created_at || existing?.lastOrderDate,
-                  vipTier: p.preferences?.vipTier || existing?.vipTier || vipTier,
-                  notes: p.preferences?.notes || (p.role === 'admin' ? 'Atelier Administrator' : existing?.notes || 'Registered online patron account.'),
+                  phone: p.phone || latestOrder?.customer_details?.phone || '',
+                  district: p.preferences?.district || latestOrder?.customer_details?.district || 'Colombo',
+                  city: p.preferences?.city || latestOrder?.customer_details?.city || 'Colombo',
+                  totalOrders: totalOrders,
+                  totalSpent: totalSpent,
+                  firstJoined: p.created_at || new Date().toISOString(),
+                  lastOrderDate: latestOrder?.created_at || undefined,
+                  vipTier: p.preferences?.vipTier || vipTier,
+                  notes: p.preferences?.notes || (p.role === 'admin' ? 'Atelier Administrator' : 'Registered online patron account.'),
                 });
               });
             }
 
-            // 3. Also capture any guest orders placed via storefront
+            // 2. Also capture any guest orders placed via storefront
             if (dbOrders && dbOrders.length > 0) {
               dbOrders.forEach((o: any) => {
                 const email = o.customer_details?.email?.toLowerCase().trim();
@@ -662,20 +689,24 @@ export const useAdminStore = create<AdminState>()(
           try {
             const { data: dbDressTypes } = await supabase.from('tailoring_dress_types').select('*').order('display_order', { ascending: true });
             if (dbDressTypes && dbDressTypes.length > 0) {
+              const currentDressTypes = get().dressTypes || DEFAULT_DRESS_TYPES;
               set({
-                dressTypes: dbDressTypes.map((dt: any) => ({
-                  id: dt.id,
-                  collectionId: dt.collection_id || undefined,
-                  collectionSlug: dt.collection_slug || '',
-                  name: dt.name,
-                  slug: dt.slug,
-                  coverImage: dt.cover_image || dt.icon || '',
-                  stitchingFee: Number(dt.stitching_fee || 0),
-                  leadTime: dt.lead_time || '5–7 working days',
-                  description: dt.description || '',
-                  isActive: dt.is_active !== false,
-                  displayOrder: Number(dt.display_order || 0),
-                })),
+                dressTypes: dbDressTypes.map((dt: any) => {
+                  const existing = currentDressTypes.find((item) => item.id === dt.id || item.slug === dt.slug);
+                  return {
+                    id: dt.id,
+                    collectionId: dt.collection_id ?? existing?.collectionId,
+                    collectionSlug: dt.collection_slug || existing?.collectionSlug || 'kurties',
+                    name: dt.name,
+                    slug: dt.slug,
+                    coverImage: dt.cover_image || dt.icon || existing?.coverImage || '',
+                    stitchingFee: Number(dt.stitching_fee ?? existing?.stitchingFee ?? 0),
+                    leadTime: dt.lead_time || existing?.leadTime || '5–7 working days',
+                    description: dt.description || existing?.description || '',
+                    isActive: dt.is_active !== false,
+                    displayOrder: Number(dt.display_order ?? existing?.displayOrder ?? 0),
+                  };
+                }),
               });
             }
 
@@ -727,42 +758,16 @@ export const useAdminStore = create<AdminState>()(
             console.warn('[Tailoring Supabase Fetch]: Using local defaults', tailoringErr);
           }
 
-          // 8. Fetch Atelier Inquiries
+          // 8. Fetch Atelier Inquiries strictly from Supabase
           try {
-            const { data: dbInquiries } = await supabase
+            const { data: dbInquiries, error: inqErr } = await supabase
               .from('inquiries')
               .select('*')
               .order('created_at', { ascending: false });
 
-            let localInquiries: AtelierInquiry[] = [];
-            if (typeof window !== 'undefined') {
-              try {
-                const stored = localStorage.getItem('azhai-inquiries');
-                if (stored) {
-                  const list = JSON.parse(stored);
-                  if (Array.isArray(list)) {
-                    localInquiries = list.map((item: any) => ({
-                      id: item.id || `inq-${Date.now()}`,
-                      name: item.name,
-                      email: item.email,
-                      phone: item.phone || '',
-                      topic: item.topic || 'General Inquiry',
-                      message: item.message || '',
-                      status: (item.status || 'unread') as InquiryStatus,
-                      adminNotes: item.adminNotes || '',
-                      createdAt: item.createdAt || new Date().toISOString(),
-                    }));
-                  }
-                }
-              } catch {}
-            }
-
-            const inqMap = new Map<string, AtelierInquiry>();
-            localInquiries.forEach((inq) => inqMap.set(inq.id, inq));
-
-            if (dbInquiries && dbInquiries.length > 0) {
-              dbInquiries.forEach((d: any) => {
-                inqMap.set(d.id, {
+            if (!inqErr && dbInquiries) {
+              set({
+                inquiries: dbInquiries.map((d: any) => ({
                   id: d.id,
                   name: d.name,
                   email: d.email,
@@ -772,11 +777,9 @@ export const useAdminStore = create<AdminState>()(
                   status: (d.status || 'unread') as InquiryStatus,
                   adminNotes: d.admin_notes || '',
                   createdAt: d.created_at || new Date().toISOString(),
-                });
+                })),
               });
             }
-
-            set({ inquiries: Array.from(inqMap.values()) });
           } catch (inqErr) {
             console.warn('[Supabase Inquiries Fetch Error]:', inqErr);
           }
@@ -789,6 +792,45 @@ export const useAdminStore = create<AdminState>()(
         const cleanEmail = email.trim().toLowerCase();
         const expectedEmail = (import.meta.env.VITE_ADMIN_EMAIL || 'admin@azhai.lk').trim().toLowerCase();
         const expectedPassword = import.meta.env.VITE_ADMIN_PASSWORD || 'AzhaiAdmin@2026';
+
+        // 1. First check Supabase Auth + profiles.role
+        if (isSupabaseConfigured()) {
+          try {
+            const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+              email: cleanEmail,
+              password,
+            });
+
+            if (!authError && authData.user) {
+              const { data: profile } = await supabase
+                .from('profiles')
+                .select('*')
+                .eq('id', authData.user.id)
+                .single();
+
+              const userRole = (profile?.role || 'customer').toLowerCase();
+              if (['admin', 'owner', 'manager', 'dispatch'].includes(userRole)) {
+                const mappedRole: AdminRole = 
+                  userRole === 'dispatch' ? 'dispatch' :
+                  userRole === 'manager' ? 'manager' : 'owner';
+
+                const adminUser: AdminUser = {
+                  id: authData.user.id,
+                  name: profile?.full_name || (mappedRole === 'owner' ? 'Preethi' : 'Atelier Manager'),
+                  email: cleanEmail,
+                  role: mappedRole,
+                  avatar: profile?.avatar_url,
+                };
+                set({ adminUser, isAdminAuthenticated: true });
+                return { success: true };
+              }
+            }
+          } catch (err) {
+            console.warn('[Admin Supabase Auth Login Exception]:', err);
+          }
+        }
+
+        // 2. Fallback to Master Admin Credentials from .env
         if (cleanEmail === expectedEmail && password === expectedPassword) {
           const user: AdminUser = {
             id: 'adm_01',
@@ -881,6 +923,32 @@ export const useAdminStore = create<AdminState>()(
               .eq('order_code', orderId);
           } catch (err) {
             console.error('[Supabase Order Update Error]:', err);
+          }
+        }
+      },
+
+      deleteOrder: async (orderId: string) => {
+        set((state) => ({
+          orders: state.orders.filter((o) => o.orderId !== orderId),
+        }));
+
+        if (isSupabaseConfigured()) {
+          try {
+            await supabase.from('orders').delete().eq('order_code', orderId);
+          } catch (err) {
+            console.error('[Supabase Delete Order Error]:', err);
+          }
+        }
+      },
+
+      clearAllOrders: async () => {
+        set({ orders: [] });
+
+        if (isSupabaseConfigured()) {
+          try {
+            await supabase.from('orders').delete().neq('order_code', '');
+          } catch (err) {
+            console.error('[Supabase Clear All Orders Error]:', err);
           }
         }
       },
@@ -1053,6 +1121,14 @@ export const useAdminStore = create<AdminState>()(
               rating: productData.rating || 5.0,
               reviews_count: productData.reviewsCount || 0,
             });
+
+            if (Array.isArray(productData.categories) && productData.categories.length > 0) {
+              const junctionRows = productData.categories.map((c: any) => ({
+                product_id: newId,
+                category_id: c.id,
+              }));
+              await supabase.from('product_categories').insert(junctionRows);
+            }
           } catch (err) {
             console.error('[Supabase Product Insert Error]:', err);
           }
@@ -1089,6 +1165,17 @@ export const useAdminStore = create<AdminState>()(
             if (updates.occasion !== undefined) dbPayload.occasion = updates.occasion;
 
             await supabase.from('products').update(dbPayload).eq('id', id);
+
+            if (Array.isArray(updates.categories)) {
+              await supabase.from('product_categories').delete().eq('product_id', id);
+              if (updates.categories.length > 0) {
+                const junctionRows = updates.categories.map((c: any) => ({
+                  product_id: id,
+                  category_id: c.id,
+                }));
+                await supabase.from('product_categories').insert(junctionRows);
+              }
+            }
           } catch (err) {
             console.error('[Supabase Product Update Error]:', err);
           }
@@ -1320,6 +1407,7 @@ export const useAdminStore = create<AdminState>()(
               socialLinks: current.socialLinks,
               studio: current.studio,
               phoneNumber: current.phoneNumber,
+              enableFreeShippingThreshold: current.enableFreeShippingThreshold,
             };
 
             const dbPayload: any = {
@@ -1399,7 +1487,7 @@ export const useAdminStore = create<AdminState>()(
           inquiries: state.inquiries.map((inq) => (inq.id === id ? { ...inq, status } : inq)),
         }));
 
-        if (isSupabaseConfigured() && id.length > 30) {
+        if (isSupabaseConfigured()) {
           try {
             await supabase.from('inquiries').update({ status }).eq('id', id);
           } catch (err) {
@@ -1413,7 +1501,7 @@ export const useAdminStore = create<AdminState>()(
           inquiries: state.inquiries.map((inq) => (inq.id === id ? { ...inq, adminNotes } : inq)),
         }));
 
-        if (isSupabaseConfigured() && id.length > 30) {
+        if (isSupabaseConfigured()) {
           try {
             await supabase.from('inquiries').update({ admin_notes: adminNotes }).eq('id', id);
           } catch (err) {
@@ -1427,7 +1515,7 @@ export const useAdminStore = create<AdminState>()(
           inquiries: state.inquiries.filter((inq) => inq.id !== id),
         }));
 
-        if (isSupabaseConfigured() && id.length > 30) {
+        if (isSupabaseConfigured()) {
           try {
             await supabase.from('inquiries').delete().eq('id', id);
           } catch (err) {
@@ -1441,12 +1529,12 @@ export const useAdminStore = create<AdminState>()(
         const newId = Date.now();
         const newDt: DressType = { ...dt, id: newId };
         set((state) => ({
-          dressTypes: [...state.dressTypes, newDt],
+          dressTypes: [...(state.dressTypes || []), newDt],
         }));
 
         if (isSupabaseConfigured()) {
           try {
-            const { data } = await supabase.from('tailoring_dress_types').insert({
+            let res = await supabase.from('tailoring_dress_types').insert({
               collection_id: dt.collectionId || null,
               collection_slug: dt.collectionSlug || '',
               name: dt.name,
@@ -1459,9 +1547,22 @@ export const useAdminStore = create<AdminState>()(
               display_order: dt.displayOrder,
             }).select().single();
 
-            if (data?.id) {
+            if (res.error && (res.error.code === 'PGRST204' || res.error.message?.includes('column'))) {
+              console.warn('[Supabase Dress Type Column Fallback]: Inserting base columns without optional metadata');
+              res = await supabase.from('tailoring_dress_types').insert({
+                name: dt.name,
+                slug: dt.slug,
+                cover_image: dt.coverImage,
+                stitching_fee: dt.stitchingFee,
+                lead_time: dt.leadTime,
+                is_active: dt.isActive,
+                display_order: dt.displayOrder,
+              }).select().single();
+            }
+
+            if (res.data?.id) {
               set((state) => ({
-                dressTypes: state.dressTypes.map((item) => (item.id === newId ? { ...item, id: data.id } : item)),
+                dressTypes: (state.dressTypes || []).map((item) => (item.id === newId ? { ...item, id: res.data.id } : item)),
               }));
             }
           } catch (err) {
@@ -1472,7 +1573,7 @@ export const useAdminStore = create<AdminState>()(
 
       updateDressType: async (id, updates) => {
         set((state) => ({
-          dressTypes: state.dressTypes.map((dt) => (dt.id === id ? { ...dt, ...updates } : dt)),
+          dressTypes: (state.dressTypes || []).map((dt) => (dt.id === id ? { ...dt, ...updates } : dt)),
         }));
 
         if (isSupabaseConfigured()) {
@@ -1489,7 +1590,15 @@ export const useAdminStore = create<AdminState>()(
             if (updates.isActive !== undefined) dbPayload.is_active = updates.isActive;
             if (updates.displayOrder !== undefined) dbPayload.display_order = updates.displayOrder;
 
-            await supabase.from('tailoring_dress_types').update(dbPayload).eq('id', id);
+            let res = await supabase.from('tailoring_dress_types').update(dbPayload).eq('id', id);
+
+            if (res.error && (res.error.code === 'PGRST204' || res.error.message?.includes('column'))) {
+              console.warn('[Supabase Dress Type Column Fallback]: Updating base columns without optional metadata');
+              delete dbPayload.collection_id;
+              delete dbPayload.collection_slug;
+              delete dbPayload.description;
+              await supabase.from('tailoring_dress_types').update(dbPayload).eq('id', id);
+            }
           } catch (err) {
             console.error('[Supabase Dress Type Update Error]:', err);
           }
@@ -1498,7 +1607,7 @@ export const useAdminStore = create<AdminState>()(
 
       deleteDressType: async (id) => {
         set((state) => ({
-          dressTypes: state.dressTypes.filter((dt) => dt.id !== id),
+          dressTypes: (state.dressTypes || []).filter((dt) => dt.id !== id),
         }));
 
         if (isSupabaseConfigured()) {
@@ -1511,12 +1620,13 @@ export const useAdminStore = create<AdminState>()(
       },
 
       toggleDressTypeActive: async (id) => {
-        const target = get().dressTypes.find((dt) => dt.id === id);
+        const list = get().dressTypes || [];
+        const target = list.find((dt) => dt.id === id);
         if (!target) return;
         const newStatus = !target.isActive;
 
         set((state) => ({
-          dressTypes: state.dressTypes.map((dt) => (dt.id === id ? { ...dt, isActive: newStatus } : dt)),
+          dressTypes: (state.dressTypes || []).map((dt) => (dt.id === id ? { ...dt, isActive: newStatus } : dt)),
         }));
 
         if (isSupabaseConfigured()) {
@@ -1532,7 +1642,7 @@ export const useAdminStore = create<AdminState>()(
         const newId = Date.now();
         const newFabric: TailoringFabric = { ...fabric, id: newId };
         set((state) => ({
-          tailoringFabrics: [...state.tailoringFabrics, newFabric],
+          tailoringFabrics: [...(state.tailoringFabrics || []), newFabric],
         }));
 
         if (isSupabaseConfigured()) {
@@ -1551,7 +1661,7 @@ export const useAdminStore = create<AdminState>()(
 
             if (data?.id) {
               set((state) => ({
-                tailoringFabrics: state.tailoringFabrics.map((item) => (item.id === newId ? { ...item, id: data.id } : item)),
+                tailoringFabrics: (state.tailoringFabrics || []).map((item) => (item.id === newId ? { ...item, id: data.id } : item)),
               }));
             }
           } catch (err) {
@@ -1562,7 +1672,7 @@ export const useAdminStore = create<AdminState>()(
 
       updateTailoringFabric: async (id, updates) => {
         set((state) => ({
-          tailoringFabrics: state.tailoringFabrics.map((f) => (f.id === id ? { ...f, ...updates } : f)),
+          tailoringFabrics: (state.tailoringFabrics || []).map((f) => (f.id === id ? { ...f, ...updates } : f)),
         }));
 
         if (isSupabaseConfigured()) {
@@ -1587,7 +1697,7 @@ export const useAdminStore = create<AdminState>()(
 
       deleteTailoringFabric: async (id) => {
         set((state) => ({
-          tailoringFabrics: state.tailoringFabrics.filter((f) => f.id !== id),
+          tailoringFabrics: (state.tailoringFabrics || []).filter((f) => f.id !== id),
         }));
 
         if (isSupabaseConfigured()) {
@@ -1600,12 +1710,13 @@ export const useAdminStore = create<AdminState>()(
       },
 
       toggleFabricStock: async (id) => {
-        const target = get().tailoringFabrics.find((f) => f.id === id);
+        const list = get().tailoringFabrics || [];
+        const target = list.find((f) => f.id === id);
         if (!target) return;
         const newStock = !target.inStock;
 
         set((state) => ({
-          tailoringFabrics: state.tailoringFabrics.map((f) => (f.id === id ? { ...f, inStock: newStock } : f)),
+          tailoringFabrics: (state.tailoringFabrics || []).map((f) => (f.id === id ? { ...f, inStock: newStock } : f)),
         }));
 
         if (isSupabaseConfigured()) {
@@ -1621,7 +1732,7 @@ export const useAdminStore = create<AdminState>()(
         const newId = Date.now();
         const newField: MeasurementField = { ...field, id: newId };
         set((state) => ({
-          measurementFields: [...state.measurementFields, newField],
+          measurementFields: [...(state.measurementFields || []), newField],
         }));
 
         if (isSupabaseConfigured()) {
@@ -1637,7 +1748,7 @@ export const useAdminStore = create<AdminState>()(
 
             if (data?.id) {
               set((state) => ({
-                measurementFields: state.measurementFields.map((item) => (item.id === newId ? { ...item, id: data.id } : item)),
+                measurementFields: (state.measurementFields || []).map((item) => (item.id === newId ? { ...item, id: data.id } : item)),
               }));
             }
           } catch (err) {
@@ -1648,7 +1759,7 @@ export const useAdminStore = create<AdminState>()(
 
       updateMeasurementField: async (id, updates) => {
         set((state) => ({
-          measurementFields: state.measurementFields.map((f) => (f.id === id ? { ...f, ...updates } : f)),
+          measurementFields: (state.measurementFields || []).map((f) => (f.id === id ? { ...f, ...updates } : f)),
         }));
 
         if (isSupabaseConfigured()) {
@@ -1669,7 +1780,7 @@ export const useAdminStore = create<AdminState>()(
 
       deleteMeasurementField: async (id) => {
         set((state) => ({
-          measurementFields: state.measurementFields.filter((f) => f.id !== id),
+          measurementFields: (state.measurementFields || []).filter((f) => f.id !== id),
         }));
 
         if (isSupabaseConfigured()) {
@@ -1685,7 +1796,7 @@ export const useAdminStore = create<AdminState>()(
         const newId = Date.now();
         const newPreset: SizePreset = { ...preset, id: newId };
         set((state) => ({
-          sizePresets: [...state.sizePresets, newPreset],
+          sizePresets: [...(state.sizePresets || []), newPreset],
         }));
 
         if (isSupabaseConfigured()) {
@@ -1698,7 +1809,7 @@ export const useAdminStore = create<AdminState>()(
 
             if (data?.id) {
               set((state) => ({
-                sizePresets: state.sizePresets.map((item) => (item.id === newId ? { ...item, id: data.id } : item)),
+                sizePresets: (state.sizePresets || []).map((item) => (item.id === newId ? { ...item, id: data.id } : item)),
               }));
             }
           } catch (err) {
@@ -1709,7 +1820,7 @@ export const useAdminStore = create<AdminState>()(
 
       updateSizePreset: async (id, updates) => {
         set((state) => ({
-          sizePresets: state.sizePresets.map((p) => (p.id === id ? { ...p, ...updates } : p)),
+          sizePresets: (state.sizePresets || []).map((p) => (p.id === id ? { ...p, ...updates } : p)),
         }));
 
         if (isSupabaseConfigured()) {
@@ -1727,7 +1838,7 @@ export const useAdminStore = create<AdminState>()(
 
       deleteSizePreset: async (id) => {
         set((state) => ({
-          sizePresets: state.sizePresets.filter((p) => p.id !== id),
+          sizePresets: (state.sizePresets || []).filter((p) => p.id !== id),
         }));
 
         if (isSupabaseConfigured()) {
@@ -1938,6 +2049,10 @@ export const useAdminStore = create<AdminState>()(
     {
       name: 'azhai-admin-store-v3',
       storage: createJSONStorage(() => localStorage),
+      partialize: (state) => ({
+        adminUser: state.adminUser,
+        isAdminAuthenticated: state.isAdminAuthenticated,
+      }),
     }
   )
 );
@@ -1949,5 +2064,24 @@ if (typeof window !== 'undefined') {
       useAdminStore.persist?.rehydrate();
     }
   });
+
+  // Purge legacy/un-partialized data from previous sessions
+  try {
+    localStorage.removeItem('azhai-inquiries');
+    const oldAdmin = localStorage.getItem('azhai-admin-store-v3');
+    if (oldAdmin) {
+      const parsed = JSON.parse(oldAdmin);
+      if (parsed?.state?.orders || parsed?.state?.products || parsed?.state?.inquiries) {
+        delete parsed.state.orders;
+        delete parsed.state.products;
+        delete parsed.state.categories;
+        delete parsed.state.coupons;
+        delete parsed.state.tags;
+        delete parsed.state.inquiries;
+        delete parsed.state.customers;
+        localStorage.setItem('azhai-admin-store-v3', JSON.stringify(parsed));
+      }
+    }
+  } catch {}
 }
 

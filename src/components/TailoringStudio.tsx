@@ -166,13 +166,13 @@ export default function TailoringStudio() {
   };
 
   return (
-    <section className="py-20 px-4 sm:px-8 max-w-7xl mx-auto relative z-10 scroll-mt-24 bg-[#FCFBF8] rounded-3xl my-10">
+    <section className="py-10 sm:py-16 px-3 sm:px-8 max-w-7xl mx-auto relative z-10 scroll-mt-24 bg-[#FCFBF8] rounded-3xl my-6 sm:my-10">
       {/* Header */}
-      <div className="text-center space-y-2.5 mb-10">
+      <div className="text-center space-y-2.5 mb-8 sm:mb-10 px-2">
         <span className="text-[10px] uppercase tracking-[0.3em] text-[#701626] font-bold flex items-center justify-center gap-2">
           <Scissors className="w-3.5 h-3.5" /> BESPOKE TAILORING STUDIO
         </span>
-        <h2 className="font-display text-3xl sm:text-5xl font-bold text-[#110B0E]">
+        <h2 className="font-display text-2xl sm:text-5xl font-bold text-[#110B0E]">
           Your measurements. Your fabric. Your masterpiece.
         </h2>
         <p className="text-xs sm:text-sm text-[#6D6268] max-w-xl mx-auto font-light leading-relaxed">
@@ -181,7 +181,7 @@ export default function TailoringStudio() {
       </div>
 
       {/* 5-Step Horizontal Progress Indicator */}
-      <div className="max-w-3xl mx-auto mb-10 relative px-2 sm:px-0">
+      <div className="max-w-3xl mx-auto mb-8 sm:mb-10 relative px-1 sm:px-0">
         <div className="flex justify-between items-center relative z-10">
           {[
             { id: 1, label: 'COLLECTION', icon: Sparkles },
@@ -195,7 +195,7 @@ export default function TailoringStudio() {
             const Icon = isCompleted ? Check : s.icon;
             
             return (
-              <div key={s.id} className="flex flex-col items-center gap-2">
+              <div key={s.id} className="flex flex-col items-center gap-1.5 sm:gap-2">
                 <button
                   disabled={step < s.id && !isCompleted}
                   onClick={() => {
@@ -204,7 +204,7 @@ export default function TailoringStudio() {
                     else if (s.id === 3 && selectedDressType) setStep(3);
                     else if (s.id === 4 && selectedFabric) setStep(4);
                   }}
-                  className={`w-9 h-9 sm:w-12 sm:h-12 rounded-full flex items-center justify-center transition-all cursor-pointer ${
+                  className={`w-8 h-8 sm:w-12 sm:h-12 rounded-full flex items-center justify-center transition-all cursor-pointer ${
                     isActive
                       ? 'bg-[#701626] text-white shadow-lg border border-[#C5A059]'
                       : isCompleted
@@ -214,7 +214,7 @@ export default function TailoringStudio() {
                 >
                   <Icon className="w-3.5 h-3.5 sm:w-5 sm:h-5" />
                 </button>
-                <span className={`text-[8.5px] sm:text-[10px] uppercase tracking-wider font-bold text-center ${isActive ? 'text-[#701626]' : 'text-[#6D6268]'}`}>
+                <span className={`text-[7.5px] xs:text-[8.5px] sm:text-[10px] uppercase tracking-tight xs:tracking-wider font-bold text-center max-w-[56px] xs:max-w-none truncate ${isActive ? 'text-[#701626]' : 'text-[#6D6268]'}`}>
                   {s.label}
                 </span>
               </div>
@@ -322,15 +322,15 @@ export default function TailoringStudio() {
               </div>
 
               {collectionSilhouettes.length > 0 ? (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+                <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-5">
                   {collectionSilhouettes.map(dt => {
                     const isSelected = selectedDressType?.id === dt.id;
                     return (
                       <button
                         key={dt.id}
                         onClick={() => handleDressSelect(dt)}
-                        className={`relative aspect-[3/4] rounded-3xl overflow-hidden group text-left transition-all cursor-pointer shadow-md ${
-                          isSelected ? 'ring-4 ring-[#C5A059]' : 'hover:shadow-xl'
+                        className={`relative aspect-[3/4] rounded-2xl sm:rounded-3xl overflow-hidden group text-left transition-all cursor-pointer shadow-md ${
+                          isSelected ? 'ring-3 sm:ring-4 ring-[#C5A059]' : 'hover:shadow-xl'
                         }`}
                       >
                         <img
@@ -341,25 +341,25 @@ export default function TailoringStudio() {
                         <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/30 to-transparent" />
                         
                         {/* Lead Time Badge */}
-                        <div className="absolute top-3.5 right-3.5">
-                          <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-black/60 text-white/90 border border-white/20 backdrop-blur-sm shadow-sm flex items-center gap-1">
-                            <Clock className="w-3 h-3 text-[#DFBF77]" /> {dt.leadTime}
+                        <div className="absolute top-2.5 right-2.5 sm:top-3.5 sm:right-3.5">
+                          <span className="text-[9px] sm:text-[10px] font-bold px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-full bg-black/60 text-white/90 border border-white/20 backdrop-blur-sm shadow-sm flex items-center gap-1">
+                            <Clock className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-[#DFBF77]" /> {dt.leadTime}
                           </span>
                         </div>
 
                         {/* Bottom Info */}
-                        <div className="absolute bottom-0 left-0 right-0 p-5 text-white">
-                          <h4 className="font-display text-xl font-bold mb-1 leading-snug drop-shadow-md">
+                        <div className="absolute bottom-0 left-0 right-0 p-3 sm:p-5 text-white">
+                          <h4 className="font-display text-sm sm:text-xl font-bold mb-0.5 sm:mb-1 leading-snug drop-shadow-md line-clamp-1 sm:line-clamp-none">
                             {dt.name}
                           </h4>
                           {dt.description && (
-                            <p className="text-white/80 text-[11px] font-light line-clamp-2 leading-relaxed mb-3">
+                            <p className="hidden sm:block text-white/80 text-[11px] font-light line-clamp-2 leading-relaxed mb-3">
                               {dt.description}
                             </p>
                           )}
-                          <div className="flex items-center justify-between pt-2 border-t border-white/15">
-                            <span className="text-[11px] text-white/80 font-medium">Stitching:</span>
-                            <span className="font-bold text-[#DFBF77] text-sm">
+                          <div className="flex items-center justify-between pt-1.5 sm:pt-2 border-t border-white/15">
+                            <span className="text-[10px] sm:text-[11px] text-white/80 font-medium">Stitching:</span>
+                            <span className="font-bold text-[#DFBF77] text-xs sm:text-sm">
                               {formatLKR(dt.stitchingFee)}
                             </span>
                           </div>
@@ -405,31 +405,31 @@ export default function TailoringStudio() {
                 </div>
               </div>
               
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
                 {compatibleFabrics.map(fb => {
                   const isSelected = selectedFabric?.id === fb.id;
                   return (
                     <button
                       key={fb.id}
                       onClick={() => handleFabricSelect(fb)}
-                      className={`text-left p-4 rounded-3xl border transition-all flex flex-col gap-3 cursor-pointer ${
+                      className={`text-left p-3 sm:p-4 rounded-2xl sm:rounded-3xl border transition-all flex flex-col gap-2 sm:gap-3 cursor-pointer ${
                         isSelected 
                           ? 'border-[#C5A059] bg-[#FCFBF8] shadow-md ring-2 ring-[#C5A059]' 
                           : 'border-black/5 hover:border-[#C5A059]/50 hover:bg-[#F7F4EE]/60'
                       }`}
                     >
-                      <div className="aspect-[4/3] rounded-2xl overflow-hidden mb-1 bg-gray-100">
+                      <div className="aspect-[4/3] rounded-xl sm:rounded-2xl overflow-hidden mb-1 bg-gray-100">
                         <img src={fb.swatchImage} alt={fb.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
                       </div>
                       <div>
-                        <h4 className="font-bold text-sm text-[#110B0E] line-clamp-1">{fb.name}</h4>
-                        <p className="text-[10px] text-[#6D6268] uppercase tracking-wider mt-0.5">{fb.weight}</p>
+                        <h4 className="font-bold text-xs sm:text-sm text-[#110B0E] line-clamp-1">{fb.name}</h4>
+                        <p className="text-[9.5px] sm:text-[10px] text-[#6D6268] uppercase tracking-wider mt-0.5 truncate">{fb.weight}</p>
                       </div>
                       <div className="mt-auto flex justify-between items-end pt-2 border-t border-black/5">
-                        <span className="text-[#701626] font-bold text-sm">
-                          {formatLKR(fb.pricePerUnit)} <span className="text-[10px] font-normal text-[#6D6268]">/ {fb.unit}</span>
+                        <span className="text-[#701626] font-bold text-xs sm:text-sm">
+                          {formatLKR(fb.pricePerUnit)} <span className="text-[9px] sm:text-[10px] font-normal text-[#6D6268]">/ {fb.unit}</span>
                         </span>
-                        <span className="text-[11px] font-bold text-[#C5A059]">Select & Fit &rarr;</span>
+                        <span className="text-[10px] sm:text-[11px] font-bold text-[#C5A059] hidden xs:inline">Select & Fit &rarr;</span>
                       </div>
                     </button>
                   );

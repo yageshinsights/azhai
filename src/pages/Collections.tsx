@@ -36,7 +36,7 @@ export default function Collections() {
         url="https://azhaiclothing.lk/collections"
         schema={collectionsSchema}
       />
-      <div className="max-w-7xl mx-auto px-4 sm:px-8 py-16">
+      <div className="max-w-7xl mx-auto px-4 sm:px-8 pt-10 pb-28 sm:py-16">
         
         {/* Header */}
         <motion.div
@@ -72,7 +72,7 @@ export default function Collections() {
               >
                 <Link 
                   to={`/collections/${col.slug}`} 
-                  className="group block relative rounded-[2rem] overflow-hidden aspect-[16/10] sm:aspect-[16/9] bg-[#110B0E] border border-[#C5A059]/30 shadow-lg hover:shadow-2xl hover:border-[#C5A059] transition-all duration-500"
+                  className="group block relative rounded-[2rem] overflow-hidden aspect-[4/3] xs:aspect-[16/10] sm:aspect-[16/9] bg-[#110B0E] border border-[#C5A059]/30 shadow-lg hover:shadow-2xl hover:border-[#C5A059] transition-all duration-500"
                 >
                   <motion.img
                     src={col.heroImage}

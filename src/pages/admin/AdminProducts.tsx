@@ -44,57 +44,6 @@ interface PatronReview {
   created_at?: string;
 }
 
-const INITIAL_ADMIN_REVIEWS: PatronReview[] = [
-  {
-    id: '4e3252d2-448b-4039-a55e-ba16aaee8cda',
-    product_name: 'Maroon Corset Handloom Kurti Set',
-    product_slug: 'maroon-corset-kurti-set',
-    author_name: 'Ananya S.',
-    location: 'Colombo 07',
-    rating: 5,
-    title: 'Exquisite handloom drape and stitching',
-    comment:
-      'The silk is featherlight and the maroon hue is truly royal. Wore this for my cousin’s engagement in Colombo and received endless compliments. Sizing was spot-on.',
-    fit: 'True to Size',
-    is_verified: true,
-    likes: 15,
-    is_approved: true,
-    created_at: new Date(Date.now() - 21 * 86400000).toISOString(),
-  },
-  {
-    id: 'e90ca227-11dd-4d54-89b9-fb3d06addc09',
-    product_name: 'Ivory Hand-Painted Lotus Organza Saree',
-    product_slug: 'ivory-lotus-organza-saree',
-    author_name: 'Tharushi W.',
-    location: 'Kandy',
-    rating: 5,
-    title: 'Prompt delivery and heirloom packaging',
-    comment:
-      'Arrived in Kandy within 48 hours via Sri Lanka Post Speed Post. The gold zari weaving is breathtaking and the fabric breathes beautifully in our climate.',
-    fit: 'True to Size',
-    is_verified: true,
-    likes: 9,
-    is_approved: true,
-    created_at: new Date(Date.now() - 30 * 86400000).toISOString(),
-  },
-  {
-    id: '7563d24a-e02d-4bb3-8cc0-b51379da92b0',
-    product_name: 'Heirloom Zari Embroidered Silk Shawl',
-    product_slug: 'heirloom-zari-silk-shawl',
-    author_name: 'Preethi K.',
-    location: 'Jaffna',
-    rating: 5,
-    title: 'Authentic craftsmanship by Preethi',
-    comment:
-      'You can feel the artisan touch in every border detail. The lining is soft pure cotton, making it extremely comfortable for all-day wear.',
-    fit: 'True to Size',
-    is_verified: true,
-    likes: 18,
-    is_approved: true,
-    created_at: new Date(Date.now() - 60 * 86400000).toISOString(),
-  },
-];
-
 export default function AdminProducts() {
   const { products, categories, addProduct, updateProduct, updateProductStock, deleteProduct } = useAdminStore();
   
@@ -109,7 +58,7 @@ export default function AdminProducts() {
   const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null);
 
   // Reviews Moderation State
-  const [reviews, setReviews] = useState<PatronReview[]>(INITIAL_ADMIN_REVIEWS);
+  const [reviews, setReviews] = useState<PatronReview[]>([]);
   const [isLoadingReviews, setIsLoadingReviews] = useState(false);
   const [reviewSearchTerm, setReviewSearchTerm] = useState('');
   const [reviewStatusFilter, setReviewStatusFilter] = useState<'all' | 'approved' | 'pending'>('all');
@@ -128,7 +77,7 @@ export default function AdminProducts() {
 
       if (error) {
         console.warn('[Supabase Reviews Load Notice]:', error.message);
-      } else if (data && data.length > 0) {
+      } else if (data) {
         setReviews(data as PatronReview[]);
       }
     } catch (err) {
@@ -222,7 +171,8 @@ export default function AdminProducts() {
       p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       p.slug.toLowerCase().includes(searchTerm.toLowerCase());
     const matchCat =
-      selectedCategory === 'all' || p.categories.some((c) => c.slug === selectedCategory);
+      selectedCategory === 'all' ||
+      (Array.isArray(p.categories) && p.categories.some((c) => c.slug === selectedCategory));
     return matchSearch && matchCat;
   });
 
@@ -450,7 +400,7 @@ export default function AdminProducts() {
 
                     <td className="p-4 whitespace-nowrap">
                       <span className="bg-[#F7F4EE] text-[#701626] px-2.5 py-1 rounded-lg font-bold text-[10.5px] border border-[#C5A059]/25 whitespace-nowrap inline-block">
-                        {p.categories[0]?.name}
+                        {p.categories?.[0]?.name || 'Uncategorized'}
                       </span>
                     </td>
 

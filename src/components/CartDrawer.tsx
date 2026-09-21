@@ -26,6 +26,7 @@ export default function CartDrawer() {
   const [isGiftNoteOpen, setIsGiftNoteOpen] = useState(false);
   const [giftNote, setGiftNote] = useState('');
 
+  const enableFreeShippingThreshold = Boolean(adminSettings?.enableFreeShippingThreshold);
   const freeShippingThreshold = adminSettings?.freeShippingThreshold || 15000;
   const standardShippingFee = adminSettings?.standardShippingFee || 450;
 
@@ -158,14 +159,21 @@ export default function CartDrawer() {
               </motion.button>
             </div>
 
-            {/* Free shipping progress (Sri Lanka LKR 15,000 threshold) */}
+            {/* Delivery banner / Free shipping progress */}
             <div className="px-5 sm:px-6 py-2.5 bg-[#F7F4EE] border-b border-[#C5A059]/30 flex items-center justify-between text-[11px] text-[#6D6268]">
-              <span className="flex items-center gap-1.5 font-medium text-[#701626]">
-                <Sparkles className="w-3.5 h-3.5 text-[#C5A059]" />
-                {rawTotal >= freeShippingThreshold 
-                  ? "You've unlocked Free Island-wide Delivery!" 
-                  : `Add LKR ${(freeShippingThreshold - rawTotal).toLocaleString('en-US')} more for Free Delivery`}
-              </span>
+              {enableFreeShippingThreshold ? (
+                <span className="flex items-center gap-1.5 font-medium text-[#701626]">
+                  <Sparkles className="w-3.5 h-3.5 text-[#C5A059]" />
+                  {rawTotal >= freeShippingThreshold 
+                    ? "You've unlocked Free Island-wide Delivery!" 
+                    : `Add LKR ${(freeShippingThreshold - rawTotal).toLocaleString('en-US')} more for Free Delivery`}
+                </span>
+              ) : (
+                <span className="flex items-center gap-1.5 font-medium text-[#701626]">
+                  <Sparkles className="w-3.5 h-3.5 text-[#C5A059]" />
+                  Signature Keepsake Packaging · Island-wide Dispatch
+                </span>
+              )}
               {validWishlistCount > 0 && (
                 <button
                   onClick={() => {
@@ -243,12 +251,28 @@ export default function CartDrawer() {
 
                           <p className="font-display text-base font-bold text-[#701626]">{item.price}</p>
                           <div className="flex items-center gap-3 pt-2">
-                            <div className="flex items-center gap-2 bg-[#F7F4EE] rounded-full px-2.5 py-0.5 border border-[#C5A059]/40">
-                              <button onClick={() => updateQuantity(item.id, item.size, item.quantity - 1)} className="text-[#110B0E]/60 hover:text-[#701626]"><Minus className="w-3 h-3" /></button>
-                              <span className="text-xs font-bold w-4 text-center text-[#110B0E]">{item.quantity}</span>
-                              <button onClick={() => updateQuantity(item.id, item.size, item.quantity + 1)} className="text-[#110B0E]/60 hover:text-[#701626]"><Plus className="w-3 h-3" /></button>
+                            <div className="flex items-center bg-[#F7F4EE] rounded-full p-0.5 border border-[#C5A059]/40">
+                              <button 
+                                onClick={() => updateQuantity(item.id, item.size, item.quantity - 1)} 
+                                className="w-7 h-7 flex items-center justify-center rounded-full text-[#110B0E]/70 hover:text-[#701626] hover:bg-black/5 active:scale-95 transition-all cursor-pointer"
+                                aria-label="Decrease quantity"
+                              >
+                                <Minus className="w-3.5 h-3.5" />
+                              </button>
+                              <span className="text-xs font-bold w-6 text-center text-[#110B0E]">{item.quantity}</span>
+                              <button 
+                                onClick={() => updateQuantity(item.id, item.size, item.quantity + 1)} 
+                                className="w-7 h-7 flex items-center justify-center rounded-full text-[#110B0E]/70 hover:text-[#701626] hover:bg-black/5 active:scale-95 transition-all cursor-pointer"
+                                aria-label="Increase quantity"
+                              >
+                                <Plus className="w-3.5 h-3.5" />
+                              </button>
                             </div>
-                            <button onClick={() => removeItem(item.id, item.size)} className="text-[#6D6268]/60 hover:text-rose-600 transition-colors ml-auto">
+                            <button 
+                              onClick={() => removeItem(item.id, item.size)} 
+                              className="p-2 rounded-xl text-[#6D6268]/60 hover:text-rose-600 hover:bg-rose-50 transition-colors ml-auto cursor-pointer"
+                              aria-label="Remove item"
+                            >
                               <Trash2 className="w-4 h-4" />
                             </button>
                           </div>
@@ -349,7 +373,7 @@ export default function CartDrawer() {
 
             {/* Footer Calculation */}
             {items.length > 0 && (
-              <div className="px-5 sm:px-6 py-5 border-t border-[#C5A059]/30 bg-white/95 backdrop-blur-md space-y-3">
+              <div className="px-5 sm:px-6 pt-4 pb-8 sm:py-5 border-t border-[#C5A059]/30 bg-white/95 backdrop-blur-md space-y-3">
                 <div className="space-y-1.5 text-xs">
                   <div className="flex justify-between text-[#6D6268]">
                     <span>Bag Subtotal</span>

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useLocation, useSearchParams } from 'react-router-dom';
 import { 
   Users, 
   Search, 
@@ -30,6 +31,10 @@ import { useAdminStore, type CustomerRecord, type AtelierInquiry, type InquirySt
 import { useAuthStore } from '@/store/auth';
 
 export default function AdminCustomers() {
+  const location = useLocation();
+  const [searchParams] = useSearchParams();
+  const initialIsInquiries = location.pathname.includes('/inquiries') || searchParams.get('tab') === 'inquiries';
+
   const { 
     customers, 
     inquiries,
@@ -46,7 +51,13 @@ export default function AdminCustomers() {
   const currentAuthUser = useAuthStore((s) => s.user);
 
   // Active top tab: 'patrons' | 'inquiries'
-  const [activeTab, setActiveTab] = useState<'patrons' | 'inquiries'>('patrons');
+  const [activeTab, setActiveTab] = useState<'patrons' | 'inquiries'>(initialIsInquiries ? 'inquiries' : 'patrons');
+
+  useEffect(() => {
+    if (location.pathname.includes('/inquiries') || searchParams.get('tab') === 'inquiries') {
+      setActiveTab('inquiries');
+    }
+  }, [location.pathname, searchParams]);
 
   // Patrons View Filters & State
   const [searchTerm, setSearchTerm] = useState('');

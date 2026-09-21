@@ -89,9 +89,9 @@ export default function TermsConditions() {
           </div>
 
           <div className="space-y-2">
-            <h2 className="font-display text-lg font-bold text-[#110B0E]">6. 14-Day Doorstep Exchange Policy</h2>
+            <h2 className="font-display text-lg font-bold text-[#110B0E]">6. Exchange & Sizing Policy</h2>
             <p>
-              Standard unworn catalog pieces in original condition with intact atelier tags may be exchanged within 14 calendar days of delivery. Refer to our <Link to="/returns-exchanges" className="text-[#701626] font-bold underline">14-Day Exchanges Policy</Link> for step-by-step instructions.
+              Standard unworn catalog pieces in original condition with intact atelier tags may be eligible for sizing exchanges. Refer to our <Link to="/returns-exchanges" className="text-[#701626] font-bold underline">Atelier Exchanges Policy</Link> for step-by-step instructions.
             </p>
           </div>
 

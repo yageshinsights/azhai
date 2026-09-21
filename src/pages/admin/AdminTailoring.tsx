@@ -13,16 +13,35 @@ import type { DressType, TailoringFabric, MeasurementField, SizePreset } from '@
 export default function AdminTailoring() {
   const [activeTab, setActiveTab] = useState<'dressTypes' | 'fabrics' | 'fields' | 'presets'>('dressTypes');
   
-  // Try to read from store, fallback to default seed data if undefined or empty
-  const store = useAdminStore((s) => s);
+  const {
+    dressTypes: rawDressTypes,
+    tailoringFabrics: rawFabrics,
+    measurementFields: rawFields,
+    sizePresets: rawPresets,
+    categories: rawCategories,
+    addDressType,
+    updateDressType,
+    deleteDressType,
+    toggleDressTypeActive,
+    addTailoringFabric,
+    updateTailoringFabric,
+    deleteTailoringFabric,
+    toggleFabricStock,
+    addMeasurementField,
+    updateMeasurementField,
+    deleteMeasurementField,
+    addSizePreset,
+    updateSizePreset,
+    deleteSizePreset,
+  } = useAdminStore();
   
   // Main Boutique Collections from Store
-  const categories = Array.isArray(store.categories) && store.categories.length > 0 ? store.categories : COLLECTIONS;
+  const categories = Array.isArray(rawCategories) && rawCategories.length > 0 ? rawCategories : COLLECTIONS;
 
-  const dressTypes = (store.dressTypes && store.dressTypes.length > 0) ? store.dressTypes : DEFAULT_DRESS_TYPES;
-  const fabrics = (store.tailoringFabrics && store.tailoringFabrics.length > 0) ? store.tailoringFabrics : DEFAULT_FABRICS;
-  const measurementFields = (store.measurementFields && store.measurementFields.length > 0) ? store.measurementFields : DEFAULT_MEASUREMENT_FIELDS;
-  const sizePresets = (store.sizePresets && store.sizePresets.length > 0) ? store.sizePresets : DEFAULT_SIZE_PRESETS;
+  const dressTypes = Array.isArray(rawDressTypes) && rawDressTypes.length > 0 ? rawDressTypes : DEFAULT_DRESS_TYPES;
+  const fabrics = Array.isArray(rawFabrics) && rawFabrics.length > 0 ? rawFabrics : DEFAULT_FABRICS;
+  const measurementFields = Array.isArray(rawFields) && rawFields.length > 0 ? rawFields : DEFAULT_MEASUREMENT_FIELDS;
+  const sizePresets = Array.isArray(rawPresets) && rawPresets.length > 0 ? rawPresets : DEFAULT_SIZE_PRESETS;
 
   // Selected dress type for sub-tabs
   const [selectedDressTypeId, setSelectedDressTypeId] = useState<number>(dressTypes[0]?.id || 1);
@@ -54,14 +73,6 @@ export default function AdminTailoring() {
   // Filtered fields/presets for sub-tabs
   const currentFields = measurementFields.filter(f => f.dressTypeId === selectedDressTypeId).sort((a, b) => a.displayOrder - b.displayOrder);
   const currentPresets = sizePresets.filter(p => p.dressTypeId === selectedDressTypeId);
-
-  const safeCall = (fn: any, ...args: any[]) => {
-    if (typeof fn === 'function') {
-      fn(...args);
-    } else {
-      console.warn('Action not implemented yet in useAdminStore');
-    }
-  };
 
   const getCollectionBadge = (slug: string) => {
     const match = categories.find(c => c.slug === slug);
@@ -183,11 +194,34 @@ export default function AdminTailoring() {
                       <p className="text-[11px] text-[#6D6268] flex justify-between"><span>Lead Time:</span> <span>{dt.leadTime}</span></p>
                     </div>
                     <div className="pt-3 border-t border-[#C5A059]/15 flex justify-end gap-2">
-                      <button onClick={() => safeCall(store.toggleDressTypeActive, dt.id)} className="p-1.5 text-gray-500 hover:text-emerald-600 bg-gray-50 hover:bg-emerald-50 rounded-lg transition-colors cursor-pointer" title="Toggle Status">
+                      <button
+                        onClick={() => toggleDressTypeActive(dt.id)}
+                        className="p-1.5 text-gray-500 hover:text-emerald-600 bg-gray-50 hover:bg-emerald-50 rounded-lg transition-colors cursor-pointer"
+                        title="Toggle Status"
+                      >
                         {dt.isActive ? <ToggleRight className="w-4 h-4 text-emerald-600" /> : <ToggleLeft className="w-4 h-4" />}
                       </button>
-                      <button onClick={() => { setEditDressType(dt); setIsDressTypeModalOpen(true); }} className="p-1.5 text-gray-500 hover:text-[#701626] hover:bg-[#F7F4EE] rounded-lg transition-colors cursor-pointer"><Edit2 className="w-4 h-4" /></button>
-                      <button onClick={() => safeCall(store.deleteDressType, dt.id)} className="p-1.5 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"><Trash2 className="w-4 h-4" /></button>
+                      <button
+                        onClick={() => {
+                          setEditDressType(dt);
+                          setIsDressTypeModalOpen(true);
+                        }}
+                        className="p-1.5 text-gray-500 hover:text-[#701626] hover:bg-[#F7F4EE] rounded-lg transition-colors cursor-pointer"
+                        title="Edit Silhouette"
+                      >
+                        <Edit2 className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => {
+                          if (window.confirm(`Are you sure you want to delete "${dt.name}"?`)) {
+                            deleteDressType(dt.id);
+                          }
+                        }}
+                        className="p-1.5 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                        title="Delete Silhouette"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -234,11 +268,11 @@ export default function AdminTailoring() {
                       {fabric.inStock ? 'In Stock' : 'Out of Stock'}
                     </span>
                     <div className="flex gap-1">
-                      <button onClick={() => safeCall(store.toggleFabricStock, fabric.id)} className="p-1 text-gray-500 hover:text-emerald-600 transition-colors" title="Toggle Stock">
+                      <button onClick={() => toggleFabricStock(fabric.id)} className="p-1 text-gray-500 hover:text-emerald-600 transition-colors" title="Toggle Stock">
                          {fabric.inStock ? <ToggleRight className="w-4 h-4 text-emerald-600" /> : <ToggleLeft className="w-4 h-4" />}
                       </button>
-                      <button onClick={() => { setEditFabric(fabric); setIsFabricModalOpen(true); }} className="p-1 text-gray-500 hover:text-[#701626] transition-colors"><Edit2 className="w-3.5 h-3.5" /></button>
-                      <button onClick={() => safeCall(store.deleteTailoringFabric, fabric.id)} className="p-1 text-gray-400 hover:text-rose-600 transition-colors"><Trash2 className="w-3.5 h-3.5" /></button>
+                      <button onClick={() => { setEditFabric(fabric); setIsFabricModalOpen(true); }} className="p-1 text-gray-500 hover:text-[#701626] transition-colors" title="Edit Fabric"><Edit2 className="w-3.5 h-3.5" /></button>
+                      <button onClick={() => { if (window.confirm(`Delete fabric "${fabric.name}"?`)) deleteTailoringFabric(fabric.id); }} className="p-1 text-gray-400 hover:text-rose-600 transition-colors" title="Delete Fabric"><Trash2 className="w-3.5 h-3.5" /></button>
                     </div>
                   </div>
                 </div>
@@ -299,8 +333,8 @@ export default function AdminTailoring() {
                       <td className="px-6 py-3 font-mono text-[#701626] bg-[#F7F4EE]/50 rounded">{f.fieldName}</td>
                       <td className="px-6 py-3 text-[#6D6268]">{f.minValue}" – {f.maxValue}"</td>
                       <td className="px-6 py-3 flex justify-end gap-2">
-                        <button onClick={() => { setEditField(f); setIsFieldModalOpen(true); }} className="p-1.5 text-gray-500 hover:text-[#701626] hover:bg-[#F7F4EE] rounded-lg"><Edit2 className="w-3.5 h-3.5" /></button>
-                        <button onClick={() => safeCall(store.deleteMeasurementField, f.id)} className="p-1.5 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg"><Trash2 className="w-3.5 h-3.5" /></button>
+                        <button onClick={() => { setEditField(f); setIsFieldModalOpen(true); }} className="p-1.5 text-gray-500 hover:text-[#701626] hover:bg-[#F7F4EE] rounded-lg" title="Edit Field"><Edit2 className="w-3.5 h-3.5" /></button>
+                        <button onClick={() => { if (window.confirm(`Delete field "${f.fieldLabel}"?`)) deleteMeasurementField(f.id); }} className="p-1.5 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg" title="Delete Field"><Trash2 className="w-3.5 h-3.5" /></button>
                       </td>
                     </tr>
                   )) : (
@@ -366,8 +400,8 @@ export default function AdminTailoring() {
                         </td>
                       ))}
                       <td className="px-6 py-3 flex justify-end gap-2 sticky right-0 bg-white group-hover:bg-[#FCFBF8]">
-                        <button onClick={() => { setEditPreset(preset); setIsPresetModalOpen(true); }} className="p-1.5 text-gray-500 hover:text-[#701626] hover:bg-[#F7F4EE] rounded-lg"><Edit2 className="w-3.5 h-3.5" /></button>
-                        <button onClick={() => safeCall(store.deleteSizePreset, preset.id)} className="p-1.5 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg"><Trash2 className="w-3.5 h-3.5" /></button>
+                        <button onClick={() => { setEditPreset(preset); setIsPresetModalOpen(true); }} className="p-1.5 text-gray-500 hover:text-[#701626] hover:bg-[#F7F4EE] rounded-lg" title="Edit Preset"><Edit2 className="w-3.5 h-3.5" /></button>
+                        <button onClick={() => { if (window.confirm(`Delete preset "${preset.sizeLabel}"?`)) deleteSizePreset(preset.id); }} className="p-1.5 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg" title="Delete Preset"><Trash2 className="w-3.5 h-3.5" /></button>
                       </td>
                     </tr>
                   )) : (
@@ -383,43 +417,71 @@ export default function AdminTailoring() {
       {/* Modals */}
       <DressTypeModal
         isOpen={isDressTypeModalOpen}
-        onClose={() => setIsDressTypeModalOpen(false)}
+        onClose={() => {
+          setIsDressTypeModalOpen(false);
+          setEditDressType(null);
+        }}
         initial={editDressType}
         onSave={(data) => {
-          if (editDressType) safeCall(store.updateDressType, editDressType.id, data);
-          else safeCall(store.addDressType, data);
+          if (editDressType) {
+            updateDressType(editDressType.id, data);
+          } else {
+            addDressType(data);
+          }
+          setEditDressType(null);
         }}
       />
       
       <FabricModal
         isOpen={isFabricModalOpen}
-        onClose={() => setIsFabricModalOpen(false)}
+        onClose={() => {
+          setIsFabricModalOpen(false);
+          setEditFabric(null);
+        }}
         initial={editFabric}
         dressTypes={dressTypes}
         onSave={(data) => {
-          if (editFabric) safeCall(store.updateTailoringFabric, editFabric.id, data);
-          else safeCall(store.addTailoringFabric, data);
+          if (editFabric) {
+            updateTailoringFabric(editFabric.id, data);
+          } else {
+            addTailoringFabric(data);
+          }
+          setEditFabric(null);
         }}
       />
       
       <MeasurementFieldModal
         isOpen={isFieldModalOpen}
-        onClose={() => setIsFieldModalOpen(false)}
+        onClose={() => {
+          setIsFieldModalOpen(false);
+          setEditField(null);
+        }}
         initial={editField}
         onSave={(data) => {
-          if (editField) safeCall(store.updateMeasurementField, editField.id, data);
-          else safeCall(store.addMeasurementField, { dressTypeId: selectedDressTypeId, ...data });
+          if (editField) {
+            updateMeasurementField(editField.id, data);
+          } else {
+            addMeasurementField({ dressTypeId: selectedDressTypeId, ...data });
+          }
+          setEditField(null);
         }}
       />
       
       <SizePresetModal
         isOpen={isPresetModalOpen}
-        onClose={() => setIsPresetModalOpen(false)}
+        onClose={() => {
+          setIsPresetModalOpen(false);
+          setEditPreset(null);
+        }}
         initial={editPreset}
         measurementFields={currentFields}
         onSave={(data) => {
-          if (editPreset) safeCall(store.updateSizePreset, editPreset.id, data);
-          else safeCall(store.addSizePreset, { dressTypeId: selectedDressTypeId, ...data });
+          if (editPreset) {
+            updateSizePreset(editPreset.id, data);
+          } else {
+            addSizePreset({ dressTypeId: selectedDressTypeId, ...data });
+          }
+          setEditPreset(null);
         }}
       />
 

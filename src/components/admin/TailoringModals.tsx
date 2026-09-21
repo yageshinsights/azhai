@@ -34,23 +34,24 @@ export function DressTypeModal({ isOpen, onClose, onSave, initial }: DressTypeMo
 
   useEffect(() => {
     if (initial) {
-      setCollectionSlug(initial.collectionSlug || 'kurties');
-      setName(initial.name);
-      setSlug(initial.slug);
+      const matchCat = categories.find(c => c.slug === initial.collectionSlug || (initial.collectionId && c.id === initial.collectionId));
+      setCollectionSlug(matchCat?.slug || initial.collectionSlug || 'kurties');
+      setName(initial.name || '');
+      setSlug(initial.slug || '');
       setDescription(initial.description || '');
-      setStitchingFee(initial.stitchingFee);
-      setLeadTime(initial.leadTime);
-      setCoverImage(initial.coverImage);
-      setIsActive(initial.isActive);
-      setDisplayOrder(initial.displayOrder);
+      setStitchingFee(Number(initial.stitchingFee) || 0);
+      setLeadTime(initial.leadTime || '5–7 working days');
+      setCoverImage(initial.coverImage || '');
+      setIsActive(initial.isActive !== false);
+      setDisplayOrder(Number(initial.displayOrder) || 1);
       setShowUrlFallback(false);
     } else {
-      setCollectionSlug('kurties');
+      setCollectionSlug(categories[0]?.slug || 'kurties');
       setName('');
       setSlug('');
       setDescription('');
       setStitchingFee(0);
-      setLeadTime('');
+      setLeadTime('5–7 working days');
       setCoverImage('');
       setIsActive(true);
       setDisplayOrder(1);
@@ -129,11 +130,11 @@ export function DressTypeModal({ isOpen, onClose, onSave, initial }: DressTypeMo
       name: name.trim(),
       slug: slug.trim() || name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, ''),
       coverImage: coverImage.trim(),
-      stitchingFee,
-      leadTime: leadTime.trim(),
+      stitchingFee: Number(stitchingFee) || 0,
+      leadTime: leadTime.trim() || '5–7 working days',
       description: description.trim(),
       isActive,
-      displayOrder,
+      displayOrder: Number(displayOrder) || 1,
     });
     onClose();
   };

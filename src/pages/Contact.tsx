@@ -52,42 +52,29 @@ export default function Contact() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    try {
-      const stored = localStorage.getItem('azhai-inquiries');
-      const list = stored ? JSON.parse(stored) : [];
-      list.push({
-        id: `inq_${Date.now()}`,
-        name: name.trim(),
-        email: email.trim(),
-        phone: phone.trim(),
-        topic: topic.trim(),
-        message: message.trim(),
-        createdAt: new Date().toISOString(),
-      });
-      localStorage.setItem('azhai-inquiries', JSON.stringify(list));
 
-      // Persist inquiry in Supabase database
-      if (isSupabaseConfigured()) {
-        (async () => {
-          try {
-            const { error } = await supabase
-              .from('inquiries')
-              .insert({
-                name: name.trim(),
-                email: email.trim(),
-                phone: phone.trim() || null,
-                topic: topic.trim(),
-                message: message.trim(),
-                status: 'unread',
-              });
-            if (error) console.warn('[Supabase Inquiry Insert Warning]:', error.message);
-          } catch (err) {
-            console.warn('[Supabase Inquiry Insert Exception]:', err);
-          }
-        })();
-      }
+    // Persist inquiry in Supabase database
+    if (isSupabaseConfigured()) {
+      (async () => {
+        try {
+          const { error } = await supabase
+            .from('inquiries')
+            .insert({
+              name: name.trim(),
+              email: email.trim(),
+              phone: phone.trim() || null,
+              topic: topic.trim(),
+              message: message.trim(),
+              status: 'unread',
+            });
+          if (error) console.warn('[Supabase Inquiry Insert Warning]:', error.message);
+        } catch (err) {
+          console.warn('[Supabase Inquiry Insert Exception]:', err);
+        }
+      })();
+    }
 
-      // Sanitize fields before embedding into HTML email to prevent injection attacks
+    // Sanitize fields before embedding into HTML email to prevent injection attacks
       const safeName = escapeHtml(name.trim());
       const safeEmail = escapeHtml(email.trim());
       const safePhone = escapeHtml(phone.trim() || 'Not provided');
@@ -146,9 +133,6 @@ export default function Contact() {
           }),
         }).catch((err) => console.warn('[Brevo Customer Confirmation Exception]:', err));
       }
-    } catch (err) {
-      console.warn('Inquiry storage error:', err);
-    }
     setSubmitted(true);
   };
 
@@ -394,7 +378,7 @@ export default function Contact() {
                       <option value="Bespoke Sizing & Styling">Bespoke Sizing & Styling Advice</option>
                       <option value="Wedding & Bridal Inquiries">Wedding & Bridal Trousseau Orders</option>
                       <option value="Order Tracking & Dispatch">Order Tracking & Dispatch Updates</option>
-                      <option value="Exchange & Returns">14-Day Doorstep Exchange Request</option>
+                      <option value="Exchange & Returns">Atelier Exchange & Resizing Request</option>
                       <option value="Order Feedback & Review">Order Feedback & Review</option>
                       <option value="Other Inquiries">Other Inquiries</option>
                     </select>
