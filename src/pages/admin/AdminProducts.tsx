@@ -186,13 +186,13 @@ export default function AdminProducts() {
     setIsModalOpen(true);
   };
 
-  const handleSaveProduct = (productData: any) => {
-    if (editingProduct) {
-      updateProduct(editingProduct.id, productData);
-    } else {
-      addProduct(productData);
-    }
+  const handleSaveProduct = async (productData: any) => {
     setIsModalOpen(false);
+    if (editingProduct) {
+      await updateProduct(editingProduct.id, productData);
+    } else {
+      await addProduct(productData);
+    }
   };
 
   const handleDelete = (id: number) => {

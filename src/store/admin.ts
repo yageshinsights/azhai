@@ -434,21 +434,56 @@ export const useAdminStore = create<AdminState>()(
 
           if (!prodErr && dbProducts) {
             const mappedProducts = dbProducts.map((p) => {
-              // Find category IDs linked to this product from junction table
-              const linkedCatIds = (dbProductCats || [])
+              // Extract metadata stored in __meta__ attribute if columns aren't in schema
+              let metaStock = 15;
+              let metaWeight = 400;
+              let metaCatIds: number[] = [];
+
+              if (Array.isArray(p.attributes)) {
+                const metaItem = p.attributes.find((a: any) => a.name === '__meta__');
+                if (metaItem && metaItem.options?.[0]) {
+                  try {
+                    const parsed = JSON.parse(metaItem.options[0]);
+                    if (parsed.stockQuantity !== undefined) metaStock = Number(parsed.stockQuantity);
+                    if (parsed.weightGrams !== undefined) metaWeight = Number(parsed.weightGrams);
+                    if (Array.isArray(parsed.categoryIds)) metaCatIds = parsed.categoryIds.map(Number);
+                  } catch {}
+                }
+              }
+
+              // Find category IDs linked to this product from junction table or __meta__
+              const junctionCatIds = (dbProductCats || [])
                 .filter((pc: any) => Number(pc.product_id) === Number(p.id))
                 .map((pc: any) => Number(pc.category_id));
 
+              const allCatIds = Array.from(new Set([...junctionCatIds, ...metaCatIds]));
+
               const matchedCategories = resolvedCategories.filter((c) =>
-                linkedCatIds.includes(Number(c.id))
+                allCatIds.includes(Number(c.id))
               );
 
+              // If no junction match, fallback to p.categories or default to first category if available
               const finalCategories =
                 matchedCategories.length > 0
                   ? matchedCategories
                   : Array.isArray(p.categories) && p.categories.length > 0
                   ? p.categories
+                  : resolvedCategories.length > 0
+                  ? [resolvedCategories[0]]
                   : [];
+
+              // Clean user-facing attributes without internal __meta__
+              const cleanAttributes = Array.isArray(p.attributes)
+                ? p.attributes.filter((a: any) => a.name !== '__meta__')
+                : [];
+
+              const finalStock = p.stock_quantity !== undefined && p.stock_quantity !== null
+                ? Number(p.stock_quantity)
+                : metaStock;
+
+              const finalWeight = p.weight_grams !== undefined && p.weight_grams !== null
+                ? Number(p.weight_grams)
+                : metaWeight;
 
               return {
                 id: p.id,
@@ -467,12 +502,13 @@ export const useAdminStore = create<AdminState>()(
                 pairingProductIds: p.pairing_product_ids || undefined,
                 images: p.images || [],
                 categories: finalCategories,
-                attributes: p.attributes || [],
+                attributes: cleanAttributes,
                 isFeatured: p.is_featured,
                 tag: p.tag || undefined,
                 occasion: p.occasion || undefined,
-                stockQuantity: p.stock_quantity !== undefined && p.stock_quantity !== null ? Number(p.stock_quantity) : 15,
-                weightGrams: p.weight_grams !== undefined && p.weight_grams !== null ? Number(p.weight_grams) : 400,
+                stockQuantity: finalStock,
+                quantity: finalStock,
+                weightGrams: finalWeight,
                 rating: Number(p.rating) || 5.0,
                 reviewsCount: p.reviews_count || 0,
               };
@@ -1082,29 +1118,30 @@ export const useAdminStore = create<AdminState>()(
       },
 
       addProduct: async (productData) => {
-        const newId = Math.max(...get().products.map((p) => p.id), 100) + 1;
         const initialStock = productData.stockQuantity !== undefined ? Number(productData.stockQuantity) : 15;
         const initialWeight = productData.weightGrams !== undefined ? Number(productData.weightGrams) : 400;
-        const newProduct: Product = {
-          ...productData,
-          stockQuantity: initialStock,
-          quantity: initialStock,
-          weightGrams: initialWeight,
-          id: newId,
+        const catIds = Array.isArray(productData.categories) ? productData.categories.map((c: any) => c.id) : [];
+
+        // Meta attribute to store stock, weight, and category IDs safely inside JSONB attributes
+        const metaAttr = {
+          name: '__meta__',
+          options: [JSON.stringify({ stockQuantity: initialStock, weightGrams: initialWeight, categoryIds: catIds })],
         };
-        set((state) => ({ products: [newProduct, ...state.products] }));
+        const rawAttrs = Array.isArray(productData.attributes)
+          ? productData.attributes.filter((a: any) => a.name !== '__meta__')
+          : [];
+        const combinedAttrs = [...rawAttrs, metaAttr];
+
+        let createdId = Math.max(...get().products.map((p) => p.id), 100) + 1;
 
         if (isSupabaseConfigured()) {
           try {
-            await supabase.from('products').insert({
-              id: newId,
+            const payload: any = {
               name: productData.name,
               slug: productData.slug,
               price: productData.price,
               regular_price: productData.regularPrice,
               sale_price: productData.salePrice || null,
-              stock_quantity: initialStock,
-              weight_grams: initialWeight,
               description: productData.description,
               short_description: productData.shortDescription,
               styling_tip: productData.stylingTip || null,
@@ -1113,26 +1150,72 @@ export const useAdminStore = create<AdminState>()(
               care_guide: productData.careGuide || null,
               shipping_note: productData.shippingNote || null,
               pairing_product_ids: productData.pairingProductIds || null,
-              images: productData.images,
-              attributes: productData.attributes,
+              images: productData.images || [],
+              attributes: combinedAttrs,
               is_featured: productData.isFeatured || false,
               tag: productData.tag || null,
               occasion: productData.occasion || null,
               rating: productData.rating || 5.0,
               reviews_count: productData.reviewsCount || 0,
-            });
+            };
 
-            if (Array.isArray(productData.categories) && productData.categories.length > 0) {
-              const junctionRows = productData.categories.map((c: any) => ({
-                product_id: newId,
-                category_id: c.id,
-              }));
-              await supabase.from('product_categories').insert(junctionRows);
+            // 1. Try inserting with stock_quantity & weight_grams if columns exist
+            let { data: inserted, error: insertErr } = await supabase
+              .from('products')
+              .insert({
+                ...payload,
+                stock_quantity: initialStock,
+                weight_grams: initialWeight,
+              })
+              .select()
+              .single();
+
+            // 2. Fallback retry if columns do not exist in database schema yet
+            if (insertErr && (insertErr.code === 'PGRST204' || insertErr.message?.includes('column'))) {
+              console.warn('[Supabase Insert Fallback] Retrying product insert without schema-dependent columns:', insertErr.message);
+              const fallbackRes = await supabase
+                .from('products')
+                .insert(payload)
+                .select()
+                .single();
+              inserted = fallbackRes.data;
+              insertErr = fallbackRes.error;
+            }
+
+            if (insertErr) {
+              console.error('[Supabase Product Insert Error]:', insertErr);
+            } else if (inserted) {
+              createdId = inserted.id;
+
+              // 3. Attempt junction table insert (wrapped safely so RLS warnings don't block product)
+              if (catIds.length > 0) {
+                try {
+                  const junctionRows = catIds.map((catId: number) => ({
+                    product_id: createdId,
+                    category_id: catId,
+                  }));
+                  const { error: jErr } = await supabase.from('product_categories').insert(junctionRows);
+                  if (jErr) {
+                    console.warn('[Supabase product_categories Notice]:', jErr.message);
+                  }
+                } catch (jEx) {
+                  console.warn('[Supabase product_categories Exception]:', jEx);
+                }
+              }
             }
           } catch (err) {
-            console.error('[Supabase Product Insert Error]:', err);
+            console.error('[Supabase Product Insert Exception]:', err);
           }
         }
+
+        const newProduct: Product = {
+          ...productData,
+          stockQuantity: initialStock,
+          quantity: initialStock,
+          weightGrams: initialWeight,
+          id: createdId,
+        };
+        set((state) => ({ products: [newProduct, ...state.products.filter((p) => p.id !== createdId)] }));
       },
 
       updateProduct: async (id, updates) => {
@@ -1142,14 +1225,31 @@ export const useAdminStore = create<AdminState>()(
 
         if (isSupabaseConfigured()) {
           try {
-            const dbPayload: any = {};
+            const currentProduct = get().products.find((p) => p.id === id);
+            const currentStock = updates.stockQuantity !== undefined ? updates.stockQuantity : currentProduct?.stockQuantity ?? 15;
+            const currentWeight = updates.weightGrams !== undefined ? updates.weightGrams : currentProduct?.weightGrams ?? 400;
+            const currentCats = updates.categories !== undefined ? updates.categories : currentProduct?.categories ?? [];
+            const catIds = currentCats.map((c: any) => c.id);
+
+            const rawAttrs = Array.isArray(updates.attributes || currentProduct?.attributes)
+              ? (updates.attributes || currentProduct?.attributes || []).filter((a: any) => a.name !== '__meta__')
+              : [];
+            const combinedAttrs = [
+              ...rawAttrs,
+              {
+                name: '__meta__',
+                options: [JSON.stringify({ stockQuantity: currentStock, weightGrams: currentWeight, categoryIds: catIds })],
+              },
+            ];
+
+            const dbPayload: any = {
+              attributes: combinedAttrs,
+            };
             if (updates.name !== undefined) dbPayload.name = updates.name;
             if (updates.slug !== undefined) dbPayload.slug = updates.slug;
             if (updates.price !== undefined) dbPayload.price = updates.price;
             if (updates.regularPrice !== undefined) dbPayload.regular_price = updates.regularPrice;
             if (updates.salePrice !== undefined) dbPayload.sale_price = updates.salePrice;
-            if (updates.stockQuantity !== undefined) dbPayload.stock_quantity = updates.stockQuantity;
-            if (updates.weightGrams !== undefined) dbPayload.weight_grams = updates.weightGrams;
             if (updates.description !== undefined) dbPayload.description = updates.description;
             if (updates.shortDescription !== undefined) dbPayload.short_description = updates.shortDescription;
             if (updates.stylingTip !== undefined) dbPayload.styling_tip = updates.stylingTip;
@@ -1159,25 +1259,41 @@ export const useAdminStore = create<AdminState>()(
             if (updates.shippingNote !== undefined) dbPayload.shipping_note = updates.shippingNote;
             if (updates.pairingProductIds !== undefined) dbPayload.pairing_product_ids = updates.pairingProductIds;
             if (updates.images !== undefined) dbPayload.images = updates.images;
-            if (updates.attributes !== undefined) dbPayload.attributes = updates.attributes;
             if (updates.isFeatured !== undefined) dbPayload.is_featured = updates.isFeatured;
             if (updates.tag !== undefined) dbPayload.tag = updates.tag;
             if (updates.occasion !== undefined) dbPayload.occasion = updates.occasion;
 
-            await supabase.from('products').update(dbPayload).eq('id', id);
+            let { error: updateErr } = await supabase.from('products').update({
+              ...dbPayload,
+              stock_quantity: currentStock,
+              weight_grams: currentWeight,
+            }).eq('id', id);
+
+            if (updateErr && (updateErr.code === 'PGRST204' || updateErr.message?.includes('column'))) {
+              const res = await supabase.from('products').update(dbPayload).eq('id', id);
+              updateErr = res.error;
+            }
+
+            if (updateErr) {
+              console.error('[Supabase Product Update Error]:', updateErr);
+            }
 
             if (Array.isArray(updates.categories)) {
-              await supabase.from('product_categories').delete().eq('product_id', id);
-              if (updates.categories.length > 0) {
-                const junctionRows = updates.categories.map((c: any) => ({
-                  product_id: id,
-                  category_id: c.id,
-                }));
-                await supabase.from('product_categories').insert(junctionRows);
+              try {
+                await supabase.from('product_categories').delete().eq('product_id', id);
+                if (updates.categories.length > 0) {
+                  const junctionRows = updates.categories.map((c: any) => ({
+                    product_id: id,
+                    category_id: c.id,
+                  }));
+                  await supabase.from('product_categories').insert(junctionRows);
+                }
+              } catch (jcErr) {
+                console.warn('[Supabase product_categories update warning]:', jcErr);
               }
             }
           } catch (err) {
-            console.error('[Supabase Product Update Error]:', err);
+            console.error('[Supabase Product Update Exception]:', err);
           }
         }
       },
