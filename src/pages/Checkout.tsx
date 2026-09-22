@@ -301,15 +301,29 @@ export default function Checkout() {
               image_url: item.image || null,
               size: sizeLabel,
               quantity: Number(item.quantity) || 1,
-              custom_measurements: item.tailoring || null,
             };
           });
 
-          const { error: itemsErr } = await supabase.from('order_items').insert(orderItemsPayload);
-          if (itemsErr) {
-            console.error('[Supabase Order Items Insert Error]:', itemsErr);
+          const hasTailoring = items.some((i) => i.tailoring);
+          if (hasTailoring) {
+            const withMeasurements = orderItemsPayload.map((it, idx) => ({
+              ...it,
+              custom_measurements: items[idx].tailoring || null,
+            }));
+            const { error: itemsErr } = await supabase.from('order_items').insert(withMeasurements);
+            if (itemsErr) {
+              console.warn('[Supabase Order Items with measurements notice, falling back to base payload]:', itemsErr);
+              await supabase.from('order_items').insert(orderItemsPayload);
+            } else {
+              console.log('[Supabase Sync]: Order and items successfully saved to database');
+            }
           } else {
-            console.log('[Supabase Sync]: Order and items successfully saved to database');
+            const { error: itemsErr } = await supabase.from('order_items').insert(orderItemsPayload);
+            if (itemsErr) {
+              console.error('[Supabase Order Items Insert Error]:', itemsErr);
+            } else {
+              console.log('[Supabase Sync]: Order and items successfully saved to database');
+            }
           }
         } else if (orderErr) {
           console.error('[Supabase Order Insert Error]:', orderErr);
@@ -515,7 +529,7 @@ export default function Checkout() {
           }
 
           if (insertedOrder) {
-            const orderItemsPayload = items.map((item) => ({
+            const baseOrderItems = items.map((item) => ({
               order_id: insertedOrder.id,
               product_id: null,
               product_name: item.name,
@@ -523,9 +537,22 @@ export default function Checkout() {
               image_url: item.image || null,
               size: item.tailoring ? `Tailored (${item.tailoring.sizeLabel}) - ${item.tailoring.fabricName}` : item.size || 'M',
               quantity: Number(item.quantity) || 1,
-              custom_measurements: item.tailoring || null,
             }));
-            await supabase.from('order_items').insert(orderItemsPayload);
+
+            const hasTailoring = items.some((i) => i.tailoring);
+            if (hasTailoring) {
+              const withMeasurements = baseOrderItems.map((it, idx) => ({
+                ...it,
+                custom_measurements: items[idx].tailoring || null,
+              }));
+              const { error: itemsErr } = await supabase.from('order_items').insert(withMeasurements);
+              if (itemsErr) {
+                console.warn('[Payments.lk Pre-Save Items with measurements notice, falling back to base payload]:', itemsErr);
+                await supabase.from('order_items').insert(baseOrderItems);
+              }
+            } else {
+              await supabase.from('order_items').insert(baseOrderItems);
+            }
           }
         } catch (dbErr) {
           console.warn('[Payments.lk Pre-Save Warning]:', dbErr);

@@ -117,25 +117,28 @@ export default {
             const finalSuccessUrl = successUrl || `${url.origin}/order-success/${orderId}?payments_lk=success`;
             const finalCancelUrl = cancelUrl || `${url.origin}/checkout?status=cancelled&order_id=${orderId}`;
 
+            let cleanPhone = (customer?.phone || '').replace(/[^\d+]/g, '').trim();
+            if (cleanPhone && cleanPhone.startsWith('0')) {
+              cleanPhone = '+94' + cleanPhone.slice(1);
+            } else if (cleanPhone && !cleanPhone.startsWith('+')) {
+              cleanPhone = '+94' + cleanPhone;
+            }
+
+            const customerPayload = customer
+              ? {
+                  name: customer.name ? String(customer.name).trim() : undefined,
+                  email: customer.email ? String(customer.email).trim() : undefined,
+                  phone: cleanPhone && cleanPhone.length >= 9 ? cleanPhone : undefined,
+                }
+              : undefined;
+
             const checkoutPayload = {
-              amountCents,
+              amountCents: Math.round(Number(amountCents)),
               description: description || `Azhai Order #${orderId}`,
               reference: String(orderId),
-              customer: customer
-                ? {
-                    name: customer.name,
-                    email: customer.email,
-                    phone: customer.phone || undefined,
-                  }
-                : undefined,
+              customer: customerPayload,
               successUrl: finalSuccessUrl,
-              returnUrl: finalSuccessUrl,
-              return_url: finalSuccessUrl,
-              success_url: finalSuccessUrl,
-              redirectUrl: finalSuccessUrl,
-              redirect_url: finalSuccessUrl,
               cancelUrl: finalCancelUrl,
-              cancel_url: finalCancelUrl,
             };
 
           const pResp = await fetch('https://api.payments.lk/v1/checkouts', {
@@ -151,8 +154,15 @@ export default {
           const pData = await pResp.json();
 
           if (!pResp.ok) {
+            const errDetail = pData.errors 
+              ? (typeof pData.errors === 'string' ? pData.errors : JSON.stringify(pData.errors))
+              : '';
+            const errorMsg = errDetail 
+              ? `${pData.message || 'Validation error'}: ${errDetail}`
+              : (pData.message || pData.error || 'Payments.lk API returned an error');
+
             return new Response(
-              JSON.stringify({ error: pData.message || pData.error || 'Payments.lk API returned an error', details: pData }),
+              JSON.stringify({ error: errorMsg, details: pData }),
               { status: pResp.status, headers: { 'Content-Type': 'application/json', ...corsHeaders } }
             );
           }
