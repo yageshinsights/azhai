@@ -17,7 +17,12 @@ interface Review {
   likes: number;
 }
 
-export default function ReviewSection({ productName }: { productName: string }) {
+interface ReviewSectionProps {
+  productName: string;
+  onReviewsLoaded?: (count: number, avgRating: number) => void;
+}
+
+export default function ReviewSection({ productName, onReviewsLoaded }: ReviewSectionProps) {
   const user = useAuthStore((s) => s.user);
   const [reviews, setReviews] = useState<Review[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -72,9 +77,12 @@ export default function ReviewSection({ productName }: { productName: string }) 
               verified: !!r.is_verified,
               likes: r.likes || 0,
             }));
+            const avg = Number((mapped.reduce((acc, r) => acc + r.rating, 0) / (mapped.length || 1)).toFixed(1));
             setReviews(mapped);
+            onReviewsLoaded?.(mapped.length, avg);
           } else {
             setReviews([]);
+            onReviewsLoaded?.(0, 0);
           }
         }
       } catch (err) {
@@ -128,7 +136,10 @@ export default function ReviewSection({ productName }: { productName: string }) 
       likes: 0,
     };
 
-    setReviews([newRev, ...reviews]);
+    const nextReviews = [newRev, ...reviews];
+    setReviews(nextReviews);
+    const avg = Number((nextReviews.reduce((acc, r) => acc + r.rating, 0) / (nextReviews.length || 1)).toFixed(1));
+    onReviewsLoaded?.(nextReviews.length, avg);
     setSubmitted(true);
 
     if (isSupabaseConfigured()) {
@@ -166,7 +177,7 @@ export default function ReviewSection({ productName }: { productName: string }) 
   };
 
   return (
-    <div className="pt-16 border-t border-[#C5A059]/30 space-y-10">
+    <div id="reviews-section" className="pt-16 border-t border-[#C5A059]/30 space-y-10 scroll-mt-24">
       {/* Header & Rating Breakdown */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-8 bg-white rounded-3xl p-6 sm:p-8 border border-[#C5A059]/30 shadow-sm">
         {/* Left: Star Score */}

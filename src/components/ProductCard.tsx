@@ -72,9 +72,12 @@ export default function ProductCard({ product, index = 0 }: { product: Product; 
             />
 
             {/* Top Luxury Badges */}
-            <div className="absolute top-2 sm:top-3.5 left-2 sm:left-3.5 right-2 sm:right-3.5 flex items-center justify-between z-20 pointer-events-none">
+            <div className="absolute top-2 sm:top-3.5 left-2 sm:left-3.5 right-2 sm:right-3.5 flex items-start justify-between gap-1.5 z-20 pointer-events-none">
               {product.tag ? (
-                <div className="bg-[#701626]/90 backdrop-blur-md text-[#F3E8CE] text-[8px] sm:text-[9px] uppercase tracking-[0.14em] sm:tracking-[0.18em] font-semibold px-2 sm:px-3 py-0.5 sm:py-1 rounded-full shadow-sm border border-[#C5A059]/30">
+                <div 
+                  className="bg-[#701626]/95 backdrop-blur-md text-[#F3E8CE] text-[7.5px] sm:text-[9px] uppercase tracking-[0.1em] sm:tracking-[0.16em] font-semibold px-2 sm:px-3 py-0.5 sm:py-1 rounded-full shadow-sm border border-[#C5A059]/35 max-w-[calc(100%-2.5rem)] truncate leading-tight"
+                  title={product.tag}
+                >
                   {product.tag}
                 </div>
               ) : <div />}
@@ -83,7 +86,7 @@ export default function ProductCard({ product, index = 0 }: { product: Product; 
               <button
                 type="button"
                 onClick={handleToggleWishlist}
-                className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-white/90 backdrop-blur-md flex items-center justify-center text-[#110B0E]/70 hover:text-rose-500 transition-all shadow-sm border border-[#C5A059]/20 pointer-events-auto cursor-pointer"
+                className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-white/90 backdrop-blur-md flex items-center justify-center text-[#110B0E]/70 hover:text-rose-500 transition-all shadow-sm border border-[#C5A059]/20 pointer-events-auto cursor-pointer shrink-0"
                 title="Save to Wishlist"
               >
                 <Heart className={`w-3 h-3 sm:w-3.5 sm:h-3.5 ${isWishlisted ? 'fill-rose-500 text-rose-500' : ''}`} />
@@ -173,7 +176,7 @@ export default function ProductCard({ product, index = 0 }: { product: Product; 
               <span className="text-[8.5px] sm:text-[9px] uppercase tracking-[0.2em] sm:tracking-[0.25em] text-[#6D6268] font-bold truncate">
                 {product.categories[0]?.name}
               </span>
-              {product.rating && (
+              {Boolean(product.rating && product.reviewsCount && product.reviewsCount > 0) && (
                 <div className="flex items-center gap-1 text-[9.5px] sm:text-[10px] text-[#C5A059] font-bold shrink-0">
                   <Star className="w-2.5 h-2.5 sm:w-3 sm:h-3 fill-[#C5A059]" />
                   <span>{product.rating}</span>

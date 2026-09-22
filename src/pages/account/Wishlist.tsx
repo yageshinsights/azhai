@@ -101,7 +101,10 @@ export default function Wishlist() {
               </button>
 
               {product.tag && (
-                <div className="absolute top-3 left-3 bg-[#701626] text-[#F3E8CE] text-[9px] uppercase tracking-wider font-bold px-2.5 py-0.5 rounded-full shadow-sm">
+                <div 
+                  className="absolute top-3 left-3 bg-[#701626] text-[#F3E8CE] text-[8px] sm:text-[9px] uppercase tracking-wider font-bold px-2.5 py-0.5 rounded-full shadow-sm max-w-[calc(100%-3rem)] truncate"
+                  title={product.tag}
+                >
                   {product.tag}
                 </div>
               )}

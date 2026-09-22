@@ -36,6 +36,7 @@ import ReviewSection from '@/components/ReviewSection';
 import SEOHead from '@/components/SEOHead';
 import RecentlyViewed from '@/components/RecentlyViewed';
 import { useRecentlyViewed } from '@/hooks/useRecentlyViewed';
+import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 
 export default function ProductDetail() {
   const { slug } = useParams<{ slug: string }>();
@@ -52,10 +53,34 @@ export default function ProductDetail() {
   const [isSizeGuideOpen, setIsSizeGuideOpen] = useState(false);
   const [isLightboxOpen, setIsLightboxOpen] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
+  const [dynamicReviews, setDynamicReviews] = useState<{ count: number; avgRating: number } | null>(null);
 
   const { addItem } = useCartStore();
   const { isInWishlist, toggleWishlist } = useAuthStore();
   const recentlyViewed = useRecentlyViewed(product?.slug);
+
+  // Sync real reviews dynamically from Supabase product_reviews table
+  useEffect(() => {
+    if (!isSupabaseConfigured() || !product?.name) return;
+    const pSlug = product.slug || product.name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+    supabase
+      .from('product_reviews')
+      .select('rating')
+      .or(`product_name.eq.${product.name},product_slug.eq.${pSlug}`)
+      .eq('is_approved', true)
+      .then(({ data, error }) => {
+        if (!error && data) {
+          const count = data.length;
+          const avg = count > 0 
+            ? Number((data.reduce((acc: number, r: { rating?: number }) => acc + (r.rating || 5), 0) / count).toFixed(1))
+            : 0;
+          setDynamicReviews({ count, avgRating: avg });
+        }
+      });
+  }, [product?.name, product?.slug]);
+
+  const activeReviewCount = dynamicReviews !== null ? dynamicReviews.count : (product?.reviewsCount || 0);
+  const activeRating = dynamicReviews !== null ? dynamicReviews.avgRating : (product?.rating || 0);
 
   // Schema.org Product JSON-LD for Google Rich Snippets
   const productSchema = useMemo(() => {
@@ -122,14 +147,18 @@ export default function ProductDetail() {
           availability: 'https://schema.org/InStock',
           itemCondition: 'https://schema.org/NewCondition',
         },
-        aggregateRating: {
-          '@type': 'AggregateRating',
-          ratingValue: product.rating || 4.9,
-          reviewCount: product.reviewsCount || 64,
-        },
+        ...(activeReviewCount > 0
+          ? {
+              aggregateRating: {
+                '@type': 'AggregateRating',
+                ratingValue: activeRating > 0 ? activeRating : 5.0,
+                reviewCount: activeReviewCount,
+              },
+            }
+          : {}),
       },
     ];
-  }, [product]);
+  }, [product, activeReviewCount, activeRating]);
 
   // Curated Pairings & Complete The Look Resolution
   const pairedProducts = useMemo(() => {
@@ -393,12 +422,27 @@ export default function ProductDetail() {
                 <span className="text-[10px] uppercase tracking-[0.25em] text-[#701626] font-bold">
                   {product.categories[0]?.name}
                 </span>
-                {product.rating && (
-                  <div className="flex items-center gap-1.5 text-xs text-[#C5A059] font-bold bg-[#F7F4EE] px-3 py-1 rounded-full border border-[#C5A059]/30">
+                {activeReviewCount > 0 ? (
+                  <button
+                    type="button"
+                    onClick={() => document.getElementById('reviews-section')?.scrollIntoView({ behavior: 'smooth' })}
+                    className="flex items-center gap-1.5 text-xs text-[#C5A059] font-bold bg-[#F7F4EE] hover:bg-[#F0EBE0] px-3 py-1 rounded-full border border-[#C5A059]/30 transition-colors cursor-pointer"
+                    title="Read patron reviews"
+                  >
                     <Star className="w-3.5 h-3.5 fill-[#C5A059]" />
-                    <span>{product.rating}</span>
-                    <span className="text-[#6D6268]">({product.reviewsCount} reviews)</span>
-                  </div>
+                    <span>{activeRating > 0 ? activeRating.toFixed(1) : '5.0'}</span>
+                    <span className="text-[#6D6268]">({activeReviewCount} {activeReviewCount === 1 ? 'review' : 'reviews'})</span>
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => document.getElementById('reviews-section')?.scrollIntoView({ behavior: 'smooth' })}
+                    className="flex items-center gap-1.5 text-[11px] text-[#701626] font-semibold bg-[#701626]/5 hover:bg-[#701626]/10 px-3 py-1 rounded-full border border-[#C5A059]/30 transition-colors cursor-pointer"
+                    title="Be the first to review"
+                  >
+                    <Sparkles className="w-3 h-3 text-[#C5A059]" />
+                    <span>No reviews yet · Be the first</span>
+                  </button>
                 )}
               </div>
               
@@ -686,7 +730,10 @@ export default function ProductDetail() {
         </div>
 
         {/* ── CUSTOMER REVIEWS SECTION ── */}
-        <ReviewSection productName={product.name} />
+        <ReviewSection 
+          productName={product.name} 
+          onReviewsLoaded={(count, avgRating) => setDynamicReviews({ count, avgRating })}
+        />
 
         {/* ── COMPLETE THE LOOK / CURATED PAIRINGS ── */}
         <section className="mt-20 pt-16 border-t border-[#C5A059]/30 space-y-10">

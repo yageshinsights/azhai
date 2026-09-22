@@ -63,110 +63,125 @@ export default function WhatsAppConcierge() {
   return (
     <AnimatePresence>
       {isVisible && (
-        <motion.div
-          initial={{ opacity: 0, y: 30, scale: 0.9 }}
-          animate={{ opacity: 1, y: 0, scale: 1 }}
-          exit={{ opacity: 0, y: 30, scale: 0.9 }}
-          transition={{ duration: 0.65, ease: [0.16, 1, 0.3, 1] }}
-          className={`fixed ${isProductPage ? 'bottom-36 lg:bottom-8' : 'bottom-20 lg:bottom-6'} right-3.5 sm:right-6 z-50 print:hidden`}
-        >
+        <div className="fixed right-0 top-1/2 -translate-y-1/2 z-50 print:hidden flex items-center">
+          {/* Modal / Dialog Popover */}
           <AnimatePresence>
             {isOpen && (
-              <motion.div
-                initial={{ opacity: 0, y: 20, scale: 0.9 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: 20, scale: 0.9 }}
-                transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-                className="mb-3 w-[calc(100vw-2rem)] max-w-xs sm:max-w-sm bg-white rounded-3xl p-5 border border-[#DFBF77] shadow-2xl space-y-4 text-left relative overflow-hidden"
-              >
-            {/* Top Atelier Bar */}
-            <div className="flex items-center justify-between border-b border-[#C5A059]/20 pb-3">
-              <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-full bg-[#701626] text-[#DFBF77] flex items-center justify-center border border-[#DFBF77]/40 shadow-sm shrink-0">
-                  <LotusIcon size={20} variant="gold" />
-                </div>
-                <div>
-                  <h4 className="font-serif text-sm font-bold text-[#110B0E] leading-tight">
-                    Preethi's Styling Concierge
-                  </h4>
-                  <p className="text-[10px] text-emerald-700 font-bold flex items-center gap-1">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                    Live Atelier Assistance
-                  </p>
-                  <p className="text-[10px] text-[#701626] font-semibold pt-0.5">
-                    WhatsApp: {whatsappNumber || '+94 77 123 4567'}
-                  </p>
-                </div>
-              </div>
+              <>
+                {/* Mobile Backdrop */}
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  onClick={() => setIsOpen(false)}
+                  className="fixed inset-0 bg-black/50 backdrop-blur-xs sm:hidden z-40"
+                />
 
-              <button
-                onClick={() => setIsOpen(false)}
-                className="p-1.5 rounded-full bg-[#F7F4EE] hover:bg-gray-200 text-[#6D6268] transition-colors cursor-pointer"
-              >
-                <X className="w-3.5 h-3.5" />
-              </button>
+                {/* Popover Card */}
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.9, x: 25 }}
+                  animate={{ opacity: 1, scale: 1, x: 0 }}
+                  exit={{ opacity: 0, scale: 0.9, x: 25 }}
+                  transition={{ type: 'spring', damping: 26, stiffness: 320 }}
+                  className="fixed sm:static right-3 top-1/2 -translate-y-1/2 sm:translate-y-0 sm:mr-3 w-[calc(100vw-1.5rem)] max-w-xs sm:max-w-sm bg-white rounded-3xl p-5 border border-[#DFBF77] shadow-2xl space-y-4 text-left z-50 overflow-hidden max-h-[90vh] overflow-y-auto"
+                >
+                  {/* Top Atelier Bar */}
+                  <div className="flex items-center justify-between border-b border-[#C5A059]/20 pb-3">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-9 h-9 rounded-full bg-[#701626] text-[#DFBF77] flex items-center justify-center border border-[#DFBF77]/40 shadow-sm shrink-0">
+                        <LotusIcon size={20} variant="gold" />
+                      </div>
+                      <div>
+                        <h4 className="font-serif text-sm font-bold text-[#110B0E] leading-tight">
+                          Preethi's Styling Concierge
+                        </h4>
+                        <p className="text-[10px] text-emerald-700 font-bold flex items-center gap-1">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                          Live Atelier Assistance
+                        </p>
+                        <p className="text-[10px] text-[#701626] font-semibold pt-0.5">
+                          WhatsApp: {whatsappNumber || '+94 77 123 4567'}
+                        </p>
+                      </div>
+                    </div>
+
+                    <button
+                      onClick={() => setIsOpen(false)}
+                      className="p-1.5 rounded-full bg-[#F7F4EE] hover:bg-gray-200 text-[#6D6268] transition-colors cursor-pointer"
+                      aria-label="Close concierge"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+
+                  {/* Quick Inquiries Menu */}
+                  <div className="space-y-1.5 text-xs">
+                    <p className="text-[11px] text-[#6D6268] leading-relaxed">
+                      How may our Colombo atelier assist your wardrobe today?
+                    </p>
+
+                    <button
+                      onClick={() => handleOpenWhatsApp('tailoring')}
+                      className="w-full p-2.5 rounded-xl bg-[#FCFBF8] hover:bg-[#701626]/5 border border-[#C5A059]/30 text-left font-semibold text-[#110B0E] hover:text-[#701626] transition-all flex items-center justify-between text-xs cursor-pointer group"
+                    >
+                      <span>✂️ Sizing & Bespoke Tailoring</span>
+                      <Send className="w-3 h-3 text-[#C5A059] group-hover:translate-x-0.5 transition-transform" />
+                    </button>
+
+                    <button
+                      onClick={() => handleOpenWhatsApp('bridal')}
+                      className="w-full p-2.5 rounded-xl bg-[#FCFBF8] hover:bg-[#701626]/5 border border-[#C5A059]/30 text-left font-semibold text-[#110B0E] hover:text-[#701626] transition-all flex items-center justify-between text-xs cursor-pointer group"
+                    >
+                      <span>💍 Bridal & Heirloom Silks</span>
+                      <Send className="w-3 h-3 text-[#C5A059] group-hover:translate-x-0.5 transition-transform" />
+                    </button>
+
+                    <button
+                      onClick={() => handleOpenWhatsApp('delivery')}
+                      className="w-full p-2.5 rounded-xl bg-[#FCFBF8] hover:bg-[#701626]/5 border border-[#C5A059]/30 text-left font-semibold text-[#110B0E] hover:text-[#701626] transition-all flex items-center justify-between text-xs cursor-pointer group"
+                    >
+                      <span>🚚 Colombo Same-Day Dispatch</span>
+                      <Send className="w-3 h-3 text-[#C5A059] group-hover:translate-x-0.5 transition-transform" />
+                    </button>
+                  </div>
+
+                  {/* Direct WhatsApp CTA Button */}
+                  <button
+                    onClick={() => handleOpenWhatsApp()}
+                    className="w-full py-2.5 rounded-xl bg-[#25D366] hover:bg-[#20bd5a] text-white text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2 shadow-md transition-all cursor-pointer"
+                  >
+                    <MessageCircle className="w-4 h-4 fill-white" />
+                    <span>Chat on WhatsApp</span>
+                  </button>
+                </motion.div>
+              </>
+            )}
+          </AnimatePresence>
+
+          {/* Right-Side Sticky Tab Trigger */}
+          <motion.button
+            whileHover={{ x: -4 }}
+            whileTap={{ scale: 0.95 }}
+            onClick={() => setIsOpen(!isOpen)}
+            className="pl-3 sm:pl-3.5 pr-2 sm:pr-3 py-3 rounded-l-2xl rounded-r-none bg-[#701626] text-white border-2 border-r-0 border-[#DFBF77] shadow-[-4px_4px_22px_rgba(112,22,38,0.35)] flex items-center gap-2.5 cursor-pointer group transition-all"
+            title="Chat with Preethi on WhatsApp"
+            aria-label="Open WhatsApp Styling Concierge"
+          >
+            <div className="relative">
+              <MessageCircle className="w-5 h-5 text-[#DFBF77] group-hover:text-white transition-colors" />
+              <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-emerald-500 border-2 border-[#701626]"></span>
             </div>
-
-            {/* Quick Inquiries Menu */}
-            <div className="space-y-1.5 text-xs">
-              <p className="text-[11px] text-[#6D6268] leading-relaxed">
-                How may our Colombo atelier assist your wardrobe today?
-              </p>
-
-              <button
-                onClick={() => handleOpenWhatsApp('tailoring')}
-                className="w-full p-2.5 rounded-xl bg-[#FCFBF8] hover:bg-[#701626]/5 border border-[#C5A059]/30 text-left font-semibold text-[#110B0E] hover:text-[#701626] transition-all flex items-center justify-between text-xs cursor-pointer group"
-              >
-                <span>✂️ Sizing & Bespoke Tailoring</span>
-                <Send className="w-3 h-3 text-[#C5A059] group-hover:translate-x-0.5 transition-transform" />
-              </button>
-
-              <button
-                onClick={() => handleOpenWhatsApp('bridal')}
-                className="w-full p-2.5 rounded-xl bg-[#FCFBF8] hover:bg-[#701626]/5 border border-[#C5A059]/30 text-left font-semibold text-[#110B0E] hover:text-[#701626] transition-all flex items-center justify-between text-xs cursor-pointer group"
-              >
-                <span>💍 Bridal & Heirloom Silks</span>
-                <Send className="w-3 h-3 text-[#C5A059] group-hover:translate-x-0.5 transition-transform" />
-              </button>
-
-              <button
-                onClick={() => handleOpenWhatsApp('delivery')}
-                className="w-full p-2.5 rounded-xl bg-[#FCFBF8] hover:bg-[#701626]/5 border border-[#C5A059]/30 text-left font-semibold text-[#110B0E] hover:text-[#701626] transition-all flex items-center justify-between text-xs cursor-pointer group"
-              >
-                <span>🚚 Colombo Same-Day Dispatch</span>
-                <Send className="w-3 h-3 text-[#C5A059] group-hover:translate-x-0.5 transition-transform" />
-              </button>
+            <div className="hidden sm:flex flex-col items-start text-left pr-0.5">
+              <span className="text-[10.5px] font-bold tracking-wider text-[#F3E8CE] leading-tight">
+                Styling Concierge
+              </span>
+              <span className="text-[9px] text-emerald-400 font-semibold leading-tight flex items-center gap-1 pt-0.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                WhatsApp
+              </span>
             </div>
-
-            {/* Direct WhatsApp CTA Button */}
-            <button
-              onClick={() => handleOpenWhatsApp()}
-              className="w-full py-2.5 rounded-xl bg-[#25D366] hover:bg-[#20bd5a] text-white text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2 shadow-md transition-all cursor-pointer"
-            >
-              <MessageCircle className="w-4 h-4 fill-white" />
-              <span>Chat on WhatsApp</span>
-            </button>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Floating Action Trigger Button */}
-      <motion.button
-        whileHover={{ scale: 1.06 }}
-        whileTap={{ scale: 0.95 }}
-        onClick={() => setIsOpen(!isOpen)}
-        className="px-4 py-3 rounded-full bg-[#701626] text-white border-2 border-[#DFBF77] shadow-2xl flex items-center gap-2.5 cursor-pointer group transition-all"
-        title="Chat with Preethi"
-      >
-        <div className="relative">
-          <MessageCircle className="w-5 h-5 text-[#DFBF77] group-hover:text-white transition-colors" />
-          <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-emerald-500 border-2 border-[#701626]"></span>
+          </motion.button>
         </div>
-        <span className="text-xs font-bold tracking-wider hidden sm:inline text-[#F3E8CE]">
-          Styling Concierge
-        </span>
-      </motion.button>
-        </motion.div>
       )}
     </AnimatePresence>
   );

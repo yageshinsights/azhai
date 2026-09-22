@@ -17,7 +17,8 @@ import {
   Calendar,
   Copy,
   AlertCircle,
-  ChevronDown
+  ChevronDown,
+  Trash2
 } from 'lucide-react';
 import { useCartStore, type PlacedOrder } from '@/store/cart';
 import { useAuthStore } from '@/store/auth';
@@ -68,7 +69,7 @@ export default function Checkout() {
   const location = useLocation();
   const state = (location.state as { appliedCoupon?: string; discountAmount?: number; giftNote?: string }) || {};
 
-  const { items, clearCart, setLastOrder, totalPrice } = useCartStore();
+  const { items, removeItem, clearCart, setLastOrder, totalPrice } = useCartStore();
   const { user, isAuthenticated, addresses, addAddress, addOrder } = useAuthStore();
   const settings = useAdminStore((s) => s.settings);
   const adminProducts = useAdminStore((s) => s.products);
@@ -624,7 +625,7 @@ export default function Checkout() {
                 {/* Mobile Item List */}
                 <div className="space-y-3 max-h-64 overflow-y-auto pr-1">
                   {items.map(item => (
-                    <div key={`m-${item.id}-${item.size}`} className="flex gap-3 items-start">
+                    <div key={`m-${item.id}-${item.size}`} className="flex gap-3 items-start group">
                       <div className="w-14 h-16 rounded-xl overflow-hidden bg-[#F7F4EE] shrink-0 border border-[#C5A059]/30">
                         <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
                       </div>
@@ -646,6 +647,15 @@ export default function Checkout() {
                         )}
                         <p className="font-display text-xs font-bold text-[#701626]">{item.price}</p>
                       </div>
+                      <button
+                        type="button"
+                        onClick={() => removeItem(item.id, item.size)}
+                        className="p-1.5 rounded-lg text-gray-400 hover:text-rose-600 hover:bg-rose-50 transition-colors shrink-0"
+                        title="Remove item"
+                        aria-label={`Remove ${item.name}`}
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
                     </div>
                   ))}
                 </div>
@@ -1251,7 +1261,7 @@ export default function Checkout() {
               {/* Item List */}
               <div className="space-y-4 max-h-72 overflow-y-auto pr-1">
                 {items.map(item => (
-                  <div key={`${item.id}-${item.size}`} className="flex gap-4 items-start">
+                  <div key={`${item.id}-${item.size}`} className="flex gap-4 items-start group relative">
                     <div className="w-16 h-20 rounded-xl overflow-hidden bg-[#F7F4EE] shrink-0 border border-[#C5A059]/30">
                       <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
                     </div>
@@ -1273,6 +1283,15 @@ export default function Checkout() {
                       )}
                       <p className="font-display text-sm font-bold text-[#701626]">{item.price}</p>
                     </div>
+                    <button
+                      type="button"
+                      onClick={() => removeItem(item.id, item.size)}
+                      className="p-2 rounded-xl text-gray-400 hover:text-rose-600 hover:bg-rose-50 transition-all shrink-0 opacity-70 group-hover:opacity-100"
+                      title="Remove item"
+                      aria-label={`Remove ${item.name}`}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
                   </div>
                 ))}
               </div>

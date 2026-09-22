@@ -303,8 +303,8 @@ export default function ProductModal({ isOpen, onClose, onSave, initialProduct }
       categories: [{ id: foundCategory?.id || 1, name: categoryName, slug: categorySlug }],
       attributes: [{ name: 'Size', options: sizes.length > 0 ? sizes : ['Free Size'] }],
       tag: tag.trim() || undefined,
-      rating: initialProduct?.rating || 5.0,
-      reviewsCount: initialProduct?.reviewsCount || 1,
+      rating: initialProduct?.rating !== undefined ? initialProduct.rating : 0,
+      reviewsCount: initialProduct?.reviewsCount !== undefined ? initialProduct.reviewsCount : 0,
     };
 
     onSave(productPayload);
