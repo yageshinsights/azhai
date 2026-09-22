@@ -23,6 +23,7 @@ export interface PaymentsLkCheckoutParams {
   customer: PaymentsLkCustomer;
   successUrl?: string;
   cancelUrl?: string;
+  autoRedirect?: boolean;
 }
 
 export interface PaymentsLkCheckoutResult {
@@ -110,8 +111,10 @@ export async function initiatePaymentsLkCheckout(
       return { success: false, error: 'No checkout redirect URL received from Payments.lk gateway' };
     }
 
-    // Direct patron to Payments.lk hosted 3D Secure payment page
-    window.location.href = data.url;
+    // Direct patron to Payments.lk hosted 3D Secure payment page if autoRedirect !== false
+    if (params.autoRedirect !== false) {
+      window.location.href = data.url;
+    }
 
     return {
       success: true,

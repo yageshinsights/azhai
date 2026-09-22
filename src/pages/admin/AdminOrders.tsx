@@ -141,6 +141,7 @@ export default function AdminOrders() {
               >
                 <option value="all">All Payment Types</option>
                 <option value="paid">Paid (Card / Bank Verified)</option>
+                <option value="pending_card">Pending Card (Awaiting 3DS)</option>
                 <option value="pending_bank">Pending Bank Slip Verification</option>
                 <option value="pending_cod">Pending COD Collection</option>
                 <option value="refunded">Refunded</option>
@@ -203,6 +204,11 @@ export default function AdminOrders() {
                             <span className="text-[9.5px] font-sans font-bold text-emerald-800 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded uppercase">
                               Paid
                             </span>
+                          ) : order.paymentStatus === 'pending_card' ? (
+                            <span className="text-[9.5px] font-sans font-bold text-purple-800 bg-purple-50 border border-purple-200 px-1.5 py-0.5 rounded inline-flex items-center gap-1">
+                              <span className="w-1.5 h-1.5 rounded-full bg-purple-500 animate-pulse" />
+                              Card Awaiting 3DS
+                            </span>
                           ) : order.paymentStatus === 'pending_bank' ? (
                             order.bankTransferDetails?.slipUrl ? (
                               <span className="text-[9.5px] font-sans font-bold text-blue-800 bg-blue-50 border border-blue-200 px-1.5 py-0.5 rounded inline-flex items-center gap-1">
@@ -215,6 +221,10 @@ export default function AdminOrders() {
                                 Bank Slip Pending
                               </span>
                             )
+                          ) : order.paymentStatus === 'refunded' ? (
+                            <span className="text-[9.5px] font-sans font-bold text-rose-800 bg-rose-50 border border-rose-200 px-1.5 py-0.5 rounded uppercase">
+                              Refunded
+                            </span>
                           ) : (
                             <span className="text-[9.5px] font-sans font-bold text-orange-800 bg-orange-50 border border-orange-200 px-1.5 py-0.5 rounded uppercase">
                               COD Due

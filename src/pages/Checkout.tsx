@@ -492,7 +492,29 @@ export default function Checkout() {
         return;
       }
 
-      // Pre-save order to local state & database as pending_card before redirecting to 3D Secure gateway
+      // Step 1: Request Payments.lk 3D Secure session FIRST before creating database records
+      const checkoutRes = await initiatePaymentsLkCheckout({
+        orderId: generatedOrderId,
+        amount: finalTotal,
+        description: `Azhai Boutique Order #${generatedOrderId}`,
+        customer: {
+          name: fullName.trim(),
+          email: email.trim(),
+          phone: phone.replace(/[^\d+]/g, '').trim(),
+          address,
+          city,
+          country: 'Sri Lanka',
+        },
+        autoRedirect: false,
+      });
+
+      if (!checkoutRes.success || !checkoutRes.checkoutUrl) {
+        setIsSubmitting(false);
+        alert(`Could not initiate secure card checkout: ${checkoutRes.error || 'Please verify your contact details or choose Direct Bank Deposit / Cash on Delivery.'}`);
+        return;
+      }
+
+      // Step 2: Session created successfully on Payments.lk! Save order as pending_card before redirecting
       orderData.paymentStatus = 'pending_card';
       orderData.status = 'pending';
       setLastOrder(orderData);
@@ -559,24 +581,8 @@ export default function Checkout() {
         }
       }
 
-      const checkoutRes = await initiatePaymentsLkCheckout({
-        orderId: generatedOrderId,
-        amount: finalTotal,
-        description: `Azhai Boutique Order #${generatedOrderId}`,
-        customer: {
-          name: fullName,
-          email,
-          phone: phone.replace(/[^\d+]/g, ''),
-          address,
-          city,
-          country: 'Sri Lanka',
-        },
-      });
-
-      if (!checkoutRes.success) {
-        setIsSubmitting(false);
-        alert(`Could not initiate secure card checkout: ${checkoutRes.error || 'Please try again or select Direct Bank Deposit / Cash on Delivery.'}`);
-      }
+      // Step 3: Direct patron to Payments.lk hosted 3D Secure page
+      window.location.href = checkoutRes.checkoutUrl;
     } else {
       // COD, Bank Deposit
       finalizeOrderPlacement(orderData);
