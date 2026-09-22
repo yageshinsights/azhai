@@ -503,6 +503,7 @@ export default function Checkout() {
           phone: phone.replace(/[^\d+]/g, '').trim(),
           address,
           city,
+          postalCode,
           country: 'Sri Lanka',
         },
         autoRedirect: false,

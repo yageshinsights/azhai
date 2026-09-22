@@ -13,6 +13,7 @@ export interface PaymentsLkCustomer {
   phone?: string;
   address?: string;
   city?: string;
+  postalCode?: string;
   country?: string;
 }
 
@@ -75,6 +76,7 @@ export async function initiatePaymentsLkCheckout(
       amountCents,
       description: params.description || `Azhai Boutique Order #${params.orderId}`,
       reference: params.orderId,
+      customer: params.customer,
       successUrl: params.successUrl || `${origin}/order-success/${params.orderId}?payments_lk=success`,
       cancelUrl: params.cancelUrl || `${origin}/checkout?status=cancelled&order_id=${params.orderId}`,
     };

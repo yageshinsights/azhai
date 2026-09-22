@@ -117,35 +117,146 @@ export default {
           const finalSuccessUrl = successUrl || `${url.origin}/order-success/${orderId}?payments_lk=success`;
           const finalCancelUrl = cancelUrl || `${url.origin}/checkout?status=cancelled&order_id=${orderId}`;
 
-          const checkoutPayload = {
-            amountCents: Math.round(Number(amountCents)),
-            description: description || `Azhai Order #${orderId}`,
-            reference: String(orderId),
-            successUrl: finalSuccessUrl,
-            cancelUrl: finalCancelUrl,
+          // Format Sri Lankan domestic mobile numbers to 07XXXXXXXX (10 digits) matching Payments.lk hosted form
+          const formatSriLankanPhone = (raw) => {
+            if (!raw) return undefined;
+            const digits = String(raw).replace(/\D/g, '');
+            if (digits.startsWith('94') && digits.length === 11) {
+              return '0' + digits.slice(2);
+            }
+            if (!digits.startsWith('0') && digits.length === 9) {
+              return '0' + digits;
+            }
+            if (digits.startsWith('0') && digits.length === 10) {
+              return digits;
+            }
+            return digits.length >= 9 ? digits : undefined;
           };
 
-          const pResp = await fetch('https://api.payments.lk/v1/checkouts', {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${secretKey}`,
-              'Idempotency-Key': `order-${orderId}`,
-              'Content-Type': 'application/json',
+          const cleanName = customer?.name ? String(customer.name).trim() : undefined;
+          const cleanEmail = customer?.email ? String(customer.email).trim() : undefined;
+          const cleanPhone = formatSriLankanPhone(customer?.phone);
+          const cleanAddress = customer?.address ? String(customer.address).trim() : undefined;
+          const cleanCity = customer?.city ? String(customer.city).trim() : undefined;
+          const cleanPostal = customer?.postalCode ? String(customer.postalCode).trim() : undefined;
+
+          const candidates = [];
+
+          // Candidate 1: Full pre-fill (name, email, phone, street address, city, postal code)
+          if (cleanName || cleanEmail || cleanPhone) {
+            const cust1 = {};
+            if (cleanName) cust1.name = cleanName;
+            if (cleanEmail) cust1.email = cleanEmail;
+            if (cleanPhone) cust1.phone = cleanPhone;
+            if (cleanAddress) cust1.address = cleanAddress;
+            if (cleanCity) cust1.city = cleanCity;
+            if (cleanPostal) cust1.postalCode = cleanPostal;
+
+            candidates.push({
+              name: 'full-prefill',
+              payload: {
+                amountCents: Math.round(Number(amountCents)),
+                description: description || `Azhai Order #${orderId}`,
+                reference: String(orderId),
+                customer: cust1,
+                successUrl: finalSuccessUrl,
+                cancelUrl: finalCancelUrl,
+              },
+            });
+          }
+
+          // Candidate 2: Contact pre-fill with phone (name, email, phone)
+          if (cleanName || cleanEmail || cleanPhone) {
+            const cust2 = {};
+            if (cleanName) cust2.name = cleanName;
+            if (cleanEmail) cust2.email = cleanEmail;
+            if (cleanPhone) cust2.phone = cleanPhone;
+
+            candidates.push({
+              name: 'contact-phone-prefill',
+              payload: {
+                amountCents: Math.round(Number(amountCents)),
+                description: description || `Azhai Order #${orderId}`,
+                reference: String(orderId),
+                customer: cust2,
+                successUrl: finalSuccessUrl,
+                cancelUrl: finalCancelUrl,
+              },
+            });
+          }
+
+          // Candidate 3: Official guide pre-fill (name, email)
+          if (cleanName && cleanEmail) {
+            candidates.push({
+              name: 'guide-name-email-prefill',
+              payload: {
+                amountCents: Math.round(Number(amountCents)),
+                description: description || `Azhai Order #${orderId}`,
+                reference: String(orderId),
+                customer: {
+                  name: cleanName,
+                  email: cleanEmail,
+                },
+                successUrl: finalSuccessUrl,
+                cancelUrl: finalCancelUrl,
+              },
+            });
+          }
+
+          // Candidate 4: Guaranteed baseline (100% verified to work with Payments.lk)
+          candidates.push({
+            name: 'guaranteed-core',
+            payload: {
+              amountCents: Math.round(Number(amountCents)),
+              description: description || `Azhai Order #${orderId}`,
+              reference: String(orderId),
+              successUrl: finalSuccessUrl,
+              cancelUrl: finalCancelUrl,
             },
-            body: JSON.stringify(checkoutPayload),
           });
 
-          const pData = await pResp.json();
+          let pResp = null;
+          let pData = null;
+          let successTier = null;
 
-          if (!pResp.ok) {
+          for (let i = 0; i < candidates.length; i++) {
+            const candidate = candidates[i];
+            const idempotencyKey = `order-${orderId}-${candidate.name}`;
+
+            try {
+              pResp = await fetch('https://api.payments.lk/v1/checkouts', {
+                method: 'POST',
+                headers: {
+                  'Authorization': `Bearer ${secretKey}`,
+                  'Idempotency-Key': idempotencyKey,
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(candidate.payload),
+              });
+
+              pData = await pResp.json();
+
+              if (pResp.ok && pData?.url) {
+                successTier = candidate.name;
+                console.log(`[Payments.lk Checkout SUCCESS] Order #${orderId} created via tier: ${candidate.name}`);
+                break;
+              }
+
+              console.warn(`[Payments.lk Checkout] Tier '${candidate.name}' rejected (HTTP ${pResp.status}):`, pData);
+            } catch (candidateErr) {
+              console.warn(`[Payments.lk Checkout] Exception on tier '${candidate.name}':`, candidateErr);
+            }
+          }
+
+          if (!pResp || !pResp.ok || !pData?.url) {
             const errDetail = typeof pData === 'object' ? JSON.stringify(pData) : String(pData);
-            const errorMsg = pData.message 
+            const errorMsg = pData?.message 
               ? `${pData.message} (${errDetail})`
-              : (pData.error || `Payments.lk API returned an error: ${errDetail}`);
+              : (pData?.error || `Payments.lk API returned an error: ${errDetail}`);
 
             return new Response(
               JSON.stringify({ error: errorMsg, details: pData }),
-              { status: pResp.status, headers: { 'Content-Type': 'application/json', ...corsHeaders } }
+              { status: pResp ? pResp.status : 500, headers: { 'Content-Type': 'application/json', ...corsHeaders } }
             );
           }
 
@@ -155,6 +266,7 @@ export default {
               url: pData.url,
               paymentId: pData.payment?.id,
               status: pData.status,
+              tier: successTier,
             }),
             { status: 200, headers: { 'Content-Type': 'application/json', ...corsHeaders } }
           );

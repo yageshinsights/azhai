@@ -114,31 +114,127 @@ export default defineConfig(({ mode }) => {
               req.on('end', async () => {
                 try {
                   const parsed = JSON.parse(body);
-                  const pResp = await fetch('https://api.payments.lk/v1/checkouts', {
-                    method: 'POST',
-                    headers: {
-                      'Authorization': `Bearer ${paymentsLkSecret}`,
-                      'Idempotency-Key': `order-${parsed.orderId}`,
-                      'Content-Type': 'application/json',
+                  const { orderId, amountCents, description, customer, successUrl, cancelUrl } = parsed;
+
+                  const formatSriLankanPhone = (raw: any) => {
+                    if (!raw) return undefined;
+                    const digits = String(raw).replace(/\D/g, '');
+                    if (digits.startsWith('94') && digits.length === 11) return '0' + digits.slice(2);
+                    if (!digits.startsWith('0') && digits.length === 9) return '0' + digits;
+                    if (digits.startsWith('0') && digits.length === 10) return digits;
+                    return digits.length >= 9 ? digits : undefined;
+                  };
+
+                  const cleanName = customer?.name ? String(customer.name).trim() : undefined;
+                  const cleanEmail = customer?.email ? String(customer.email).trim() : undefined;
+                  const cleanPhone = formatSriLankanPhone(customer?.phone);
+                  const cleanAddress = customer?.address ? String(customer.address).trim() : undefined;
+                  const cleanCity = customer?.city ? String(customer.city).trim() : undefined;
+                  const cleanPostal = customer?.postalCode ? String(customer.postalCode).trim() : undefined;
+
+                  const candidates: Array<{ name: string; payload: any }> = [];
+
+                  if (cleanName || cleanEmail || cleanPhone) {
+                    const cust1: any = {};
+                    if (cleanName) cust1.name = cleanName;
+                    if (cleanEmail) cust1.email = cleanEmail;
+                    if (cleanPhone) cust1.phone = cleanPhone;
+                    if (cleanAddress) cust1.address = cleanAddress;
+                    if (cleanCity) cust1.city = cleanCity;
+                    if (cleanPostal) cust1.postalCode = cleanPostal;
+
+                    candidates.push({
+                      name: 'full-prefill',
+                      payload: {
+                        amountCents: Math.round(Number(amountCents)),
+                        description: description || `Azhai Order #${orderId}`,
+                        reference: String(orderId),
+                        customer: cust1,
+                        successUrl,
+                        cancelUrl,
+                      },
+                    });
+                  }
+
+                  if (cleanName || cleanEmail || cleanPhone) {
+                    const cust2: any = {};
+                    if (cleanName) cust2.name = cleanName;
+                    if (cleanEmail) cust2.email = cleanEmail;
+                    if (cleanPhone) cust2.phone = cleanPhone;
+
+                    candidates.push({
+                      name: 'contact-phone-prefill',
+                      payload: {
+                        amountCents: Math.round(Number(amountCents)),
+                        description: description || `Azhai Order #${orderId}`,
+                        reference: String(orderId),
+                        customer: cust2,
+                        successUrl,
+                        cancelUrl,
+                      },
+                    });
+                  }
+
+                  if (cleanName && cleanEmail) {
+                    candidates.push({
+                      name: 'guide-name-email-prefill',
+                      payload: {
+                        amountCents: Math.round(Number(amountCents)),
+                        description: description || `Azhai Order #${orderId}`,
+                        reference: String(orderId),
+                        customer: { name: cleanName, email: cleanEmail },
+                        successUrl,
+                        cancelUrl,
+                      },
+                    });
+                  }
+
+                  candidates.push({
+                    name: 'guaranteed-core',
+                    payload: {
+                      amountCents: Math.round(Number(amountCents)),
+                      description: description || `Azhai Order #${orderId}`,
+                      reference: String(orderId),
+                      successUrl,
+                      cancelUrl,
                     },
-                    body: JSON.stringify({
-                      amountCents: Math.round(Number(parsed.amountCents)),
-                      description: parsed.description,
-                      reference: String(parsed.orderId),
-                      successUrl: parsed.successUrl,
-                      cancelUrl: parsed.cancelUrl,
-                    }),
                   });
-                  const data: any = await pResp.json();
-                  res.statusCode = pResp.status;
+
+                  let pResp: any = null;
+                  let data: any = null;
+                  let successTier: string | null = null;
+
+                  for (const candidate of candidates) {
+                    try {
+                      pResp = await fetch('https://api.payments.lk/v1/checkouts', {
+                        method: 'POST',
+                        headers: {
+                          'Authorization': `Bearer ${paymentsLkSecret}`,
+                          'Idempotency-Key': `order-${orderId}-${candidate.name}`,
+                          'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify(candidate.payload),
+                      });
+                      data = await pResp.json();
+                      if (pResp.ok && data?.url) {
+                        successTier = candidate.name;
+                        break;
+                      }
+                    } catch (e) {
+                      // continue cascade
+                    }
+                  }
+
+                  res.statusCode = pResp ? pResp.status : 500;
                   res.setHeader('Content-Type', 'application/json');
                   const errDetail = typeof data === 'object' ? JSON.stringify(data) : String(data);
                   res.end(JSON.stringify({
-                    id: data.id,
-                    url: data.url,
-                    paymentId: data.payment?.id,
-                    status: data.status,
-                    error: res.statusCode !== 200 ? (data.message ? `${data.message} (${errDetail})` : errDetail) : undefined,
+                    id: data?.id,
+                    url: data?.url,
+                    paymentId: data?.payment?.id,
+                    status: data?.status,
+                    tier: successTier,
+                    error: res.statusCode !== 200 ? (data?.message ? `${data.message} (${errDetail})` : errDetail) : undefined,
                   }));
                 } catch (err: any) {
                   res.statusCode = 500;
