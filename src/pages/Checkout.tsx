@@ -485,7 +485,7 @@ export default function Checkout() {
 
       if (isSupabaseConfigured()) {
         try {
-          const { data: insertedOrder } = await supabase
+          const { data: insertedOrder, error: orderErr } = await supabase
             .from('orders')
             .insert({
               order_code: orderData.orderId,
@@ -501,13 +501,16 @@ export default function Checkout() {
               cost_price: Math.round(orderData.subtotal * 0.45),
               delivery_method: orderData.deliveryMethod,
               payment_method: 'Online Card & LankaQR (Payments.lk)',
-              payment_status: 'pending_card',
               status: 'pending',
               courier_partner: orderData.courierPartner || 'Sri Lanka Post',
               tracking_number: orderData.trackingNumber || null,
             })
             .select()
             .single();
+
+          if (orderErr) {
+            console.error('[Payments.lk Pre-Save Error]:', orderErr);
+          }
 
           if (insertedOrder) {
             const orderItemsPayload = items.map((item) => ({
