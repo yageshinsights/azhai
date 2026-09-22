@@ -644,6 +644,7 @@ export default function OrderDetailDrawer({ order, isOpen, onClose }: OrderDetai
 
                   if (!isCardOrder) return null;
 
+                  const isPaid = order.paymentStatus === 'paid';
                   const isRefunded = order.paymentStatus === 'refunded' || order.status === 'cancelled';
                   const isPartiallyRefunded = order.paymentStatus === 'partially_refunded';
 
@@ -670,16 +671,22 @@ export default function OrderDetailDrawer({ order, isOpen, onClose }: OrderDetai
                           <span className="text-[10.5px] font-bold text-amber-800 bg-amber-50 px-2.5 py-1 rounded-full border border-amber-300 flex items-center gap-1">
                             <History className="w-3.5 h-3.5 text-amber-600" /> Partially Refunded
                           </span>
-                        ) : (
+                        ) : isPaid ? (
                           <span className="text-[10.5px] font-bold text-emerald-800 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-300 flex items-center gap-1">
                             <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> Paid &amp; Captured
+                          </span>
+                        ) : (
+                          <span className="text-[10.5px] font-bold text-purple-800 bg-purple-50 px-2.5 py-1 rounded-full border border-purple-300 flex items-center gap-1">
+                            <Clock className="w-3.5 h-3.5 text-purple-600 animate-pulse" /> Awaiting 3DS Payment
                           </span>
                         )}
                       </div>
 
                       <div className="p-3 bg-white rounded-xl border border-[#C5A059]/25 text-xs flex items-center justify-between flex-wrap gap-2">
                         <div>
-                          <span className="text-[11px] text-[#6D6268] block">Captured Amount</span>
+                          <span className="text-[11px] text-[#6D6268] block">
+                            {isPaid ? 'Captured Amount' : 'Order Amount'}
+                          </span>
                           <strong className="font-mono text-sm font-bold text-[#701626]">
                             LKR {order.total.toLocaleString()}
                           </strong>
@@ -691,7 +698,7 @@ export default function OrderDetailDrawer({ order, isOpen, onClose }: OrderDetai
                           </strong>
                         </div>
 
-                        {!isRefunded && (
+                        {isPaid && !isRefunded && (
                           <button
                             type="button"
                             onClick={() => {
