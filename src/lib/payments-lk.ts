@@ -101,6 +101,7 @@ export async function initiatePaymentsLkCheckout(
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
+      console.error('[Payments.lk Gateway Error Response]:', errorData);
       const errorMsg = errorData.error || errorData.message || `Checkout creation failed (HTTP ${response.status})`;
       return { success: false, error: errorMsg };
     }

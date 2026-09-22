@@ -141,7 +141,7 @@ export default {
               cancelUrl: finalCancelUrl,
             };
 
-          const pResp = await fetch('https://api.payments.lk/v1/checkouts', {
+          let pResp = await fetch('https://api.payments.lk/v1/checkouts', {
             method: 'POST',
             headers: {
               'Authorization': `Bearer ${secretKey}`,
@@ -151,15 +151,45 @@ export default {
             body: JSON.stringify(checkoutPayload),
           });
 
-          const pData = await pResp.json();
+          let pData = await pResp.json();
+
+          // Resilient fallback: If gateway rejects payload and customer object was included, retry without customer
+          if (!pResp.ok && checkoutPayload.customer) {
+            console.warn('[Payments.lk] Retrying checkout creation without customer payload due to gateway response:', pData);
+            const fallbackPayload = {
+              amountCents: checkoutPayload.amountCents,
+              description: checkoutPayload.description,
+              reference: checkoutPayload.reference,
+              successUrl: checkoutPayload.successUrl,
+              cancelUrl: checkoutPayload.cancelUrl,
+            };
+
+            const retryResp = await fetch('https://api.payments.lk/v1/checkouts', {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${secretKey}`,
+                'Idempotency-Key': `order-${orderId}-nocust`,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify(fallbackPayload),
+            });
+
+            if (retryResp.ok) {
+              pResp = retryResp;
+              pData = await retryResp.json();
+            } else {
+              const retryData = await retryResp.json().catch(() => ({}));
+              console.warn('[Payments.lk] Fallback payload also rejected:', retryData);
+              pData = retryData;
+              pResp = retryResp;
+            }
+          }
 
           if (!pResp.ok) {
-            const errDetail = pData.errors 
-              ? (typeof pData.errors === 'string' ? pData.errors : JSON.stringify(pData.errors))
-              : '';
-            const errorMsg = errDetail 
-              ? `${pData.message || 'Validation error'}: ${errDetail}`
-              : (pData.message || pData.error || 'Payments.lk API returned an error');
+            const errDetail = typeof pData === 'object' ? JSON.stringify(pData) : String(pData);
+            const errorMsg = pData.message 
+              ? `${pData.message} (${errDetail})`
+              : (pData.error || `Payments.lk API returned an error: ${errDetail}`);
 
             return new Response(
               JSON.stringify({ error: errorMsg, details: pData }),

@@ -130,15 +130,44 @@ export default defineConfig(({ mode }) => {
                       cancelUrl: parsed.cancelUrl,
                     }),
                   });
-                  const data: any = await pResp.json();
-                  res.statusCode = pResp.status;
+                  let data: any = await pResp.json();
+
+                  if (!pResp.ok && parsed.customer) {
+                    const retryResp = await fetch('https://api.payments.lk/v1/checkouts', {
+                      method: 'POST',
+                      headers: {
+                        'Authorization': `Bearer ${paymentsLkSecret}`,
+                        'Idempotency-Key': `order-${parsed.orderId}-nocust`,
+                        'Content-Type': 'application/json',
+                      },
+                      body: JSON.stringify({
+                        amountCents: parsed.amountCents,
+                        description: parsed.description,
+                        reference: String(parsed.orderId),
+                        successUrl: parsed.successUrl,
+                        cancelUrl: parsed.cancelUrl,
+                      }),
+                    });
+
+                    if (retryResp.ok) {
+                      res.statusCode = 200;
+                      data = await retryResp.json();
+                    } else {
+                      res.statusCode = pResp.status;
+                      data = await retryResp.json().catch(() => data);
+                    }
+                  } else {
+                    res.statusCode = pResp.status;
+                  }
+
                   res.setHeader('Content-Type', 'application/json');
+                  const errDetail = typeof data === 'object' ? JSON.stringify(data) : String(data);
                   res.end(JSON.stringify({
                     id: data.id,
                     url: data.url,
                     paymentId: data.payment?.id,
                     status: data.status,
-                    error: data.error || data.message,
+                    error: res.statusCode !== 200 ? (data.message ? `${data.message} (${errDetail})` : errDetail) : undefined,
                   }));
                 } catch (err: any) {
                   res.statusCode = 500;
