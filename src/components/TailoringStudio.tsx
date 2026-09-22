@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Scissors, Ruler, Palette, ShoppingBag, ChevronRight, ChevronLeft, Check, Clock, Sparkles, Layers } from 'lucide-react';
 import { useAdminStore } from '@/store/admin';
@@ -45,6 +45,43 @@ export default function TailoringStudio() {
   const [sizeLabel, setSizeLabel] = useState<string>('M');
   const [measurements, setMeasurements] = useState<Record<string, number>>({});
   const [isSuccess, setIsSuccess] = useState(false);
+
+  // Collection Slider state and navigation handlers
+  const collectionSliderRef = useRef<HTMLDivElement>(null);
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(true);
+  const [activeSlideIndex, setActiveSlideIndex] = useState(0);
+
+  const checkScroll = () => {
+    if (!collectionSliderRef.current) return;
+    const { scrollLeft, scrollWidth, clientWidth } = collectionSliderRef.current;
+    setCanScrollLeft(scrollLeft > 15);
+    setCanScrollRight(scrollLeft < scrollWidth - clientWidth - 15);
+    const itemWidth = 320;
+    const index = Math.round(scrollLeft / itemWidth);
+    setActiveSlideIndex(Math.min(Math.max(0, index), collections.length - 1));
+  };
+
+  const slideLeft = () => {
+    if (collectionSliderRef.current) {
+      collectionSliderRef.current.scrollBy({ left: -340, behavior: 'smooth' });
+    }
+  };
+
+  const slideRight = () => {
+    if (collectionSliderRef.current) {
+      collectionSliderRef.current.scrollBy({ left: 340, behavior: 'smooth' });
+    }
+  };
+
+  const scrollToSlide = (idx: number) => {
+    if (collectionSliderRef.current) {
+      const target = collectionSliderRef.current.children[idx] as HTMLElement;
+      if (target) {
+        target.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'start' });
+      }
+    }
+  };
 
   // Filtered Active Silhouettes
   const activeDressTypes = useMemo(() => 
@@ -239,66 +276,141 @@ export default function TailoringStudio() {
           {/* STEP 1: SELECT COLLECTION */}
           {step === 1 && (
             <motion.div key="step1" variants={variants} initial="initial" animate="animate" exit="exit" className="p-6 sm:p-10 h-full">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
                 <div>
                   <h3 className="font-display text-2xl font-bold text-[#110B0E]">1. Choose Garment Collection</h3>
                   <p className="text-xs text-[#6D6268]">Select the garment style category you want tailored</p>
                 </div>
-                <span className="text-[11px] font-bold text-[#701626] bg-[#701626]/10 px-3 py-1 rounded-full self-start sm:self-auto">
-                  {collections.length} Collections Available
-                </span>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-                {collections.map(col => {
-                  const count = activeDressTypes.filter(d => 
-                    d.collectionSlug === col.slug || 
-                    (d.collectionId && d.collectionId === col.id)
-                  ).length;
-                  const isSelected = selectedCollection?.id === col.id || selectedCollection?.slug === col.slug;
-
-                  return (
+                <div className="flex items-center gap-2.5 self-start sm:self-auto">
+                  <span className="text-[11px] font-bold text-[#701626] bg-[#701626]/10 px-3 py-1 rounded-full">
+                    {collections.length} Collections Available
+                  </span>
+                  
+                  {/* Slider Arrow Controls in Header */}
+                  <div className="flex items-center gap-1">
                     <button
-                      key={col.id || col.slug}
-                      onClick={() => handleCollectionSelect(col)}
-                      className={`relative aspect-[3/4] rounded-3xl overflow-hidden group text-left transition-all cursor-pointer shadow-md ${
-                        isSelected ? 'ring-4 ring-[#C5A059]' : 'hover:shadow-xl'
-                      }`}
+                      type="button"
+                      onClick={slideLeft}
+                      disabled={!canScrollLeft}
+                      className="w-8 h-8 rounded-full bg-[#F7F4EE] hover:bg-[#701626] text-[#110B0E] hover:text-white disabled:opacity-30 disabled:hover:bg-[#F7F4EE] disabled:hover:text-[#110B0E] flex items-center justify-center transition-all border border-[#C5A059]/30 cursor-pointer disabled:cursor-not-allowed shadow-xs"
+                      title="Previous Collection"
+                      aria-label="Previous Collection"
                     >
-                      <img
-                        src={col.heroImage}
-                        alt={col.name}
-                        className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
-                      />
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/35 to-transparent" />
-                      
-                      {/* Top Silhouette Count Badge */}
-                      <div className="absolute top-3.5 right-3.5">
-                        <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-black/60 text-[#DFBF77] border border-[#DFBF77]/40 backdrop-blur-sm shadow-sm">
-                          {count} {count === 1 ? 'Silhouette' : 'Silhouettes'}
-                        </span>
-                      </div>
-
-                      {/* Bottom Collection Information */}
-                      <div className="absolute bottom-0 left-0 right-0 p-5 text-white">
-                        <span className="text-[9.5px] uppercase tracking-[0.2em] text-[#DFBF77] font-bold block mb-1">
-                          {col.season || 'Signature Edit'}
-                        </span>
-                        <h4 className="font-display text-xl font-bold mb-1.5 leading-snug drop-shadow-md">
-                          {col.name}
-                        </h4>
-                        <p className="text-white/80 text-[11px] font-light line-clamp-2 leading-relaxed mb-3">
-                          {col.tagline || col.description}
-                        </p>
-                        <div className="inline-flex items-center gap-1.5 text-xs font-bold text-[#DFBF77] group-hover:translate-x-1 transition-transform">
-                          <span>Explore Silhouettes</span>
-                          <ChevronRight className="w-3.5 h-3.5" />
-                        </div>
-                      </div>
+                      <ChevronLeft className="w-4 h-4" />
                     </button>
-                  );
-                })}
+                    <button
+                      type="button"
+                      onClick={slideRight}
+                      disabled={!canScrollRight}
+                      className="w-8 h-8 rounded-full bg-[#F7F4EE] hover:bg-[#701626] text-[#110B0E] hover:text-white disabled:opacity-30 disabled:hover:bg-[#F7F4EE] disabled:hover:text-[#110B0E] flex items-center justify-center transition-all border border-[#C5A059]/30 cursor-pointer disabled:cursor-not-allowed shadow-xs"
+                      title="Next Collection"
+                      aria-label="Next Collection"
+                    >
+                      <ChevronRight className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
               </div>
+
+              {/* Slider Track Container */}
+              <div className="relative group/slider">
+                <div
+                  ref={collectionSliderRef}
+                  onScroll={checkScroll}
+                  className="flex gap-5 overflow-x-auto scroll-smooth pb-4 pt-1 px-1 snap-x snap-mandatory"
+                  style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+                >
+                  {collections.map(col => {
+                    const count = activeDressTypes.filter(d => 
+                      d.collectionSlug === col.slug || 
+                      (d.collectionId && d.collectionId === col.id)
+                    ).length;
+                    const isSelected = selectedCollection?.id === col.id || selectedCollection?.slug === col.slug;
+
+                    return (
+                      <button
+                        key={col.id || col.slug}
+                        onClick={() => handleCollectionSelect(col)}
+                        className={`relative w-[270px] sm:w-[310px] shrink-0 aspect-[3/4] rounded-3xl overflow-hidden group/card text-left transition-all cursor-pointer shadow-md snap-start ${
+                          isSelected ? 'ring-4 ring-[#C5A059]' : 'hover:shadow-xl'
+                        }`}
+                      >
+                        <img
+                          src={col.heroImage}
+                          alt={col.name}
+                          className="w-full h-full object-cover transition-transform duration-700 group-hover/card:scale-105"
+                        />
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/35 to-transparent" />
+                        
+                        {/* Top Silhouette Count Badge */}
+                        <div className="absolute top-3.5 right-3.5">
+                          <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-black/60 text-[#DFBF77] border border-[#DFBF77]/40 backdrop-blur-sm shadow-sm">
+                            {count} {count === 1 ? 'Silhouette' : 'Silhouettes'}
+                          </span>
+                        </div>
+
+                        {/* Bottom Collection Information */}
+                        <div className="absolute bottom-0 left-0 right-0 p-5 text-white">
+                          <span className="text-[9.5px] uppercase tracking-[0.2em] text-[#DFBF77] font-bold block mb-1">
+                            {col.season || 'Signature Edit'}
+                          </span>
+                          <h4 className="font-display text-xl font-bold mb-1.5 leading-snug drop-shadow-md">
+                            {col.name}
+                          </h4>
+                          <p className="text-white/80 text-[11px] font-light line-clamp-2 leading-relaxed mb-3">
+                            {col.tagline || col.description}
+                          </p>
+                          <div className="inline-flex items-center gap-1.5 text-xs font-bold text-[#DFBF77] group-hover/card:translate-x-1 transition-transform">
+                            <span>Explore Silhouettes</span>
+                            <ChevronRight className="w-3.5 h-3.5" />
+                          </div>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Left/Right Floating Side Buttons on Desktop */}
+                {canScrollLeft && (
+                  <button
+                    type="button"
+                    onClick={slideLeft}
+                    className="hidden sm:flex absolute left-2 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white/95 hover:bg-[#701626] text-[#110B0E] hover:text-white backdrop-blur-md shadow-lg border border-[#C5A059]/40 items-center justify-center transition-all cursor-pointer z-20"
+                    title="Slide left"
+                    aria-label="Slide left"
+                  >
+                    <ChevronLeft className="w-5 h-5" />
+                  </button>
+                )}
+                {canScrollRight && (
+                  <button
+                    type="button"
+                    onClick={slideRight}
+                    className="hidden sm:flex absolute right-2 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white/95 hover:bg-[#701626] text-[#110B0E] hover:text-white backdrop-blur-md shadow-lg border border-[#C5A059]/40 items-center justify-center transition-all cursor-pointer z-20"
+                    title="Slide right"
+                    aria-label="Slide right"
+                  >
+                    <ChevronRight className="w-5 h-5" />
+                  </button>
+                )}
+              </div>
+
+              {/* Slider Pagination Dots */}
+              {collections.length > 1 && (
+                <div className="flex items-center justify-center gap-2 pt-4">
+                  {collections.map((_, i) => (
+                    <button
+                      key={i}
+                      type="button"
+                      onClick={() => scrollToSlide(i)}
+                      className={`h-1.5 rounded-full transition-all cursor-pointer ${
+                        activeSlideIndex === i ? 'w-6 bg-[#701626]' : 'w-2 bg-[#C5A059]/40 hover:bg-[#C5A059]'
+                      }`}
+                      aria-label={`Slide ${i + 1}`}
+                    />
+                  ))}
+                </div>
+              )}
             </motion.div>
           )}
 
