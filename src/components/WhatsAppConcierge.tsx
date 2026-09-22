@@ -63,7 +63,13 @@ export default function WhatsAppConcierge() {
   return (
     <AnimatePresence>
       {isVisible && (
-        <div className="fixed right-0 top-1/2 -translate-y-1/2 z-50 print:hidden flex items-center">
+        <motion.div
+          initial={{ opacity: 0, y: 25, scale: 0.9 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          exit={{ opacity: 0, y: 25, scale: 0.9 }}
+          transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
+          className="fixed bottom-20 lg:bottom-6 left-4 sm:left-6 z-50 print:hidden flex flex-col items-start"
+        >
           {/* Modal / Dialog Popover */}
           <AnimatePresence>
             {isOpen && (
@@ -79,11 +85,11 @@ export default function WhatsAppConcierge() {
 
                 {/* Popover Card */}
                 <motion.div
-                  initial={{ opacity: 0, scale: 0.9, x: 25 }}
-                  animate={{ opacity: 1, scale: 1, x: 0 }}
-                  exit={{ opacity: 0, scale: 0.9, x: 25 }}
-                  transition={{ type: 'spring', damping: 26, stiffness: 320 }}
-                  className="fixed sm:static right-3 top-1/2 -translate-y-1/2 sm:translate-y-0 sm:mr-3 w-[calc(100vw-1.5rem)] max-w-xs sm:max-w-sm bg-white rounded-3xl p-5 border border-[#DFBF77] shadow-2xl space-y-4 text-left z-50 overflow-hidden max-h-[90vh] overflow-y-auto"
+                  initial={{ opacity: 0, scale: 0.92, y: 15 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.92, y: 15 }}
+                  transition={{ type: 'spring', damping: 25, stiffness: 320 }}
+                  className="mb-3 w-[calc(100vw-2rem)] max-w-xs sm:max-w-sm bg-white rounded-3xl p-5 border border-[#DFBF77] shadow-2xl space-y-4 text-left z-50 relative overflow-hidden max-h-[85vh] overflow-y-auto"
                 >
                   {/* Top Atelier Bar */}
                   <div className="flex items-center justify-between border-b border-[#C5A059]/20 pb-3">
@@ -158,12 +164,12 @@ export default function WhatsAppConcierge() {
             )}
           </AnimatePresence>
 
-          {/* Right-Side Sticky Tab Trigger */}
+          {/* Floating Action Trigger Button */}
           <motion.button
-            whileHover={{ x: -4 }}
+            whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
             onClick={() => setIsOpen(!isOpen)}
-            className="pl-3 sm:pl-3.5 pr-2 sm:pr-3 py-3 rounded-l-2xl rounded-r-none bg-[#701626] text-white border-2 border-r-0 border-[#DFBF77] shadow-[-4px_4px_22px_rgba(112,22,38,0.35)] flex items-center gap-2.5 cursor-pointer group transition-all"
+            className="px-3.5 py-2.5 sm:px-4 sm:py-3 rounded-full bg-[#701626] text-white border-2 border-[#DFBF77] shadow-[0_8px_30px_rgba(112,22,38,0.28)] flex items-center gap-2.5 cursor-pointer group transition-all"
             title="Chat with Preethi on WhatsApp"
             aria-label="Open WhatsApp Styling Concierge"
           >
@@ -177,11 +183,11 @@ export default function WhatsAppConcierge() {
               </span>
               <span className="text-[9px] text-emerald-400 font-semibold leading-tight flex items-center gap-1 pt-0.5">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-                WhatsApp
+                WhatsApp Live
               </span>
             </div>
           </motion.button>
-        </div>
+        </motion.div>
       )}
     </AnimatePresence>
   );
