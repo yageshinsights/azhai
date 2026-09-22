@@ -33,6 +33,7 @@ import { useAdminStore } from '@/store/admin';
 import { 
   sendBrevoEmail,
   buildOrderConfirmationHtml,
+  buildOrderApprovedHtml,
   buildOrderProcessingHtml,
   buildOrderShippedHtml,
   buildOrderDeliveredHtml,
@@ -107,7 +108,21 @@ export default function OrderDetailDrawer({ order, isOpen, onClose }: OrderDetai
     if (!customerEmail) return;
 
     try {
-      if (status === 'processing') {
+      if (status === 'confirmed') {
+        await sendBrevoEmail({
+          to: [{ email: customerEmail, name: customerName }],
+          subject: `✨ Order Confirmed & Approved #${order.orderId} — Azhai Boutique by Preethi`,
+          htmlContent: buildOrderApprovedHtml({
+            orderId: order.orderId,
+            customerName,
+            total: order.total,
+            items: order.items,
+            deliveryMethod: order.deliveryMethod,
+            paymentMethod: order.paymentMethod,
+          }),
+        });
+        showToast('Official order approval email sent to customer!');
+      } else if (status === 'processing') {
         await sendBrevoEmail({
           to: [{ email: customerEmail, name: customerName }],
           subject: `✂️ Atelier Crafting in Progress #${order.orderId} — Azhai Clothing`,
@@ -723,6 +738,7 @@ export default function OrderDetailDrawer({ order, isOpen, onClose }: OrderDetai
                   </label>
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                     {[
+                      { key: 'pending', label: 'Pending Review' },
                       { key: 'confirmed', label: 'Confirmed' },
                       { key: 'processing', label: 'Processing (Atelier)' },
                       { key: 'shipped', label: 'Shipped (Transit)' },

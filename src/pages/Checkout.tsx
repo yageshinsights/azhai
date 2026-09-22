@@ -276,7 +276,7 @@ export default function Checkout() {
             delivery_method: orderData.deliveryMethod,
             payment_method: orderData.paymentMethod,
             payment_status: paymentMethod === 'card' ? 'paid' : paymentMethod === 'bank' ? 'pending_bank' : 'pending_cod',
-            status: paymentMethod === 'bank' ? 'pending' : 'confirmed',
+            status: 'pending',
             courier_partner: orderData.courierPartner || 'Sri Lanka Post',
             tracking_number: orderData.trackingNumber || null,
           })
@@ -360,7 +360,7 @@ export default function Checkout() {
 
       await sendBrevoEmail({
         to: [{ email, name: fullName }],
-        subject: `✨ Order Confirmed #${orderData.orderId} — Azhai Boutique by Preethi`,
+        subject: `✨ Order Received #${orderData.orderId} — Azhai Boutique by Preethi`,
         htmlContent: emailHtml,
       });
 
@@ -466,7 +466,7 @@ export default function Checkout() {
           : paymentMethod === 'bank'
           ? 'pending_bank'
           : 'pending_cod',
-      status: paymentMethod === 'bank' ? 'pending' : 'confirmed',
+      status: 'pending',
       bankTransferDetails:
         paymentMethod === 'bank' && chosenBank
           ? {
@@ -487,7 +487,7 @@ export default function Checkout() {
       if (finalTotal <= 0) {
         // Zero-balance orders (e.g. 100% discount promo) bypass external payment gateways
         orderData.paymentStatus = 'paid';
-        orderData.status = 'confirmed';
+        orderData.status = 'pending';
         await finalizeOrderPlacement(orderData);
         return;
       }

@@ -319,7 +319,7 @@ export default {
             },
             body: JSON.stringify({
               payment_status: 'paid',
-              status: 'confirmed',
+              status: 'pending',
               updated_at: new Date().toISOString(),
             }),
           });

@@ -186,6 +186,7 @@ interface AdminState {
     trackingNumber?: string,
     notes?: string
   ) => void;
+  updateOrderPaymentStatus: (orderId: string, paymentStatus: AdminOrder['paymentStatus']) => void;
   deleteOrder: (orderId: string) => Promise<void>;
   clearAllOrders: () => Promise<void>;
   syncNewOrder: (placedOrder: PlacedOrder) => void;
@@ -964,6 +965,15 @@ export const useAdminStore = create<AdminState>()(
         }
       },
 
+      updateOrderPaymentStatus: (orderId, paymentStatus) => {
+        set((state) => ({
+          orders: state.orders.map((ord) => {
+            if (ord.orderId !== orderId) return ord;
+            return { ...ord, paymentStatus };
+          }),
+        }));
+      },
+
       deleteOrder: async (orderId: string) => {
         set((state) => ({
           orders: state.orders.filter((o) => o.orderId !== orderId),
@@ -1067,7 +1077,7 @@ export const useAdminStore = create<AdminState>()(
         const isBank = placedOrder.paymentMethod.toLowerCase().includes('bank');
         const newAdminOrder: AdminOrder = {
           ...placedOrder,
-          status: isBank ? 'pending' : (placedOrder.status || 'confirmed'),
+          status: placedOrder.status || 'pending',
           paymentStatus: isCOD ? 'pending_cod' : isBank ? 'pending_bank' : (placedOrder.paymentStatus || 'paid'),
           courierPartner: placedOrder.courierPartner || 'Sri Lanka Post',
           trackingNumber: placedOrder.trackingNumber,

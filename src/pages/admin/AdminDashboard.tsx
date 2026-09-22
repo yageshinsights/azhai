@@ -421,10 +421,12 @@ export default function AdminDashboard() {
                             ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
                             : order.status === 'shipped'
                             ? 'bg-blue-50 text-blue-800 border border-blue-200'
+                            : order.status === 'pending'
+                            ? 'bg-amber-50 text-amber-900 border border-amber-300'
                             : 'bg-[#701626]/10 text-[#701626] border border-[#701626]/20'
                         }`}
                       >
-                        {order.status}
+                        {order.status === 'pending' ? 'Pending Review' : order.status}
                       </span>
                     </td>
                     <td className="p-3.5 text-right whitespace-nowrap">

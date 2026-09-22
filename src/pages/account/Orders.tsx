@@ -83,6 +83,13 @@ export default function Orders() {
 
   const getStatusBadge = (status?: string) => {
     switch (status) {
+      case 'pending':
+        return (
+          <span className="text-[10px] bg-amber-50 text-amber-900 font-bold px-2.5 py-0.5 rounded-full border border-amber-300 inline-flex items-center gap-1">
+            <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+            Pending Review
+          </span>
+        );
       case 'processing':
         return (
           <span className="text-[10px] bg-amber-50 text-amber-900 font-bold px-2.5 py-0.5 rounded-full border border-amber-200">

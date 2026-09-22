@@ -55,6 +55,13 @@ export default function AdminOrders() {
 
   const getStatusBadge = (status: OrderStatus) => {
     switch (status) {
+      case 'pending':
+        return (
+          <span className="bg-amber-50 text-amber-900 border border-amber-300 px-3 py-1 rounded-full font-bold text-[10.5px] whitespace-nowrap inline-flex items-center gap-1.5">
+            <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+            Pending Review
+          </span>
+        );
       case 'confirmed':
         return <span className="bg-emerald-50 text-emerald-800 border border-emerald-200 px-3 py-1 rounded-full font-bold text-[10.5px] whitespace-nowrap inline-block">Confirmed</span>;
       case 'processing':
@@ -124,6 +131,7 @@ export default function AdminOrders() {
                 className="w-full px-4 py-2.5 rounded-2xl bg-[#F7F4EE]/70 border border-[#C5A059]/30 text-xs text-[#110B0E] font-medium focus:outline-none focus:border-[#701626]"
               >
                 <option value="all">All Statuses ({orders.length})</option>
+                <option value="pending">Pending Review</option>
                 <option value="confirmed">Confirmed</option>
                 <option value="processing">Atelier Packing</option>
                 <option value="shipped">In Transit</option>

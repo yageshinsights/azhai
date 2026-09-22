@@ -129,7 +129,7 @@ export default function OrderSuccess() {
         useCartStore.getState().setLastOrder({
           ...curLast,
           paymentStatus: 'paid',
-          status: 'confirmed',
+          status: 'pending',
         });
       }
 
@@ -139,7 +139,7 @@ export default function OrderSuccess() {
           .from('orders')
           .update({
             payment_status: 'paid',
-            status: 'confirmed',
+            status: 'pending',
           })
           .eq('order_code', orderId)
           .then(({ error }) => {
@@ -156,8 +156,8 @@ export default function OrderSuccess() {
         body: JSON.stringify({ orderId }),
       }).catch((err) => console.warn('[Confirm Card Order API Notice]:', err));
 
-      // 3. Update status in local Admin store if present
-      useAdminStore.getState().updateOrderStatus(orderId, 'confirmed');
+      // 3. Update payment status in local Admin store if present
+      useAdminStore.getState().updateOrderPaymentStatus(orderId, 'paid');
     }
   }, [location.search, orderId]);
 
@@ -321,7 +321,7 @@ export default function OrderSuccess() {
 
       sendBrevoEmail({
         to: [{ email: order.customer.email, name: order.customer.fullName || 'Valued Patron' }],
-        subject: `✨ Order Confirmed #${order.orderId} — Azhai Boutique by Preethi`,
+        subject: `✨ Order Received #${order.orderId} — Azhai Boutique by Preethi`,
         htmlContent: emailHtml,
       }).catch((err) => console.error('[Brevo Card Confirmation Email Error]:', err));
 
@@ -516,13 +516,13 @@ export default function OrderSuccess() {
                 </div>
                 <span className="text-[10px] uppercase tracking-[0.3em] text-[#701626] font-bold bg-[#701626]/8 border border-[#C5A059]/30 px-4 py-1.5 rounded-full inline-flex items-center gap-1.5">
                   <Crown className="w-3.5 h-3.5 text-[#C5A059]" />
-                  <span>Order Confirmed &amp; Placed</span>
+                  <span>Order Received · Under Atelier Review</span>
                 </span>
                 <h1 className="font-display text-4xl sm:text-5xl font-bold text-[#110B0E]">
                   Thank You, {order.customer.fullName.split(' ')[0]}!
                 </h1>
                 <p className="text-sm text-[#6D6268] max-w-md mx-auto font-light leading-relaxed">
-                  Your order <strong className="text-[#701626] font-bold">#{order.orderId}</strong> has been received and is being prepared with dedication by our Colombo atelier.
+                  Your order <strong className="text-[#701626] font-bold">#{order.orderId}</strong> has been received by our Colombo atelier. Our team will verify your details and officially confirm your order shortly.
                 </p>
               </div>
             );
@@ -553,11 +553,11 @@ export default function OrderSuccess() {
                 </div>
                 <div className="min-w-0">
                   <p className="text-xs font-bold text-[#110B0E] flex items-center gap-1.5">
-                    <span>Confirmation Dispatched to Email</span>
+                    <span>Order Receipt Dispatched to Email</span>
                     <Sparkles className="w-3 h-3 text-[#C5A059]" />
                   </p>
                   <p className="text-[11px] text-[#6D6268] truncate">
-                    We sent your receipt, tailoring breakdown &amp; tracking updates to <strong className="text-[#701626]">{order.customer.email}</strong>.
+                    We sent your initial receipt and order details to <strong className="text-[#701626]">{order.customer.email}</strong>.
                   </p>
                 </div>
               </motion.div>

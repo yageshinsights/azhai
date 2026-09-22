@@ -57,13 +57,20 @@ export default function OrderDetail({ order, onBack }: OrderDetailProps) {
       })
     : 'Recently';
 
-  const currentStatus = liveOrder.status || 'confirmed';
+  const currentStatus = liveOrder.status || 'pending';
   const courier = liveOrder.courierPartner || 'Sri Lanka Post Speed Post';
   const trackingNumber = liveOrder.trackingNumber;
 
   // Dynamic status badges
   const getStatusBadge = () => {
     switch (currentStatus) {
+      case 'pending':
+        return (
+          <span className="bg-amber-50 text-amber-900 text-[10px] font-bold px-3 py-1 rounded-full border border-amber-300 inline-flex items-center gap-1.5">
+            <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+            Pending Atelier Review
+          </span>
+        );
       case 'processing':
         return (
           <span className="bg-amber-50 text-amber-900 text-[10px] font-bold px-3 py-1 rounded-full border border-amber-200">
@@ -106,7 +113,7 @@ export default function OrderDetail({ order, onBack }: OrderDetailProps) {
 
   const steps = [
     {
-      title: 'Order Confirmed',
+      title: currentStatus === 'pending' ? 'Order Placed (Under Review)' : 'Order Confirmed',
       time: formattedDate,
       completed: isConfirmed,
       icon: CheckCircle2,

@@ -423,14 +423,14 @@ export function buildOrderConfirmationHtml(order: {
 
   const body = `
     <div style="text-align: center; margin-bottom: 24px;">
-      <span style="background-color: ${isBankTransfer ? '#FFF8E1' : '#E8F5E9'}; color: ${isBankTransfer ? '#B78103' : '#2E7D32'}; font-size: 10px; font-weight: bold; text-transform: uppercase; letter-spacing: 2px; padding: 4px 14px; border-radius: 20px;">
-        ${isBankTransfer ? 'Awaiting Bank Deposit · Order Reserved' : `Order Placed #${order.orderId}`}
+      <span style="background-color: ${isBankTransfer ? '#FFF8E1' : '#FFF3E0'}; color: ${isBankTransfer ? '#B78103' : '#E65100'}; font-size: 10px; font-weight: bold; text-transform: uppercase; letter-spacing: 2px; padding: 4px 14px; border-radius: 20px;">
+        ${isBankTransfer ? 'Awaiting Bank Deposit · Order Reserved' : `Awaiting Review · Order Received #${order.orderId}`}
       </span>
       <h2 style="font-family: Georgia, serif; color: #110B0E; font-size: 25px; margin: 12px 0 6px 0;">Thank you, ${firstName}</h2>
       <p style="color: #6D6268; font-size: 13px; margin: 0; line-height: 1.6;">
         ${isBankTransfer 
           ? 'Your handcrafted pieces have been reserved. Please complete your bank transfer using the instructions below.' 
-          : 'Your handcrafted order has been received by our Colombo atelier and is being carefully tailored for dispatch.'}
+          : 'Your handcrafted order has been received by our Colombo atelier and is under review. Our team will verify your details and officially confirm your order shortly.'}
       </p>
     </div>
 
@@ -462,6 +462,88 @@ export function buildOrderConfirmationHtml(order: {
       </a>
     </div>
   `;
+  return wrapEmailLayout(`Order Received #${order.orderId}`, body);
+}
+
+// ─────────────────────────────────────────────────────────────
+// 2b. 🎉 OFFICIAL ORDER CONFIRMATION & APPROVAL (Admin Dispatched)
+// ─────────────────────────────────────────────────────────────
+export function buildOrderApprovedHtml(order: {
+  orderId: string;
+  customerName: string;
+  total: number;
+  items: { name: string; size?: string; quantity: number; price: string; image?: string; tailoring?: any }[];
+  deliveryMethod?: string;
+  paymentMethod?: string;
+}): string {
+  const firstName = order.customerName ? order.customerName.split(' ')[0] : 'Valued Patron';
+
+  const itemsHtml = (order.items || [])
+    .map(
+      (item) => `
+      <tr>
+        <td style="padding: 14px 0; border-bottom: 1px solid #E5E0D8; vertical-align: top; width: 75px;">
+          <img 
+            src="${item.image || 'https://images.unsplash.com/photo-1610030469983-98e550d6193c?auto=format&fit=crop&w=300&q=80'}" 
+            alt="${item.name}" 
+            style="width: 68px; height: 86px; object-fit: cover; border-radius: 12px; border: 1px solid #DFBF77; display: block;" 
+          />
+        </td>
+        <td style="padding: 14px 12px; border-bottom: 1px solid #E5E0D8; vertical-align: top;">
+          <strong style="color: #110B0E; font-size: 13.5px; font-family: Georgia, serif;">${item.name}</strong><br>
+          <span style="font-size: 11px; color: #6D6268;">Size: <strong style="color: #701626;">${item.size || 'M'}</strong> | Qty: ${item.quantity}</span>
+          ${
+            item.tailoring
+              ? `<div style="margin-top: 6px; font-size: 10px; color: #701626; font-weight: bold; background: #F7F4EE; padding: 4px 8px; border-radius: 6px; border: 1px solid #DFBF77; display: inline-block;">
+                  ✂️ Bespoke Custom Fitting (${item.tailoring.leadTime || '4-7 days'})
+                 </div>`
+              : ''
+          }
+        </td>
+        <td style="padding: 14px 0; border-bottom: 1px solid #E5E0D8; vertical-align: top; text-align: right; color: #701626; font-weight: bold; font-size: 13.5px; white-space: nowrap;">
+          ${item.price}
+        </td>
+      </tr>
+    `
+    )
+    .join('');
+
+  const body = `
+    <div style="text-align: center; margin-bottom: 24px;">
+      <span style="background-color: #E8F5E9; color: #2E7D32; font-size: 10px; font-weight: bold; text-transform: uppercase; letter-spacing: 2px; padding: 4px 14px; border-radius: 20px;">
+        ✨ Officially Confirmed &amp; Approved
+      </span>
+      <h2 style="font-family: Georgia, serif; color: #110B0E; font-size: 25px; margin: 12px 0 6px 0;">Great News, ${firstName}!</h2>
+      <p style="color: #6D6268; font-size: 13px; margin: 0; line-height: 1.6;">
+        Preethi and our Colombo atelier have reviewed and approved your order <strong>#${order.orderId}</strong>. Your creations are now entering atelier preparation.
+      </p>
+    </div>
+
+    <!-- Itemized Products Table -->
+    <div style="background-color: #FCFBF8; border-radius: 18px; border: 1px solid #DFBF77; padding: 20px; margin-bottom: 24px;">
+      <h3 style="font-size: 11px; text-transform: uppercase; letter-spacing: 2px; color: #701626; margin: 0 0 14px 0; font-weight: bold;">
+        Confirmed Garments
+      </h3>
+      <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
+        ${itemsHtml}
+      </table>
+
+      <div style="margin-top: 18px; padding-top: 14px; border-top: 2px solid #701626; text-align: right;">
+        <p style="font-size: 18px; font-weight: bold; color: #701626; margin: 0; font-family: Georgia, serif;">
+          Total: LKR ${order.total.toLocaleString()}
+        </p>
+        ${order.paymentMethod ? `<p style="font-size: 11px; color: #6D6268; margin: 6px 0 0 0;">Payment: <strong>${order.paymentMethod}</strong></p>` : ''}
+        ${order.deliveryMethod ? `<p style="font-size: 11px; color: #6D6268; margin: 2px 0 0 0;">Delivery: <strong>${order.deliveryMethod}</strong></p>` : ''}
+      </div>
+    </div>
+
+    <div style="text-align: center;">
+      <a href="${STORE_URL}/account?tab=orders" style="display: inline-block; background: linear-gradient(135deg, #701626 0%, #8E1E34 100%); color: #ffffff; font-size: 11.5px; font-weight: bold; text-transform: uppercase; letter-spacing: 2px; padding: 13px 26px; border-radius: 12px; text-decoration: none; box-shadow: 0 4px 15px rgba(112, 22, 38, 0.2);">
+        Track Live in My Orders →
+      </a>
+    </div>
+  `;
+
   return wrapEmailLayout(`Order Confirmed #${order.orderId}`, body);
 }
 
