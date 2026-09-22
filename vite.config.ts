@@ -144,7 +144,7 @@ export default defineConfig(({ mode }) => {
                     url: data.url,
                     paymentId: data.payment?.id,
                     status: data.status,
-                    error: data.message,
+                    error: data.error || data.message,
                   }));
                 } catch (err: any) {
                   res.statusCode = 500;
@@ -218,6 +218,115 @@ export default defineConfig(({ mode }) => {
                   res.end(JSON.stringify(data));
                 } catch (err: any) {
                   res.statusCode = 500;
+                  res.setHeader('Content-Type', 'application/json');
+                  res.end(JSON.stringify({ error: err.message }));
+                }
+              });
+            } else {
+              next();
+            }
+          });
+
+          // ── Confirm Card Order Dev Proxy ───────────────────────────
+          server.middlewares.use('/api/confirm-card-order', (req, res, next) => {
+            if (req.method === 'POST') {
+              let body = '';
+              req.on('data', (c) => { body += c; });
+              req.on('end', async () => {
+                try {
+                  const { orderId } = JSON.parse(body);
+                  if (!orderId) {
+                    res.statusCode = 400;
+                    res.setHeader('Content-Type', 'application/json');
+                    res.end(JSON.stringify({ error: 'Order ID is required' }));
+                    return;
+                  }
+                  const sUrl = env.VITE_SUPABASE_URL || 'https://hrmcxxcrnxqhesiywqsc.supabase.co';
+                  const sKey = env.SUPABASE_SERVICE_ROLE_KEY || env.VITE_SUPABASE_ANON_KEY || 'sb_publishable_-ZSOc4XGHM2OysLhqKZ5yQ_4OPgdcAm';
+
+                  const patchRes = await fetch(`${sUrl}/rest/v1/orders?order_code=eq.${encodeURIComponent(orderId)}`, {
+                    method: 'PATCH',
+                    headers: {
+                      'apikey': sKey,
+                      'Authorization': `Bearer ${sKey}`,
+                      'Content-Type': 'application/json',
+                      'Prefer': 'return=representation',
+                    },
+                    body: JSON.stringify({
+                      payment_status: 'paid',
+                      status: 'confirmed',
+                      updated_at: new Date().toISOString(),
+                    }),
+                  });
+                  const updated = await patchRes.json();
+                  res.statusCode = 200;
+                  res.setHeader('Content-Type', 'application/json');
+                  res.end(JSON.stringify({ success: true, updated }));
+                } catch (err: any) {
+                  res.statusCode = 500;
+                  res.setHeader('Content-Type', 'application/json');
+                  res.end(JSON.stringify({ error: err.message }));
+                }
+              });
+            } else {
+              next();
+            }
+          });
+
+          // ── Payments.lk Webhook Dev Proxy ──────────────────────────
+          server.middlewares.use('/api/payments-lk-webhook', (req, res, next) => {
+            if (req.method === 'POST') {
+              let body = '';
+              req.on('data', (c) => { body += c; });
+              req.on('end', async () => {
+                try {
+                  const event = JSON.parse(body);
+                  const sUrl = env.VITE_SUPABASE_URL || 'https://hrmcxxcrnxqhesiywqsc.supabase.co';
+                  const sKey = env.SUPABASE_SERVICE_ROLE_KEY || env.VITE_SUPABASE_ANON_KEY || 'sb_publishable_-ZSOc4XGHM2OysLhqKZ5yQ_4OPgdcAm';
+
+                  if (event.type === 'payment.succeeded') {
+                    const reference = event.data?.reference;
+                    const paymentId = event.data?.id;
+                    if (reference && sUrl) {
+                      await fetch(`${sUrl}/rest/v1/orders?order_code=eq.${encodeURIComponent(reference)}`, {
+                        method: 'PATCH',
+                        headers: {
+                          'apikey': sKey,
+                          'Authorization': `Bearer ${sKey}`,
+                          'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                          payment_status: 'paid',
+                          status: 'confirmed',
+                          admin_notes: `Paid via Payments.lk 3DS (Payment ID: ${paymentId})`,
+                          updated_at: new Date().toISOString(),
+                        }),
+                      });
+                    }
+                  } else if (event.type === 'refund.succeeded') {
+                    const reference = event.data?.reference;
+                    if (reference && sUrl) {
+                      await fetch(`${sUrl}/rest/v1/orders?order_code=eq.${encodeURIComponent(reference)}`, {
+                        method: 'PATCH',
+                        headers: {
+                          'apikey': sKey,
+                          'Authorization': `Bearer ${sKey}`,
+                          'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                          payment_status: 'refunded',
+                          admin_notes: `Refunded via Payments.lk (${event.data?.id})`,
+                          updated_at: new Date().toISOString(),
+                        }),
+                      });
+                    }
+                  }
+
+                  res.statusCode = 200;
+                  res.setHeader('Content-Type', 'application/json');
+                  res.end(JSON.stringify({ received: true }));
+                } catch (err: any) {
+                  res.statusCode = 400;
                   res.setHeader('Content-Type', 'application/json');
                   res.end(JSON.stringify({ error: err.message }));
                 }

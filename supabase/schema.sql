@@ -132,7 +132,7 @@ CREATE TABLE IF NOT EXISTS public.orders (
   cost_price NUMERIC,
   delivery_method TEXT NOT NULL,
   payment_method TEXT NOT NULL,
-  payment_status TEXT DEFAULT 'pending_cod' CHECK (payment_status IN ('paid', 'pending_cod', 'pending_bank', 'refunded')),
+  payment_status TEXT DEFAULT 'pending_cod' CHECK (payment_status IN ('paid', 'pending_card', 'pending_cod', 'pending_bank', 'refunded')),
   bank_transfer_details JSONB,
   status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'confirmed', 'processing', 'shipped', 'delivered', 'cancelled')),
   courier_partner TEXT,
@@ -262,14 +262,15 @@ CREATE POLICY "Public Products Read" ON public.products FOR SELECT USING (true);
 CREATE POLICY "Public Store Settings Read" ON public.store_settings FOR SELECT USING (true);
 CREATE POLICY "Public Coupons Read" ON public.coupons FOR SELECT USING (true);
 
--- 2. Orders & Order Items (Public Insert for guest/customer checkout, admin/auth update)
+-- 2. Orders & Order Items (Public Insert for guest/customer checkout, admin/client update & delete)
 CREATE POLICY "Public Orders Read" ON public.orders FOR SELECT USING (true);
 CREATE POLICY "Public Orders Insert" ON public.orders FOR INSERT WITH CHECK (true);
-CREATE POLICY "Admin Orders Modify" ON public.orders FOR UPDATE USING (auth.role() IN ('authenticated', 'service_role'));
+CREATE POLICY "Admin Orders Modify" ON public.orders FOR UPDATE USING (auth.role() IN ('authenticated', 'service_role', 'anon')) WITH CHECK (auth.role() IN ('authenticated', 'service_role', 'anon'));
+CREATE POLICY "Admin Orders Delete" ON public.orders FOR DELETE USING (auth.role() IN ('authenticated', 'service_role', 'anon'));
 
 CREATE POLICY "Public Order Items Read" ON public.order_items FOR SELECT USING (true);
 CREATE POLICY "Public Order Items Insert" ON public.order_items FOR INSERT WITH CHECK (true);
-CREATE POLICY "Admin Order Items Modify" ON public.order_items FOR ALL USING (auth.role() IN ('authenticated', 'service_role'));
+CREATE POLICY "Admin Order Items Modify" ON public.order_items FOR ALL USING (auth.role() IN ('authenticated', 'service_role', 'anon')) WITH CHECK (auth.role() IN ('authenticated', 'service_role', 'anon'));
 
 -- 3. Admin Writes for Catalog & Settings (Requires authenticated admin or service_role)
 -- NOTE: In local development without Supabase Auth session, you can temporarily allow anon writes by setting auth.role() IN ('authenticated', 'service_role', 'anon').
@@ -513,7 +514,7 @@ ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS bank_transfer_details JSONB;
 DO $$ 
 BEGIN
   ALTER TABLE public.orders DROP CONSTRAINT IF EXISTS orders_payment_status_check;
-  ALTER TABLE public.orders ADD CONSTRAINT orders_payment_status_check CHECK (payment_status IN ('paid', 'pending_cod', 'pending_bank', 'refunded'));
+  ALTER TABLE public.orders ADD CONSTRAINT orders_payment_status_check CHECK (payment_status IN ('paid', 'pending_card', 'pending_cod', 'pending_bank', 'refunded'));
 EXCEPTION WHEN OTHERS THEN NULL;
 END $$;
 

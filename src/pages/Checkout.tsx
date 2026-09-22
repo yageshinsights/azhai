@@ -301,6 +301,7 @@ export default function Checkout() {
               image_url: item.image || null,
               size: sizeLabel,
               quantity: Number(item.quantity) || 1,
+              custom_measurements: item.tailoring || null,
             };
           });
 
@@ -501,6 +502,7 @@ export default function Checkout() {
               cost_price: Math.round(orderData.subtotal * 0.45),
               delivery_method: orderData.deliveryMethod,
               payment_method: 'Online Card & LankaQR (Payments.lk)',
+              payment_status: 'pending_card',
               status: 'pending',
               courier_partner: orderData.courierPartner || 'Sri Lanka Post',
               tracking_number: orderData.trackingNumber || null,
@@ -521,6 +523,7 @@ export default function Checkout() {
               image_url: item.image || null,
               size: item.tailoring ? `Tailored (${item.tailoring.sizeLabel}) - ${item.tailoring.fabricName}` : item.size || 'M',
               quantity: Number(item.quantity) || 1,
+              custom_measurements: item.tailoring || null,
             }));
             await supabase.from('order_items').insert(orderItemsPayload);
           }

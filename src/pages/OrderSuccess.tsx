@@ -16,6 +16,10 @@ import { compressToWebP } from '@/lib/image-compressor';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import { 
   sendBrevoEmail, 
+  buildOrderConfirmationHtml,
+  buildAdminOrderAlertHtml,
+  createOrUpdateBrevoContact,
+  BREVO_LISTS,
   buildBankSlipReceivedCustomerHtml, 
   buildBankSlipAdminAlertHtml 
 } from '@/lib/brevo';
@@ -119,7 +123,17 @@ export default function OrderSuccess() {
       // 1. Clear cart upon verified return
       useCartStore.getState().clearCart();
 
-      // 2. Update status in Supabase if configured
+      // Update in-memory lastOrder to paid
+      const curLast = useCartStore.getState().lastOrder;
+      if (curLast && (!curLast.orderId || curLast.orderId === orderId)) {
+        useCartStore.getState().setLastOrder({
+          ...curLast,
+          paymentStatus: 'paid',
+          status: 'confirmed',
+        });
+      }
+
+      // 2. Update status in Supabase if configured (client-side + server fallback)
       if (isSupabaseConfigured()) {
         supabase
           .from('orders')
@@ -134,6 +148,13 @@ export default function OrderSuccess() {
             }
           });
       }
+
+      // Server endpoint fallback to guarantee database update
+      fetch('/api/confirm-card-order', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orderId }),
+      }).catch((err) => console.warn('[Confirm Card Order API Notice]:', err));
 
       // 3. Update status in local Admin store if present
       useAdminStore.getState().updateOrderStatus(orderId, 'confirmed');
@@ -258,6 +279,92 @@ export default function OrderSuccess() {
     return lastOrder || null;
   }, [orderId, lastOrder, authOrders, adminOrders, dbOrder]);
 
+  // Trigger Brevo receipt and admin alert for verified Payments.lk card returns
+  useEffect(() => {
+    const searchParams = new URLSearchParams(location.search);
+    const isPaymentSuccess = searchParams.get('payments_lk') === 'success';
+
+    if (!isPaymentSuccess || !orderId || !order || !order.customer?.email) return;
+
+    const dispatchKey = `azhai_card_email_dispatched_${orderId}`;
+    if (sessionStorage.getItem(dispatchKey)) return;
+    sessionStorage.setItem(dispatchKey, 'true');
+
+    try {
+      const emailHtml = buildOrderConfirmationHtml({
+        orderId: order.orderId,
+        customerName: order.customer.fullName || 'Valued Patron',
+        total: order.total,
+        items: (order.items || []).map((i: any) => ({
+          name: i.name,
+          size: i.size,
+          quantity: i.quantity,
+          price: i.price,
+          image: i.image,
+          tailoring: i.tailoring,
+        })),
+        deliveryMethod: order.deliveryMethod || 'Sri Lanka Post',
+        paymentMethod: order.paymentMethod || 'Online Card & LankaQR (Payments.lk)',
+      });
+
+      createOrUpdateBrevoContact({
+        email: order.customer.email,
+        name: order.customer.fullName || 'Valued Patron',
+        attributes: {
+          CITY: order.customer.city || '',
+          DISTRICT: order.customer.district || '',
+          SMS: order.customer.phone || '',
+          LAST_ORDER_ID: order.orderId,
+        },
+        listIds: [BREVO_LISTS.CUSTOMERS],
+      }).catch((err) => console.error('[Brevo Contact Sync Error]:', err));
+
+      sendBrevoEmail({
+        to: [{ email: order.customer.email, name: order.customer.fullName || 'Valued Patron' }],
+        subject: `✨ Order Confirmed #${order.orderId} — Azhai Boutique by Preethi`,
+        htmlContent: emailHtml,
+      }).catch((err) => console.error('[Brevo Card Confirmation Email Error]:', err));
+
+      const adminEmail = import.meta.env.VITE_ADMIN_NOTIFICATION_EMAIL || 'orders@azhaiclothing.lk';
+      const adminHtml = buildAdminOrderAlertHtml({
+        orderId: order.orderId,
+        customerName: order.customer.fullName || 'Valued Patron',
+        customerEmail: order.customer.email,
+        customerPhone: order.customer.phone || '',
+        customerAddress: order.customer.address || '',
+        city: order.customer.city || '',
+        district: order.customer.district || '',
+        total: order.total,
+        items: (order.items || []).map((i: any) => ({
+          name: i.name,
+          size: i.size,
+          quantity: i.quantity,
+          price: i.price,
+          image: i.image,
+          tailoring: i.tailoring,
+        })),
+        deliveryMethod: order.deliveryMethod || 'Sri Lanka Post',
+        paymentMethod: order.paymentMethod || 'Online Card & LankaQR (Payments.lk)',
+      });
+
+      sendBrevoEmail({
+        to: [{ email: adminEmail, name: 'Azhai Store Owner' }],
+        subject: `🛍️ Paid Card Order Received #${order.orderId} (LKR ${order.total.toLocaleString()})`,
+        htmlContent: adminHtml,
+      }).catch((err) => console.error('[Brevo Card Admin Alert Error]:', err));
+
+      if (isSupabaseConfigured() && order.customer.email) {
+        supabase
+          .from('abandoned_carts')
+          .delete()
+          .eq('customer_email', order.customer.email.toLowerCase().trim())
+          .then();
+      }
+    } catch (err) {
+      console.error('[Card Payment Confirmation Email Exception]:', err);
+    }
+  }, [location.search, orderId, order]);
+
   if (!order) {
     return (
       <div className="min-h-screen bg-[#FCFBF8] pt-32 sm:pt-36 xl:pt-40 pb-32 sm:pb-24 text-[#110B0E]">
@@ -304,8 +411,55 @@ export default function OrderSuccess() {
           transition={{ duration: 0.5 }}
           className="rounded-[2.5rem] bg-white border border-[#C5A059]/40 shadow-2xl p-6 sm:p-12 text-center space-y-8"
         >
-          {/* Top Celebration Badge */}
+          {/* Top Celebration / Status Badge */}
           {(() => {
+            const searchParams = new URLSearchParams(location.search);
+            const isPaymentSuccess = searchParams.get('payments_lk') === 'success';
+            const isPaymentFailed = 
+              searchParams.get('payments_lk') === 'failed' || 
+              searchParams.get('payments_lk') === 'cancelled' || 
+              searchParams.get('status') === 'cancelled';
+            const isCardOrder = Boolean(order.paymentMethod && order.paymentMethod.toLowerCase().includes('card'));
+            const isCardPending = isCardOrder && order.paymentStatus === 'pending_card' && !isPaymentSuccess;
+
+            if (isPaymentFailed || isCardPending) {
+              return (
+                <div className="space-y-4">
+                  <div className="w-20 h-20 rounded-full bg-amber-50 border border-amber-200 flex items-center justify-center mx-auto shadow-sm">
+                    <AlertCircle className="w-10 h-10 text-amber-600" />
+                  </div>
+                  <span className="text-[10px] uppercase tracking-[0.25em] font-bold px-4 py-1.5 rounded-full inline-flex items-center gap-1.5 bg-amber-50 text-amber-900 border border-amber-300">
+                    <AlertCircle className="w-3.5 h-3.5 text-amber-600" />
+                    <span>Payment Incomplete / Cancelled</span>
+                  </span>
+                  <h1 className="font-display text-3xl sm:text-4xl font-bold text-[#110B0E]">
+                    Payment Was Not Completed
+                  </h1>
+                  <p className="text-sm text-[#6D6268] max-w-md mx-auto font-light leading-relaxed">
+                    Your card payment session for order <strong className="text-[#701626] font-bold">#{order.orderId}</strong> was not completed or was cancelled. Your selected creations are temporarily held. You can complete your order using another method or retry your card.
+                  </p>
+                  <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
+                    <Link
+                      to={`/checkout?status=cancelled&order_id=${order.orderId}`}
+                      className="w-full sm:w-auto px-6 py-3 rounded-full bg-[#701626] hover:bg-[#8E1E34] text-white text-xs font-bold uppercase tracking-widest transition-all shadow-md flex items-center justify-center gap-2"
+                    >
+                      <RefreshCw className="w-3.5 h-3.5" />
+                      <span>Retry Payment at Checkout</span>
+                    </Link>
+                    <a
+                      href={`https://wa.me/${activeWhatsAppDigits}?text=${encodeURIComponent(`Hi Preethi, I tried placing card order #${order.orderId} but the payment was not completed. Could you assist me with completing this order?`)}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="w-full sm:w-auto px-6 py-3 rounded-full bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold uppercase tracking-widest transition-all shadow-md flex items-center justify-center gap-2"
+                    >
+                      <MessageCircle className="w-3.5 h-3.5" />
+                      <span>WhatsApp Concierge</span>
+                    </a>
+                  </div>
+                </div>
+              );
+            }
+
             const isBankTransfer = 
               order.paymentStatus === 'pending_bank' ||
               (order.paymentMethod && order.paymentMethod.toLowerCase().includes('bank')) ||
@@ -375,25 +529,40 @@ export default function OrderSuccess() {
           })()}
 
           {/* Email Confirmation Alert Banner */}
-          <motion.div 
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2 }}
-            className="p-4 sm:p-5 rounded-2xl bg-[#FCFBF8] border border-[#DFBF77] flex items-center gap-3.5 text-left shadow-xs"
-          >
-            <div className="w-10 h-10 rounded-xl bg-[#701626]/10 text-[#701626] flex items-center justify-center shrink-0">
-              <Mail className="w-5 h-5" />
-            </div>
-            <div className="min-w-0">
-              <p className="text-xs font-bold text-[#110B0E] flex items-center gap-1.5">
-                <span>Confirmation Dispatched to Email</span>
-                <Sparkles className="w-3 h-3 text-[#C5A059]" />
-              </p>
-              <p className="text-[11px] text-[#6D6268] truncate">
-                We sent your receipt, tailoring breakdown &amp; tracking updates to <strong className="text-[#701626]">{order.customer.email}</strong>.
-              </p>
-            </div>
-          </motion.div>
+          {(() => {
+            const searchParams = new URLSearchParams(location.search);
+            const isPaymentSuccess = searchParams.get('payments_lk') === 'success';
+            const isPaymentFailed = 
+              searchParams.get('payments_lk') === 'failed' || 
+              searchParams.get('payments_lk') === 'cancelled' || 
+              searchParams.get('status') === 'cancelled';
+            const isCardOrder = Boolean(order.paymentMethod && order.paymentMethod.toLowerCase().includes('card'));
+            const isCardPending = isCardOrder && order.paymentStatus === 'pending_card' && !isPaymentSuccess;
+
+            if (isPaymentFailed || isCardPending) return null;
+
+            return (
+              <motion.div 
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.2 }}
+                className="p-4 sm:p-5 rounded-2xl bg-[#FCFBF8] border border-[#DFBF77] flex items-center gap-3.5 text-left shadow-xs"
+              >
+                <div className="w-10 h-10 rounded-xl bg-[#701626]/10 text-[#701626] flex items-center justify-center shrink-0">
+                  <Mail className="w-5 h-5" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-xs font-bold text-[#110B0E] flex items-center gap-1.5">
+                    <span>Confirmation Dispatched to Email</span>
+                    <Sparkles className="w-3 h-3 text-[#C5A059]" />
+                  </p>
+                  <p className="text-[11px] text-[#6D6268] truncate">
+                    We sent your receipt, tailoring breakdown &amp; tracking updates to <strong className="text-[#701626]">{order.customer.email}</strong>.
+                  </p>
+                </div>
+              </motion.div>
+            );
+          })()}
 
           {/* Dedicated Direct Bank Transfer Deposit Instructions & Slip Upload */}
           {(() => {

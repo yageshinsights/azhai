@@ -618,6 +618,7 @@ export const useAdminStore = create<AdminState>()(
                 image: item.image_url || '',
                 quantity: item.quantity,
                 size: item.size,
+                tailoring: item.custom_measurements || undefined,
               })),
               subtotal: Number(o.subtotal),
               discount: Number(o.discount || 0),

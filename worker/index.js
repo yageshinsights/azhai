@@ -284,6 +284,50 @@ export default {
       }
     }
 
+    // ── 4b. Confirm Card Order (Server-Side Fallback) ──────────
+    if (url.pathname === '/api/confirm-card-order') {
+      if (request.method === 'POST') {
+        try {
+          const { orderId } = await request.json();
+          if (!orderId) {
+            return new Response(JSON.stringify({ error: 'Order ID is required' }), {
+              status: 400,
+              headers: { 'Content-Type': 'application/json', ...corsHeaders },
+            });
+          }
+
+          const supabaseUrl = env.VITE_SUPABASE_URL || 'https://hrmcxxcrnxqhesiywqsc.supabase.co';
+          const supabaseKey = env.SUPABASE_SERVICE_ROLE_KEY || env.VITE_SUPABASE_ANON_KEY || 'sb_publishable_-ZSOc4XGHM2OysLhqKZ5yQ_4OPgdcAm';
+
+          const patchRes = await fetch(`${supabaseUrl}/rest/v1/orders?order_code=eq.${encodeURIComponent(orderId)}`, {
+            method: 'PATCH',
+            headers: {
+              'apikey': supabaseKey,
+              'Authorization': `Bearer ${supabaseKey}`,
+              'Content-Type': 'application/json',
+              'Prefer': 'return=representation',
+            },
+            body: JSON.stringify({
+              payment_status: 'paid',
+              status: 'confirmed',
+              updated_at: new Date().toISOString(),
+            }),
+          });
+
+          const updated = await patchRes.json();
+          return new Response(JSON.stringify({ success: true, updated }), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json', ...corsHeaders },
+          });
+        } catch (err) {
+          return new Response(JSON.stringify({ error: err.message }), {
+            status: 500,
+            headers: { 'Content-Type': 'application/json', ...corsHeaders },
+          });
+        }
+      }
+    }
+
     // ── 5. Payments.lk Webhook Receiver ────────────────────────
     if (url.pathname === '/api/payments-lk-webhook') {
       if (request.method === 'POST') {
@@ -292,33 +336,49 @@ export default {
           const signatureHeader = request.headers.get('payments-signature');
           const webhookSecret = env.PAYMENTS_LK_WEBHOOK_SECRET;
 
-          // If webhook secret configured, verify signature
-          if (webhookSecret && signatureHeader) {
+          // If webhook secret configured, strictly verify signature
+          if (webhookSecret) {
+            if (!signatureHeader) {
+              return new Response(JSON.stringify({ error: 'Missing payments-signature header' }), { 
+                status: 400, 
+                headers: { 'Content-Type': 'application/json', ...corsHeaders } 
+              });
+            }
+
             const parts = Object.fromEntries(signatureHeader.split(',').map((p) => p.split('=')));
             const t = Number(parts.t);
             const toleranceSeconds = 300;
-            if (t && Math.abs(Date.now() / 1000 - t) <= toleranceSeconds) {
-              const encoder = new TextEncoder();
-              const key = await crypto.subtle.importKey(
-                'raw',
-                encoder.encode(webhookSecret),
-                { name: 'HMAC', hash: 'SHA-256' },
-                false,
-                ['sign']
-              );
-              const signatureBuffer = await crypto.subtle.sign('HMAC', key, encoder.encode(`${t}.${rawBody}`));
-              const expectedHex = Array.from(new Uint8Array(signatureBuffer))
-                .map((b) => b.toString(16).padStart(2, '0'))
-                .join('');
-              if (expectedHex.toLowerCase() !== (parts.v1 || '').toLowerCase()) {
-                return new Response('Invalid webhook signature', { status: 400, headers: corsHeaders });
-              }
+
+            if (!t || isNaN(t) || Math.abs(Date.now() / 1000 - t) > toleranceSeconds) {
+              return new Response(JSON.stringify({ error: 'Webhook timestamp expired or invalid' }), { 
+                status: 400, 
+                headers: { 'Content-Type': 'application/json', ...corsHeaders } 
+              });
+            }
+
+            const encoder = new TextEncoder();
+            const key = await crypto.subtle.importKey(
+              'raw',
+              encoder.encode(webhookSecret),
+              { name: 'HMAC', hash: 'SHA-256' },
+              false,
+              ['sign']
+            );
+            const signatureBuffer = await crypto.subtle.sign('HMAC', key, encoder.encode(`${t}.${rawBody}`));
+            const expectedHex = Array.from(new Uint8Array(signatureBuffer))
+              .map((b) => b.toString(16).padStart(2, '0'))
+              .join('');
+            if (expectedHex.toLowerCase() !== (parts.v1 || '').toLowerCase()) {
+              return new Response(JSON.stringify({ error: 'Invalid webhook signature' }), { 
+                status: 400, 
+                headers: { 'Content-Type': 'application/json', ...corsHeaders } 
+              });
             }
           }
 
           const event = JSON.parse(rawBody);
           const supabaseUrl = env.VITE_SUPABASE_URL || 'https://hrmcxxcrnxqhesiywqsc.supabase.co';
-          const supabaseKey = env.VITE_SUPABASE_ANON_KEY || 'sb_publishable_-ZSOc4XGHM2OysLhqKZ5yQ_4OPgdcAm';
+          const supabaseKey = env.SUPABASE_SERVICE_ROLE_KEY || env.VITE_SUPABASE_ANON_KEY || 'sb_publishable_-ZSOc4XGHM2OysLhqKZ5yQ_4OPgdcAm';
 
           if (event.type === 'payment.succeeded') {
             const reference = event.data?.reference;
@@ -336,6 +396,7 @@ export default {
                   payment_status: 'paid',
                   status: 'confirmed',
                   admin_notes: `Paid via Payments.lk 3DS (Payment ID: ${paymentId})`,
+                  updated_at: new Date().toISOString(),
                 }),
               });
             }
@@ -352,6 +413,7 @@ export default {
                 body: JSON.stringify({
                   payment_status: 'refunded',
                   admin_notes: `Refunded via Payments.lk (${event.data?.id})`,
+                  updated_at: new Date().toISOString(),
                 }),
               });
             }
