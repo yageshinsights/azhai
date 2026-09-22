@@ -325,7 +325,7 @@ export default {
             const paymentId = event.data?.id;
 
             if (reference && supabaseUrl) {
-              await fetch(`${supabaseUrl}/rest/v1/orders?order_id=eq.${encodeURIComponent(reference)}`, {
+              await fetch(`${supabaseUrl}/rest/v1/orders?order_code=eq.${encodeURIComponent(reference)}`, {
                 method: 'PATCH',
                 headers: {
                   'apikey': supabaseKey,
@@ -342,7 +342,7 @@ export default {
           } else if (event.type === 'refund.succeeded') {
             const reference = event.data?.reference;
             if (reference && supabaseUrl) {
-              await fetch(`${supabaseUrl}/rest/v1/orders?order_id=eq.${encodeURIComponent(reference)}`, {
+              await fetch(`${supabaseUrl}/rest/v1/orders?order_code=eq.${encodeURIComponent(reference)}`, {
                 method: 'PATCH',
                 headers: {
                   'apikey': supabaseKey,
