@@ -70,23 +70,11 @@ export async function initiatePaymentsLkCheckout(
     const origin = window.location.origin;
     const amountCents = Math.round(params.amount * 100);
 
-    let cleanPhone = (params.customer.phone || '').replace(/[^\d+]/g, '').trim();
-    if (cleanPhone && cleanPhone.startsWith('0')) {
-      cleanPhone = '+94' + cleanPhone.slice(1);
-    } else if (cleanPhone && !cleanPhone.startsWith('+')) {
-      cleanPhone = '+94' + cleanPhone;
-    }
-
     const payload = {
       orderId: params.orderId,
       amountCents,
       description: params.description || `Azhai Boutique Order #${params.orderId}`,
       reference: params.orderId,
-      customer: {
-        name: params.customer.name,
-        email: params.customer.email,
-        phone: cleanPhone && cleanPhone.length >= 9 ? cleanPhone : undefined,
-      },
       successUrl: params.successUrl || `${origin}/order-success/${params.orderId}?payments_lk=success`,
       cancelUrl: params.cancelUrl || `${origin}/checkout?status=cancelled&order_id=${params.orderId}`,
     };

@@ -114,34 +114,18 @@ export default {
             );
           }
 
-            const finalSuccessUrl = successUrl || `${url.origin}/order-success/${orderId}?payments_lk=success`;
-            const finalCancelUrl = cancelUrl || `${url.origin}/checkout?status=cancelled&order_id=${orderId}`;
+          const finalSuccessUrl = successUrl || `${url.origin}/order-success/${orderId}?payments_lk=success`;
+          const finalCancelUrl = cancelUrl || `${url.origin}/checkout?status=cancelled&order_id=${orderId}`;
 
-            let cleanPhone = (customer?.phone || '').replace(/[^\d+]/g, '').trim();
-            if (cleanPhone && cleanPhone.startsWith('0')) {
-              cleanPhone = '+94' + cleanPhone.slice(1);
-            } else if (cleanPhone && !cleanPhone.startsWith('+')) {
-              cleanPhone = '+94' + cleanPhone;
-            }
+          const checkoutPayload = {
+            amountCents: Math.round(Number(amountCents)),
+            description: description || `Azhai Order #${orderId}`,
+            reference: String(orderId),
+            successUrl: finalSuccessUrl,
+            cancelUrl: finalCancelUrl,
+          };
 
-            const customerPayload = customer
-              ? {
-                  name: customer.name ? String(customer.name).trim() : undefined,
-                  email: customer.email ? String(customer.email).trim() : undefined,
-                  phone: cleanPhone && cleanPhone.length >= 9 ? cleanPhone : undefined,
-                }
-              : undefined;
-
-            const checkoutPayload = {
-              amountCents: Math.round(Number(amountCents)),
-              description: description || `Azhai Order #${orderId}`,
-              reference: String(orderId),
-              customer: customerPayload,
-              successUrl: finalSuccessUrl,
-              cancelUrl: finalCancelUrl,
-            };
-
-          let pResp = await fetch('https://api.payments.lk/v1/checkouts', {
+          const pResp = await fetch('https://api.payments.lk/v1/checkouts', {
             method: 'POST',
             headers: {
               'Authorization': `Bearer ${secretKey}`,
@@ -151,39 +135,7 @@ export default {
             body: JSON.stringify(checkoutPayload),
           });
 
-          let pData = await pResp.json();
-
-          // Resilient fallback: If gateway rejects payload and customer object was included, retry without customer
-          if (!pResp.ok && checkoutPayload.customer) {
-            console.warn('[Payments.lk] Retrying checkout creation without customer payload due to gateway response:', pData);
-            const fallbackPayload = {
-              amountCents: checkoutPayload.amountCents,
-              description: checkoutPayload.description,
-              reference: checkoutPayload.reference,
-              successUrl: checkoutPayload.successUrl,
-              cancelUrl: checkoutPayload.cancelUrl,
-            };
-
-            const retryResp = await fetch('https://api.payments.lk/v1/checkouts', {
-              method: 'POST',
-              headers: {
-                'Authorization': `Bearer ${secretKey}`,
-                'Idempotency-Key': `order-${orderId}-nocust`,
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify(fallbackPayload),
-            });
-
-            if (retryResp.ok) {
-              pResp = retryResp;
-              pData = await retryResp.json();
-            } else {
-              const retryData = await retryResp.json().catch(() => ({}));
-              console.warn('[Payments.lk] Fallback payload also rejected:', retryData);
-              pData = retryData;
-              pResp = retryResp;
-            }
-          }
+          const pData = await pResp.json();
 
           if (!pResp.ok) {
             const errDetail = typeof pData === 'object' ? JSON.stringify(pData) : String(pData);

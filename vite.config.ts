@@ -122,44 +122,15 @@ export default defineConfig(({ mode }) => {
                       'Content-Type': 'application/json',
                     },
                     body: JSON.stringify({
-                      amountCents: parsed.amountCents,
+                      amountCents: Math.round(Number(parsed.amountCents)),
                       description: parsed.description,
                       reference: String(parsed.orderId),
-                      customer: parsed.customer,
                       successUrl: parsed.successUrl,
                       cancelUrl: parsed.cancelUrl,
                     }),
                   });
-                  let data: any = await pResp.json();
-
-                  if (!pResp.ok && parsed.customer) {
-                    const retryResp = await fetch('https://api.payments.lk/v1/checkouts', {
-                      method: 'POST',
-                      headers: {
-                        'Authorization': `Bearer ${paymentsLkSecret}`,
-                        'Idempotency-Key': `order-${parsed.orderId}-nocust`,
-                        'Content-Type': 'application/json',
-                      },
-                      body: JSON.stringify({
-                        amountCents: parsed.amountCents,
-                        description: parsed.description,
-                        reference: String(parsed.orderId),
-                        successUrl: parsed.successUrl,
-                        cancelUrl: parsed.cancelUrl,
-                      }),
-                    });
-
-                    if (retryResp.ok) {
-                      res.statusCode = 200;
-                      data = await retryResp.json();
-                    } else {
-                      res.statusCode = pResp.status;
-                      data = await retryResp.json().catch(() => data);
-                    }
-                  } else {
-                    res.statusCode = pResp.status;
-                  }
-
+                  const data: any = await pResp.json();
+                  res.statusCode = pResp.status;
                   res.setHeader('Content-Type', 'application/json');
                   const errDetail = typeof data === 'object' ? JSON.stringify(data) : String(data);
                   res.end(JSON.stringify({
