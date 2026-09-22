@@ -36,7 +36,10 @@ export interface PaymentsLkCheckoutResult {
 }
 
 export interface PaymentsLkRefundParams {
-  paymentId: string;
+  paymentId?: string;
+  orderId?: string;
+  reference?: string;
+  adminNotes?: string;
   amountCents: number; // e.g. 1450000 for LKR 14,500
   reason?: string;
 }

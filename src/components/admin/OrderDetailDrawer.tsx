@@ -55,6 +55,15 @@ import {
 } from '@/lib/slpost-calculator';
 import { requestPaymentsLkRefund } from '@/lib/payments-lk';
 
+function extractPaymentIdFromNotes(notes?: string): string {
+  if (!notes) return '';
+  const match =
+    notes.match(/Payment ID:\s*([a-zA-Z0-9_\-]+)/i) ||
+    notes.match(/pay_[a-zA-Z0-9_\-]+/i) ||
+    notes.match(/payment[_-]?id[:\s]+([a-zA-Z0-9_\-]+)/i);
+  return match ? (match[1] || match[0]) : '';
+}
+
 interface OrderDetailDrawerProps {
   order: AdminOrder | null;
   isOpen: boolean;
@@ -75,6 +84,7 @@ export default function OrderDetailDrawer({ order, isOpen, onClose }: OrderDetai
   const [isUploadingAdminSlip, setIsUploadingAdminSlip] = useState(false);
   const [slipModalUrl, setSlipModalUrl] = useState<string | null>(null);
   const [isRefundModalOpen, setIsRefundModalOpen] = useState(false);
+  const [refundPaymentId, setRefundPaymentId] = useState('');
   const [refundAmountLKR, setRefundAmountLKR] = useState<number>(order?.total || 0);
   const [refundReason, setRefundReason] = useState('Customer requested return/cancellation');
   const [isProcessingRefund, setIsProcessingRefund] = useState(false);
@@ -87,8 +97,13 @@ export default function OrderDetailDrawer({ order, isOpen, onClose }: OrderDetai
       setAdminNotes(order.adminNotes || '');
       setAdminBankNotes(order.bankTransferDetails?.notes || '');
       setRefundAmountLKR(order.total);
+      const initialPid =
+        (order as any).paymentId ||
+        (order as any).paymentsLkPaymentId ||
+        extractPaymentIdFromNotes(order.adminNotes);
+      setRefundPaymentId(initialPid || '');
     }
-  }, [order?.orderId, order?.total]);
+  }, [order?.orderId, order?.total, order?.adminNotes]);
 
   if (!isOpen || !order) return null;
 
@@ -342,13 +357,21 @@ export default function OrderDetailDrawer({ order, isOpen, onClose }: OrderDetai
       return;
     }
 
+    const trimmedPid = refundPaymentId.trim();
+    if (trimmedPid && trimmedPid.startsWith('AZH-')) {
+      alert(`"${trimmedPid}" is the Order Reference code, not a Payments.lk transaction ID. Please enter the Payment ID (which usually starts with "pay_") from your Payments.lk Merchant Portal, or leave it blank to attempt auto-resolution.`);
+      return;
+    }
+
     setIsProcessingRefund(true);
     try {
       const amountCents = Math.round(refundAmountLKR * 100);
-      const paymentId = (order as any).paymentId || (order as any).paymentsLkPaymentId || order.orderId;
 
       const res = await requestPaymentsLkRefund({
-        paymentId,
+        paymentId: trimmedPid || undefined,
+        orderId: order.orderId,
+        reference: order.orderId,
+        adminNotes: order.adminNotes,
         amountCents,
         reason: refundReason,
       });
@@ -361,7 +384,8 @@ export default function OrderDetailDrawer({ order, isOpen, onClose }: OrderDetai
       // Update Order Status to Refunded in Admin store
       const isFullRefund = refundAmountLKR >= order.total;
       const newStatus = isFullRefund ? 'cancelled' : order.status;
-      const refundNote = `Refunded LKR ${refundAmountLKR.toLocaleString()} via Payments.lk on ${new Date().toLocaleDateString()} (${refundReason})`;
+      const resolvedPid = res.data?.paymentId || trimmedPid;
+      const refundNote = `Refunded LKR ${refundAmountLKR.toLocaleString()} via Payments.lk on ${new Date().toLocaleDateString()} (${refundReason})${resolvedPid ? ` [Payment ID: ${resolvedPid}]` : ''}`;
       const updatedAdminNotes = adminNotes ? `${adminNotes}\n${refundNote}` : refundNote;
 
       updateOrderStatus(order.orderId, newStatus, courierPartner, trackingNumber, updatedAdminNotes);
@@ -712,12 +736,26 @@ export default function OrderDetailDrawer({ order, isOpen, onClose }: OrderDetai
                             {order.orderId}
                           </strong>
                         </div>
+                        {((order as any).paymentId || extractPaymentIdFromNotes(order.adminNotes)) && (
+                          <div>
+                            <span className="text-[11px] text-[#6D6268] block">Payment ID</span>
+                            <strong className="font-mono text-xs text-[#701626]">
+                              {(order as any).paymentId || extractPaymentIdFromNotes(order.adminNotes)}
+                            </strong>
+                          </div>
+                        )}
 
                         {isPaid && !isRefunded && (
                           <button
                             type="button"
                             onClick={() => {
                               setRefundAmountLKR(order.total);
+                              const detected =
+                                (order as any).paymentId ||
+                                (order as any).paymentsLkPaymentId ||
+                                extractPaymentIdFromNotes(order.adminNotes) ||
+                                '';
+                              setRefundPaymentId(detected);
                               setIsRefundModalOpen(true);
                             }}
                             className="px-3.5 py-2 bg-rose-700 hover:bg-rose-800 text-white text-xs font-bold uppercase tracking-wider rounded-xl transition-all shadow-xs flex items-center gap-1.5 cursor-pointer ml-auto"
@@ -1107,6 +1145,33 @@ export default function OrderDetailDrawer({ order, isOpen, onClose }: OrderDetai
               </div>
 
               <div className="space-y-4">
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <label className="block text-[11px] font-bold text-[#110B0E] uppercase tracking-wider">
+                      Payments.lk Transaction ID (Payment ID)
+                    </label>
+                    {refundPaymentId && !refundPaymentId.startsWith('AZH-') ? (
+                      <span className="text-[10px] text-emerald-700 font-bold bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                        ✓ Auto-detected
+                      </span>
+                    ) : (
+                      <span className="text-[10px] text-amber-700 font-semibold bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200">
+                        Required for Gateway
+                      </span>
+                    )}
+                  </div>
+                  <input
+                    type="text"
+                    placeholder="e.g. pay_281a8b9c... or leave blank for auto-lookup"
+                    value={refundPaymentId}
+                    onChange={(e) => setRefundPaymentId(e.target.value)}
+                    className="w-full px-3.5 py-2 text-xs font-mono font-bold rounded-xl bg-white border border-[#C5A059]/40 focus:outline-none focus:border-[#701626]"
+                  />
+                  <p className="text-[10px] text-[#6D6268]">
+                    Found in your <strong className="text-[#110B0E]">Payments.lk Merchant Portal</strong> under <em>Payments &gt; Transactions</em>.
+                  </p>
+                </div>
+
                 <div className="space-y-1.5">
                   <label className="block text-[11px] font-bold text-[#110B0E] uppercase tracking-wider">
                     Refund Amount (LKR) *

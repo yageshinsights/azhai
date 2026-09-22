@@ -186,7 +186,7 @@ interface AdminState {
     trackingNumber?: string,
     notes?: string
   ) => void;
-  updateOrderPaymentStatus: (orderId: string, paymentStatus: AdminOrder['paymentStatus']) => void;
+  updateOrderPaymentStatus: (orderId: string, paymentStatus: AdminOrder['paymentStatus'], paymentId?: string) => void;
   deleteOrder: (orderId: string) => Promise<void>;
   clearAllOrders: () => Promise<void>;
   syncNewOrder: (placedOrder: PlacedOrder) => void;
@@ -610,35 +610,46 @@ export const useAdminStore = create<AdminState>()(
           if (ordersFetchErr) {
             console.error('[Supabase Fetch Orders Error]:', ordersFetchErr);
           } else if (dbOrders) {
-            const mappedOrders: AdminOrder[] = dbOrders.map((o: any) => ({
-              orderId: o.order_code,
-              items: (o.order_items || []).map((item: any) => ({
-                id: item.product_id || 0,
-                name: item.product_name,
-                price: item.price,
-                image: item.image_url || '',
-                quantity: item.quantity,
-                size: item.size,
-                tailoring: item.custom_measurements || undefined,
-              })),
-              subtotal: Number(o.subtotal),
-              discount: Number(o.discount || 0),
-              shipping: Number(o.shipping || 0),
-              total: Number(o.total),
-              coupon: o.coupon_code || undefined,
-              giftNote: o.gift_note || undefined,
-              customer: o.customer_details,
-              deliveryMethod: o.delivery_method,
-              paymentMethod: o.payment_method,
-              placedAt: o.created_at,
-              status: o.status as OrderStatus,
-              paymentStatus: o.payment_status,
-              courierPartner: o.courier_partner || undefined,
-              trackingNumber: o.tracking_number || undefined,
-              adminNotes: o.admin_notes || undefined,
-              bankTransferDetails: o.customer_details?.bank_transfer_details || o.bank_transfer_details || undefined,
-              costPrice: o.cost_price ? Number(o.cost_price) : Math.round(Number(o.subtotal) * 0.45),
-            }));
+            const mappedOrders: AdminOrder[] = dbOrders.map((o: any) => {
+              const extractedPaymentId =
+                o.payment_id ||
+                (o.admin_notes
+                  ? o.admin_notes.match(/Payment ID:\s*([a-zA-Z0-9_\-]+)/i)?.[1] ||
+                    o.admin_notes.match(/pay_[a-zA-Z0-9_\-]+/i)?.[0]
+                  : undefined);
+
+              return {
+                orderId: o.order_code,
+                items: (o.order_items || []).map((item: any) => ({
+                  id: item.product_id || 0,
+                  name: item.product_name,
+                  price: item.price,
+                  image: item.image_url || '',
+                  quantity: item.quantity,
+                  size: item.size,
+                  tailoring: item.custom_measurements || undefined,
+                })),
+                subtotal: Number(o.subtotal),
+                discount: Number(o.discount || 0),
+                shipping: Number(o.shipping || 0),
+                total: Number(o.total),
+                coupon: o.coupon_code || undefined,
+                giftNote: o.gift_note || undefined,
+                customer: o.customer_details,
+                deliveryMethod: o.delivery_method,
+                paymentMethod: o.payment_method,
+                placedAt: o.created_at,
+                status: o.status as OrderStatus,
+                paymentStatus: o.payment_status,
+                paymentId: extractedPaymentId || undefined,
+                paymentsLkPaymentId: extractedPaymentId || undefined,
+                courierPartner: o.courier_partner || undefined,
+                trackingNumber: o.tracking_number || undefined,
+                adminNotes: o.admin_notes || undefined,
+                bankTransferDetails: o.customer_details?.bank_transfer_details || o.bank_transfer_details || undefined,
+                costPrice: o.cost_price ? Number(o.cost_price) : Math.round(Number(o.subtotal) * 0.45),
+              };
+            });
 
             // Supabase is the single source of truth for orders
             set({ orders: mappedOrders });
@@ -965,11 +976,23 @@ export const useAdminStore = create<AdminState>()(
         }
       },
 
-      updateOrderPaymentStatus: (orderId, paymentStatus) => {
+      updateOrderPaymentStatus: (orderId, paymentStatus, paymentId) => {
         set((state) => ({
           orders: state.orders.map((ord) => {
             if (ord.orderId !== orderId) return ord;
-            return { ...ord, paymentStatus };
+            const updatedAdminNotes =
+              paymentId && !ord.adminNotes?.includes(paymentId)
+                ? ord.adminNotes
+                  ? `${ord.adminNotes}\nPayment ID: ${paymentId}`
+                  : `Payment ID: ${paymentId}`
+                : ord.adminNotes;
+            return {
+              ...ord,
+              paymentStatus,
+              paymentId: paymentId || ord.paymentId,
+              paymentsLkPaymentId: paymentId || ord.paymentsLkPaymentId,
+              adminNotes: updatedAdminNotes,
+            };
           }),
         }));
       },

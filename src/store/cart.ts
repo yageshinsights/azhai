@@ -88,6 +88,8 @@ export interface PlacedOrder {
     deliveryTimeline?: string;
   };
   adminNotes?: string;
+  paymentId?: string;
+  paymentsLkPaymentId?: string;
   paymentStatus?: 'paid' | 'pending_cod' | 'pending_bank' | 'pending_card' | 'refunded' | 'partially_refunded';
   bankTransferDetails?: {
     bankId?: string;

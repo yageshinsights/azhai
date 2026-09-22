@@ -118,6 +118,13 @@ export default function OrderSuccess() {
   useEffect(() => {
     const searchParams = new URLSearchParams(location.search);
     const isPaymentSuccess = searchParams.get('payments_lk') === 'success';
+    const returnedPaymentId =
+      searchParams.get('payment_id') ||
+      searchParams.get('paymentId') ||
+      searchParams.get('id') ||
+      searchParams.get('transaction_id') ||
+      searchParams.get('checkout_id') ||
+      undefined;
 
     if (isPaymentSuccess && orderId) {
       // 1. Clear cart upon verified return
@@ -130,17 +137,24 @@ export default function OrderSuccess() {
           ...curLast,
           paymentStatus: 'paid',
           status: 'pending',
+          paymentId: returnedPaymentId || curLast.paymentId,
+          paymentsLkPaymentId: returnedPaymentId || curLast.paymentsLkPaymentId,
         });
       }
 
       // 2. Update status in Supabase if configured (client-side + server fallback)
       if (isSupabaseConfigured()) {
+        const updatePayload: Record<string, any> = {
+          payment_status: 'paid',
+          status: 'pending',
+        };
+        if (returnedPaymentId) {
+          updatePayload.admin_notes = `Paid via Payments.lk 3DS (Payment ID: ${returnedPaymentId})`;
+        }
+
         supabase
           .from('orders')
-          .update({
-            payment_status: 'paid',
-            status: 'pending',
-          })
+          .update(updatePayload)
           .eq('order_code', orderId)
           .then(({ error }) => {
             if (error) {
@@ -153,11 +167,11 @@ export default function OrderSuccess() {
       fetch('/api/confirm-card-order', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ orderId }),
+        body: JSON.stringify({ orderId, paymentId: returnedPaymentId }),
       }).catch((err) => console.warn('[Confirm Card Order API Notice]:', err));
 
       // 3. Update payment status in local Admin store if present
-      useAdminStore.getState().updateOrderPaymentStatus(orderId, 'paid');
+      useAdminStore.getState().updateOrderPaymentStatus(orderId, 'paid', returnedPaymentId);
     }
   }, [location.search, orderId]);
 

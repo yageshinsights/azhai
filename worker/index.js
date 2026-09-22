@@ -288,16 +288,102 @@ export default {
             env.PAYMENTS_LK_SECRET_KEY ||
             'sk_test_A9ybTZkoMw9HrgiAvcAlFNdKqp6Kp7hm';
 
-          const { paymentId, amountCents, reason } = body;
+          let { paymentId, orderId, reference, amountCents, reason, adminNotes } = body;
+          const targetRef = orderId || reference || (paymentId?.startsWith('AZH-') ? paymentId : null);
 
-          if (!paymentId || !amountCents) {
+          if (!amountCents) {
             return new Response(
-              JSON.stringify({ error: 'Missing required refund fields: paymentId, amountCents' }),
+              JSON.stringify({ error: 'Missing required refund field: amountCents' }),
               { status: 400, headers: { 'Content-Type': 'application/json', ...corsHeaders } }
             );
           }
 
-          const idempotencyKey = `refund-${paymentId}-${amountCents}-${Date.now()}`;
+          // Resolve actual Payments.lk payment ID if paymentId is missing or is an order reference
+          let resolvedPaymentId = paymentId;
+          const isOrderRef = !resolvedPaymentId || resolvedPaymentId.startsWith('AZH-') || (targetRef && resolvedPaymentId === targetRef);
+
+          if (isOrderRef) {
+            resolvedPaymentId = null;
+
+            // 1. Try parsing payment ID from passed adminNotes
+            if (adminNotes) {
+              const noteMatch =
+                adminNotes.match(/Payment ID:\s*([a-zA-Z0-9_\-]+)/i) ||
+                adminNotes.match(/pay_[a-zA-Z0-9_\-]+/i);
+              if (noteMatch) {
+                resolvedPaymentId = noteMatch[1] || noteMatch[0];
+              }
+            }
+
+            // 2. Try looking up order in Supabase to read admin_notes or payment_id
+            const supabaseUrl = env.VITE_SUPABASE_URL || 'https://hrmcxxcrnxqhesiywqsc.supabase.co';
+            const supabaseKey = env.SUPABASE_SERVICE_ROLE_KEY || env.VITE_SUPABASE_ANON_KEY;
+
+            if (!resolvedPaymentId && targetRef && supabaseUrl && supabaseKey) {
+              try {
+                const ordLookup = await fetch(
+                  `${supabaseUrl}/rest/v1/orders?order_code=eq.${encodeURIComponent(targetRef)}&select=admin_notes,payment_status`,
+                  {
+                    headers: {
+                      'apikey': supabaseKey,
+                      'Authorization': `Bearer ${supabaseKey}`,
+                    },
+                  }
+                );
+                if (ordLookup.ok) {
+                  const ordRows = await ordLookup.json();
+                  if (ordRows && ordRows[0]?.admin_notes) {
+                    const match =
+                      ordRows[0].admin_notes.match(/Payment ID:\s*([a-zA-Z0-9_\-]+)/i) ||
+                      ordRows[0].admin_notes.match(/pay_[a-zA-Z0-9_\-]+/i);
+                    if (match) {
+                      resolvedPaymentId = match[1] || match[0];
+                    }
+                  }
+                }
+              } catch (dbErr) {
+                console.warn('[Refund paymentId DB lookup warning]:', dbErr);
+              }
+            }
+
+            // 3. Try Payments.lk lookup API for the reference
+            if (!resolvedPaymentId && targetRef) {
+              try {
+                const pLookup = await fetch(
+                  `https://api.payments.lk/v1/payments?reference=${encodeURIComponent(targetRef)}`,
+                  {
+                    headers: {
+                      'Authorization': `Bearer ${secretKey}`,
+                    },
+                  }
+                );
+                if (pLookup.ok) {
+                  const pData = await pLookup.json();
+                  const list = Array.isArray(pData) ? pData : (pData.data || [pData]);
+                  const found = list.find((it) => it && (it.reference === targetRef || it.id));
+                  if (found?.id && !found.id.startsWith('AZH-')) {
+                    resolvedPaymentId = found.id;
+                  }
+                }
+              } catch (pErr) {
+                console.warn('[Refund paymentId Payments.lk API lookup warning]:', pErr);
+              }
+            }
+          }
+
+          // If still no valid payment ID found, return clear, actionable error instead of obscure 400
+          if (!resolvedPaymentId || resolvedPaymentId.startsWith('AZH-')) {
+            return new Response(
+              JSON.stringify({
+                error: `No Payments.lk transaction ID found for order #${targetRef || 'unknown'}. Please provide the Payment ID (e.g. pay_...) from your Payments.lk Merchant Portal.`,
+                code: 'PAYMENT_ID_REQUIRED',
+                orderId: targetRef,
+              }),
+              { status: 400, headers: { 'Content-Type': 'application/json', ...corsHeaders } }
+            );
+          }
+
+          const idempotencyKey = `refund-${resolvedPaymentId}-${amountCents}-${Date.now()}`;
           const refundResp = await fetch('https://api.payments.lk/v1/refunds', {
             method: 'POST',
             headers: {
@@ -306,7 +392,7 @@ export default {
               'Content-Type': 'application/json',
             },
             body: JSON.stringify({
-              paymentId,
+              paymentId: resolvedPaymentId,
               amountCents,
               reason: reason || 'Merchant issued refund via Azhai Admin',
             }),
@@ -315,16 +401,43 @@ export default {
           const refundData = await refundResp.json();
 
           if (!refundResp.ok) {
+            const errorMsg = refundData.message || refundData.error || 'Refund failed at Payments.lk processor';
             return new Response(
-              JSON.stringify({ error: refundData.message || 'Refund failed at Payments.lk processor', details: refundData }),
+              JSON.stringify({
+                error: errorMsg,
+                details: refundData,
+                paymentId: resolvedPaymentId,
+              }),
               { status: refundResp.status, headers: { 'Content-Type': 'application/json', ...corsHeaders } }
             );
           }
 
-          return new Response(JSON.stringify(refundData), {
-            status: 200,
-            headers: { 'Content-Type': 'application/json', ...corsHeaders },
-          });
+          // Automatically sync refund status to Supabase if order code is known
+          const supabaseUrl = env.VITE_SUPABASE_URL || 'https://hrmcxxcrnxqhesiywqsc.supabase.co';
+          const supabaseKey = env.SUPABASE_SERVICE_ROLE_KEY || env.VITE_SUPABASE_ANON_KEY;
+          if (targetRef && supabaseUrl && supabaseKey) {
+            try {
+              await fetch(`${supabaseUrl}/rest/v1/orders?order_code=eq.${encodeURIComponent(targetRef)}`, {
+                method: 'PATCH',
+                headers: {
+                  'apikey': supabaseKey,
+                  'Authorization': `Bearer ${supabaseKey}`,
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                  payment_status: 'refunded',
+                  updated_at: new Date().toISOString(),
+                }),
+              });
+            } catch (dbErr) {
+              console.warn('[Refund DB auto-sync warning]:', dbErr);
+            }
+          }
+
+          return new Response(
+            JSON.stringify({ ...refundData, paymentId: resolvedPaymentId }),
+            { status: 200, headers: { 'Content-Type': 'application/json', ...corsHeaders } }
+          );
         } catch (err) {
           return new Response(
             JSON.stringify({ error: err.message || 'Error executing refund' }),
@@ -392,7 +505,7 @@ export default {
     if (url.pathname === '/api/confirm-card-order') {
       if (request.method === 'POST') {
         try {
-          const { orderId } = await request.json();
+          const { orderId, paymentId } = await request.json();
           if (!orderId) {
             return new Response(JSON.stringify({ error: 'Order ID is required' }), {
               status: 400,
@@ -403,6 +516,15 @@ export default {
           const supabaseUrl = env.VITE_SUPABASE_URL || 'https://hrmcxxcrnxqhesiywqsc.supabase.co';
           const supabaseKey = env.SUPABASE_SERVICE_ROLE_KEY || env.VITE_SUPABASE_ANON_KEY || 'sb_publishable_-ZSOc4XGHM2OysLhqKZ5yQ_4OPgdcAm';
 
+          const patchPayload = {
+            payment_status: 'paid',
+            status: 'pending',
+            updated_at: new Date().toISOString(),
+          };
+          if (paymentId) {
+            patchPayload.admin_notes = `Paid via Payments.lk 3DS (Payment ID: ${paymentId})`;
+          }
+
           const patchRes = await fetch(`${supabaseUrl}/rest/v1/orders?order_code=eq.${encodeURIComponent(orderId)}`, {
             method: 'PATCH',
             headers: {
@@ -411,11 +533,7 @@ export default {
               'Content-Type': 'application/json',
               'Prefer': 'return=representation',
             },
-            body: JSON.stringify({
-              payment_status: 'paid',
-              status: 'pending',
-              updated_at: new Date().toISOString(),
-            }),
+            body: JSON.stringify(patchPayload),
           });
 
           const updated = await patchRes.json();

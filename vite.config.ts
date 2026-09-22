@@ -254,23 +254,102 @@ export default defineConfig(({ mode }) => {
               req.on('end', async () => {
                 try {
                   const parsed = JSON.parse(body);
+                  let { paymentId, orderId, reference, amountCents, reason, adminNotes } = parsed;
+                  const targetRef = orderId || reference || (paymentId?.startsWith('AZH-') ? paymentId : null);
+
+                  if (!amountCents) {
+                    res.statusCode = 400;
+                    res.setHeader('Content-Type', 'application/json');
+                    res.end(JSON.stringify({ error: 'Missing required refund field: amountCents' }));
+                    return;
+                  }
+
+                  let resolvedPaymentId = paymentId;
+                  const isOrderRef = !resolvedPaymentId || resolvedPaymentId.startsWith('AZH-') || (targetRef && resolvedPaymentId === targetRef);
+
+                  if (isOrderRef) {
+                    resolvedPaymentId = null;
+
+                    if (adminNotes) {
+                      const noteMatch =
+                        adminNotes.match(/Payment ID:\s*([a-zA-Z0-9_\-]+)/i) ||
+                        adminNotes.match(/pay_[a-zA-Z0-9_\-]+/i);
+                      if (noteMatch) {
+                        resolvedPaymentId = noteMatch[1] || noteMatch[0];
+                      }
+                    }
+
+                    const sUrl = env.VITE_SUPABASE_URL || 'https://hrmcxxcrnxqhesiywqsc.supabase.co';
+                    const sKey = env.SUPABASE_SERVICE_ROLE_KEY || env.VITE_SUPABASE_ANON_KEY;
+
+                    if (!resolvedPaymentId && targetRef && sUrl && sKey) {
+                      try {
+                        const ordLookup = await fetch(
+                          `${sUrl}/rest/v1/orders?order_code=eq.${encodeURIComponent(targetRef)}&select=admin_notes,payment_status`,
+                          { headers: { apikey: sKey, Authorization: `Bearer ${sKey}` } }
+                        );
+                        if (ordLookup.ok) {
+                          const ordRows: any = await ordLookup.json();
+                          if (ordRows && ordRows[0]?.admin_notes) {
+                            const match =
+                              ordRows[0].admin_notes.match(/Payment ID:\s*([a-zA-Z0-9_\-]+)/i) ||
+                              ordRows[0].admin_notes.match(/pay_[a-zA-Z0-9_\-]+/i);
+                            if (match) resolvedPaymentId = match[1] || match[0];
+                          }
+                        }
+                      } catch (dbErr) {
+                        console.warn('[Vite Proxy Refund DB lookup warning]:', dbErr);
+                      }
+                    }
+
+                    if (!resolvedPaymentId && targetRef) {
+                      try {
+                        const pLookup = await fetch(
+                          `https://api.payments.lk/v1/payments?reference=${encodeURIComponent(targetRef)}`,
+                          { headers: { Authorization: `Bearer ${paymentsLkSecret}` } }
+                        );
+                        if (pLookup.ok) {
+                          const pData: any = await pLookup.json();
+                          const list = Array.isArray(pData) ? pData : (pData?.data || [pData]);
+                          const found = list.find((it: any) => it && (it.reference === targetRef || it.id));
+                          if (found?.id && !found.id.startsWith('AZH-')) {
+                            resolvedPaymentId = found.id;
+                          }
+                        }
+                      } catch (pErr) {
+                        console.warn('[Vite Proxy Refund Payments.lk API lookup warning]:', pErr);
+                      }
+                    }
+                  }
+
+                  if (!resolvedPaymentId || resolvedPaymentId.startsWith('AZH-')) {
+                    res.statusCode = 400;
+                    res.setHeader('Content-Type', 'application/json');
+                    res.end(JSON.stringify({
+                      error: `No Payments.lk transaction ID found for order #${targetRef || 'unknown'}. Please provide the Payment ID (e.g. pay_...) from your Payments.lk Merchant Portal.`,
+                      code: 'PAYMENT_ID_REQUIRED',
+                      orderId: targetRef,
+                    }));
+                    return;
+                  }
+
                   const pResp = await fetch('https://api.payments.lk/v1/refunds', {
                     method: 'POST',
                     headers: {
                       'Authorization': `Bearer ${paymentsLkSecret}`,
-                      'Idempotency-Key': `ref-${parsed.paymentId}-${Date.now()}`,
+                      'Idempotency-Key': `ref-${resolvedPaymentId}-${Date.now()}`,
                       'Content-Type': 'application/json',
                     },
                     body: JSON.stringify({
-                      paymentId: parsed.paymentId,
+                      paymentId: resolvedPaymentId,
                       amountCents: parsed.amountCents,
-                      reason: parsed.reason,
+                      reason: reason || 'Merchant issued refund via Azhai Admin',
                     }),
                   });
-                  const data = await pResp.json();
+                  const data: any = await pResp.json();
                   res.statusCode = pResp.status;
                   res.setHeader('Content-Type', 'application/json');
-                  res.end(JSON.stringify(data));
+                  res.end(JSON.stringify(typeof data === 'object' && data !== null ? { ...data, paymentId: resolvedPaymentId } : data));
                 } catch (err: any) {
                   res.statusCode = 500;
                   res.setHeader('Content-Type', 'application/json');
@@ -324,7 +403,7 @@ export default defineConfig(({ mode }) => {
               req.on('data', (c) => { body += c; });
               req.on('end', async () => {
                 try {
-                  const { orderId } = JSON.parse(body);
+                  const { orderId, paymentId } = JSON.parse(body);
                   if (!orderId) {
                     res.statusCode = 400;
                     res.setHeader('Content-Type', 'application/json');
@@ -334,6 +413,15 @@ export default defineConfig(({ mode }) => {
                   const sUrl = env.VITE_SUPABASE_URL || 'https://hrmcxxcrnxqhesiywqsc.supabase.co';
                   const sKey = env.SUPABASE_SERVICE_ROLE_KEY || env.VITE_SUPABASE_ANON_KEY || 'sb_publishable_-ZSOc4XGHM2OysLhqKZ5yQ_4OPgdcAm';
 
+                  const patchPayload: Record<string, any> = {
+                    payment_status: 'paid',
+                    status: 'pending',
+                    updated_at: new Date().toISOString(),
+                  };
+                  if (paymentId) {
+                    patchPayload.admin_notes = `Paid via Payments.lk 3DS (Payment ID: ${paymentId})`;
+                  }
+
                   const patchRes = await fetch(`${sUrl}/rest/v1/orders?order_code=eq.${encodeURIComponent(orderId)}`, {
                     method: 'PATCH',
                     headers: {
@@ -342,11 +430,7 @@ export default defineConfig(({ mode }) => {
                       'Content-Type': 'application/json',
                       'Prefer': 'return=representation',
                     },
-                    body: JSON.stringify({
-                      payment_status: 'paid',
-                      status: 'pending',
-                      updated_at: new Date().toISOString(),
-                    }),
+                    body: JSON.stringify(patchPayload),
                   });
                   const updated = await patchRes.json();
                   res.statusCode = 200;
