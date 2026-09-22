@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Scissors, 
@@ -8,9 +8,11 @@ import {
   ShoppingBag, 
   Clock, 
   ShieldCheck, 
-  Info,
-  Ruler,
-  ChevronRight
+  Info, 
+  Ruler, 
+  ChevronRight,
+  Maximize2,
+  Minimize2
 } from 'lucide-react';
 import { useCartStore } from '@/store/cart';
 import { useAuthStore } from '@/store/auth';
@@ -237,6 +239,32 @@ export default function BlouseCustomizer() {
   const storeFabrics = useAdminStore((s) => s.tailoringFabrics) || [];
   const storeDressTypes = useAdminStore((s) => s.dressTypes) || [];
 
+  // Mobile sticky compact preview states
+  const [isScrolledOnMobile, setIsScrolledOnMobile] = useState(false);
+  const [isMobileExpanded, setIsMobileExpanded] = useState(false);
+  const sentinelRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const checkMobileScroll = () => {
+      if (window.innerWidth >= 1024) {
+        if (isScrolledOnMobile) setIsScrolledOnMobile(false);
+        return;
+      }
+      if (!sentinelRef.current) return;
+      const rect = sentinelRef.current.getBoundingClientRect();
+      // When the top of the customization workspace passes near the mobile header
+      setIsScrolledOnMobile(rect.top < 85);
+    };
+
+    window.addEventListener('scroll', checkMobileScroll, { passive: true });
+    window.addEventListener('resize', checkMobileScroll, { passive: true });
+    checkMobileScroll();
+    return () => {
+      window.removeEventListener('scroll', checkMobileScroll);
+      window.removeEventListener('resize', checkMobileScroll);
+    };
+  }, [isScrolledOnMobile]);
+
   const blouseDressType = useMemo(() => {
     return storeDressTypes.find(
       (d) => d.slug === 'saree-blouse' || d.name?.toLowerCase().includes('blouse')
@@ -309,6 +337,151 @@ export default function BlouseCustomizer() {
     setTimeout(() => setIsAdded(false), 3000);
   };
 
+  const renderBlouseSvg = () => (
+    <svg
+      viewBox="0 0 200 200"
+      className="w-full h-full drop-shadow-[0_12px_24px_rgba(112,22,38,0.15)]"
+    >
+      <defs>
+        {/* Fabric Texture Gradient */}
+        <linearGradient id="blouseGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stopColor={selectedFabric.hex} />
+          <stop offset="60%" stopColor={selectedFabric.secondaryHex} />
+          <stop offset="100%" stopColor={selectedFabric.hex} />
+        </linearGradient>
+
+        {/* Gold Zari Texture */}
+        <linearGradient id="zariGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+          <stop offset="0%" stopColor="#DFBF77" />
+          <stop offset="50%" stopColor="#FFF2B2" />
+          <stop offset="100%" stopColor="#C5A059" />
+        </linearGradient>
+      </defs>
+
+      {/* ── SLEEVES ── */}
+      {selectedSleeve.id === 'elbow' && (
+        <g id="elbow-sleeves">
+          {/* Left Sleeve */}
+          <path d="M 52,38 L 22,82 L 36,88 L 64,52 Z" fill="url(#blouseGrad)" stroke="#3A0812" strokeWidth="0.8" />
+          <path d="M 22,82 L 20,86 L 34,92 L 36,88 Z" fill="url(#zariGrad)" stroke="#9E7D3B" strokeWidth="0.5" />
+          {/* Right Sleeve */}
+          <path d="M 148,38 L 178,82 L 164,88 L 136,52 Z" fill="url(#blouseGrad)" stroke="#3A0812" strokeWidth="0.8" />
+          <path d="M 178,82 L 180,86 L 166,92 L 164,88 Z" fill="url(#zariGrad)" stroke="#9E7D3B" strokeWidth="0.5" />
+        </g>
+      )}
+
+      {selectedSleeve.id === 'puff' && (
+        <g id="puff-sleeves">
+          {/* Left Puff */}
+          <ellipse cx="40" cy="46" rx="18" ry="14" fill="url(#blouseGrad)" stroke="#3A0812" strokeWidth="0.8" />
+          <path d="M 25,58 L 23,76 L 37,79 L 42,60 Z" fill="url(#blouseGrad)" stroke="#3A0812" strokeWidth="0.8" />
+          <path d="M 23,76 L 22,80 L 36,83 L 37,79 Z" fill="url(#zariGrad)" />
+          {/* Right Puff */}
+          <ellipse cx="160" cy="46" rx="18" ry="14" fill="url(#blouseGrad)" stroke="#3A0812" strokeWidth="0.8" />
+          <path d="M 175,58 L 177,76 L 163,79 L 158,60 Z" fill="url(#blouseGrad)" stroke="#3A0812" strokeWidth="0.8" />
+          <path d="M 177,76 L 178,80 L 164,83 L 163,79 Z" fill="url(#zariGrad)" />
+        </g>
+      )}
+
+      {selectedSleeve.id === 'cap' && (
+        <g id="cap-sleeves">
+          <path d="M 52,38 Q 30,48 42,62 L 64,52 Z" fill="url(#blouseGrad)" stroke="#3A0812" strokeWidth="0.8" />
+          <path d="M 148,38 Q 170,48 158,62 L 136,52 Z" fill="url(#blouseGrad)" stroke="#3A0812" strokeWidth="0.8" />
+        </g>
+      )}
+
+      {selectedSleeve.id === 'full-sheer' && (
+        <g id="full-sheer-sleeves" opacity="0.85">
+          <path d="M 52,38 L 15,135 L 28,138 L 64,52 Z" fill={selectedFabric.hex} fillOpacity="0.4" stroke="#DFBF77" strokeWidth="0.8" />
+          <rect x="14" y="133" width="15" height="6" rx="2" fill="url(#zariGrad)" />
+          <path d="M 148,38 L 185,135 L 172,138 L 136,52 Z" fill={selectedFabric.hex} fillOpacity="0.4" stroke="#DFBF77" strokeWidth="0.8" />
+          <rect x="171" y="133" width="15" height="6" rx="2" fill="url(#zariGrad)" />
+        </g>
+      )}
+
+      {/* ── MAIN BODICE SILHOUETTE ── */}
+      <path
+        d="M 52,38 L 75,32 L 125,32 L 148,38 L 138,105 L 62,105 Z"
+        fill="url(#blouseGrad)"
+        stroke="#2D060E"
+        strokeWidth="1"
+      />
+
+      {/* Front/Back Waistband Zari Trim */}
+      <path d="M 62,101 L 138,101 L 138,105 L 62,105 Z" fill="url(#zariGrad)" stroke="#9E7D3B" strokeWidth="0.5" />
+
+      {/* Princess Cut Seam Lines */}
+      <path d="M 78,48 Q 80,75 74,101" stroke="#3A0812" strokeWidth="0.8" fill="none" opacity="0.6" />
+      <path d="M 122,48 Q 120,75 126,101" stroke="#3A0812" strokeWidth="0.8" fill="none" opacity="0.6" />
+
+      {/* ── FRONT VIEW CUTOUT & DETAILS ── */}
+      {viewSide === 'front' && (
+        <g id="front-neck-render">
+          {/* Neck Cutout */}
+          <path
+            d={selectedFrontNeck.pathD}
+            fill="#F3EDE2"
+            stroke="#DFBF77"
+            strokeWidth={hasPearlPiping ? "2.5" : "1.2"}
+            strokeDasharray={hasPearlPiping ? "2,2" : undefined}
+          />
+
+          {/* Front Placket & Lotus Crest */}
+          <circle cx="100" cy="80" r="1.5" fill="#DFBF77" />
+          <circle cx="100" cy="90" r="1.5" fill="#DFBF77" />
+          <circle cx="100" cy="99" r="1.5" fill="#DFBF77" />
+        </g>
+      )}
+
+      {/* ── BACK VIEW CUTOUT & DETAILS ── */}
+      {viewSide === 'back' && (
+        <g id="back-neck-render">
+          {/* Back Cutout */}
+          <path
+            d={selectedBackCut.pathD}
+            fill={selectedBackCut.id === 'sheer-organza' ? 'rgba(243,237,226,0.5)' : '#F3EDE2'}
+            stroke="#DFBF77"
+            strokeWidth={hasPearlPiping ? "2.5" : "1.2"}
+            strokeDasharray={hasPearlPiping ? "2,2" : undefined}
+          />
+
+          {/* Gold Dori Strings and Latkan Tassels */}
+          {(selectedBackCut.hasDori || hasLatkanTassels) && (
+            <g id="latkan-tassels">
+              {/* Top Tie Bow */}
+              <path d="M 76,36 Q 100,48 124,36" stroke="#DFBF77" strokeWidth="1.5" fill="none" />
+              <circle cx="100" cy="42" r="2.5" fill="#C5A059" />
+
+              {/* Left Hanging Dori & Tassel */}
+              <path d="M 98,42 Q 92,65 88,88" stroke="#DFBF77" strokeWidth="1.2" fill="none" />
+              <path d="M 88,88 L 84,98 L 92,98 Z" fill="url(#zariGrad)" stroke="#9E7D3B" strokeWidth="0.5" />
+              <circle cx="88" cy="100" r="1.5" fill="#701626" />
+
+              {/* Right Hanging Dori & Tassel */}
+              <path d="M 102,42 Q 108,65 112,88" stroke="#DFBF77" strokeWidth="1.2" fill="none" />
+              <path d="M 112,88 L 108,98 L 116,98 Z" fill="url(#zariGrad)" stroke="#9E7D3B" strokeWidth="0.5" />
+              <circle cx="112" cy="100" r="1.5" fill="#701626" />
+            </g>
+          )}
+
+          {/* Closed Back 12 Potli Buttons */}
+          {selectedBackCut.id === 'closed-potli' && (
+            <g id="potli-buttons">
+              {[38, 44, 50, 56, 62, 68, 74, 80, 86, 92, 98].map((y) => (
+                <circle key={y} cx="100" cy={y} r="1.5" fill="#DFBF77" />
+              ))}
+            </g>
+          )}
+        </g>
+      )}
+
+      {/* Scalloped Pearl Trim Accent Indicator */}
+      {hasPearlPiping && (
+        <circle cx="100" cy="32" r="3" fill="#FFF8EE" stroke="#C5A059" strokeWidth="0.5" />
+      )}
+    </svg>
+  );
+
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-8 space-y-8">
       {/* ── Studio Header ── */}
@@ -327,197 +500,145 @@ export default function BlouseCustomizer() {
         </p>
       </div>
 
+      {/* Scroll Detection Sentinel for Mobile Sticky Preview */}
+      <div ref={sentinelRef} className="relative -top-8 h-1 w-full pointer-events-none" />
+
       {/* ── Main 2-Column Atelier Workspace ── */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start relative">
         
         {/* LEFT COLUMN: Interactive 2D Visual Canvas (5 cols) */}
-        <div className="lg:col-span-5 bg-gradient-to-b from-[#FAF8F5] to-[#F3EDE2] rounded-3xl p-6 border border-[#C5A059]/40 shadow-lg sticky top-24 lg:top-28 z-20 self-start space-y-5 text-center">
-          
-          {/* Canvas Top Bar: Flip View & Active Fabric */}
-          <div className="flex items-center justify-between pb-3 border-b border-[#C5A059]/20">
-            <div className="flex items-center gap-2">
-              <span className="w-2.5 h-2.5 rounded-full animate-pulse" style={{ backgroundColor: selectedFabric.hex }} />
-              <span className="text-xs font-bold text-[#110B0E] font-display">
-                {selectedFabric.name}
-              </span>
-            </div>
-
-            {/* Flip Front/Back Button */}
-            <button
-              onClick={() => setViewSide(viewSide === 'front' ? 'back' : 'front')}
-              className="px-3.5 py-1.5 rounded-xl bg-white border border-[#C5A059]/40 hover:bg-[#701626] hover:text-white text-xs font-bold text-[#701626] transition-all flex items-center gap-1.5 shadow-xs cursor-pointer"
-            >
-              <RotateCw className="w-3.5 h-3.5" />
-              <span>{viewSide === 'front' ? 'Flip to Back View' : 'Flip to Front View'}</span>
-            </button>
-          </div>
-
-          {/* ── SVG 2D BLOUSE VECTOR CANVAS ── */}
-          <div className="relative w-full aspect-square max-w-sm mx-auto flex items-center justify-center p-4">
-            <AnimatePresence mode="wait">
-              <motion.div
-                key={viewSide}
-                initial={{ rotateY: 90, opacity: 0 }}
-                animate={{ rotateY: 0, opacity: 1 }}
-                exit={{ rotateY: -90, opacity: 0 }}
-                transition={{ duration: 0.35 }}
-                className="w-full h-full"
+        <div
+          className={`lg:col-span-5 border border-[#C5A059]/40 sticky top-[58px] sm:top-[68px] lg:top-28 z-30 self-start transition-all duration-300 ${
+            isScrolledOnMobile && !isMobileExpanded
+              ? 'p-2 sm:p-2.5 rounded-2xl bg-white/95 backdrop-blur-md shadow-xl'
+              : 'rounded-3xl p-4 sm:p-6 bg-gradient-to-b from-[#FAF8F5] to-[#F3EDE2] shadow-lg text-center'
+          }`}
+        >
+          {/* ── COMPACT STICKY VIEW (Mobile when scrolled into options) ── */}
+          {isScrolledOnMobile && !isMobileExpanded && (
+            <div className="lg:hidden flex items-center justify-between gap-2.5 w-full">
+              {/* Left: Thumbnail + Specs */}
+              <div
+                onClick={() => setIsMobileExpanded(true)}
+                className="flex items-center gap-2.5 min-w-0 cursor-pointer text-left flex-1"
+                title="Tap to enlarge preview"
               >
-                <svg
-                  viewBox="0 0 200 200"
-                  className="w-full h-full drop-shadow-[0_12px_24px_rgba(112,22,38,0.15)]"
+                <div className="w-13 h-13 rounded-xl bg-white border border-[#C5A059]/35 p-1 shrink-0 shadow-xs relative flex items-center justify-center overflow-hidden">
+                  <AnimatePresence mode="wait">
+                    <motion.div
+                      key={viewSide}
+                      initial={{ opacity: 0, scale: 0.85 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      exit={{ opacity: 0, scale: 0.85 }}
+                      transition={{ duration: 0.2 }}
+                      className="w-full h-full"
+                    >
+                      {renderBlouseSvg()}
+                    </motion.div>
+                  </AnimatePresence>
+                </div>
+
+                <div className="min-w-0 space-y-0.5">
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: selectedFabric.hex }} />
+                    <span className="text-[9px] uppercase tracking-wider text-[#701626] font-bold truncate">
+                      {viewSide === 'front' ? 'Front' : 'Back'} · {selectedFabric.name}
+                    </span>
+                  </div>
+                  <h4 className="font-display text-xs font-bold text-[#110B0E] truncate leading-tight">
+                    {viewSide === 'front' ? selectedFrontNeck.name : selectedBackCut.name}
+                  </h4>
+                  <p className="text-[9.5px] text-[#6D6268] truncate leading-tight">
+                    {selectedSleeve.name}
+                  </p>
+                </div>
+              </div>
+
+              {/* Right: Flip View Action & Enlarge Button */}
+              <div className="flex items-center gap-1.5 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setViewSide(viewSide === 'front' ? 'back' : 'front')}
+                  className="px-2.5 py-1.5 rounded-xl bg-[#701626]/10 hover:bg-[#701626] text-[#701626] hover:text-white transition-all flex items-center gap-1 text-[10px] font-bold border border-[#C5A059]/30 cursor-pointer"
+                  title="Flip front/back view"
                 >
-                  <defs>
-                    {/* Fabric Texture Gradient */}
-                    <linearGradient id="blouseGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                      <stop offset="0%" stopColor={selectedFabric.hex} />
-                      <stop offset="60%" stopColor={selectedFabric.secondaryHex} />
-                      <stop offset="100%" stopColor={selectedFabric.hex} />
-                    </linearGradient>
+                  <RotateCw className="w-3 h-3" />
+                  <span>{viewSide === 'front' ? 'Back' : 'Front'}</span>
+                </button>
 
-                    {/* Gold Zari Texture */}
-                    <linearGradient id="zariGrad" x1="0%" y1="0%" x2="100%" y2="0%">
-                      <stop offset="0%" stopColor="#DFBF77" />
-                      <stop offset="50%" stopColor="#FFF2B2" />
-                      <stop offset="100%" stopColor="#C5A059" />
-                    </linearGradient>
-                  </defs>
-
-                  {/* ── SLEEVES ── */}
-                  {selectedSleeve.id === 'elbow' && (
-                    <g id="elbow-sleeves">
-                      {/* Left Sleeve */}
-                      <path d="M 52,38 L 22,82 L 36,88 L 64,52 Z" fill="url(#blouseGrad)" stroke="#3A0812" strokeWidth="0.8" />
-                      <path d="M 22,82 L 20,86 L 34,92 L 36,88 Z" fill="url(#zariGrad)" stroke="#9E7D3B" strokeWidth="0.5" />
-                      {/* Right Sleeve */}
-                      <path d="M 148,38 L 178,82 L 164,88 L 136,52 Z" fill="url(#blouseGrad)" stroke="#3A0812" strokeWidth="0.8" />
-                      <path d="M 178,82 L 180,86 L 166,92 L 164,88 Z" fill="url(#zariGrad)" stroke="#9E7D3B" strokeWidth="0.5" />
-                    </g>
-                  )}
-
-                  {selectedSleeve.id === 'puff' && (
-                    <g id="puff-sleeves">
-                      {/* Left Puff */}
-                      <ellipse cx="40" cy="46" rx="18" ry="14" fill="url(#blouseGrad)" stroke="#3A0812" strokeWidth="0.8" />
-                      <path d="M 25,58 L 23,76 L 37,79 L 42,60 Z" fill="url(#blouseGrad)" stroke="#3A0812" strokeWidth="0.8" />
-                      <path d="M 23,76 L 22,80 L 36,83 L 37,79 Z" fill="url(#zariGrad)" />
-                      {/* Right Puff */}
-                      <ellipse cx="160" cy="46" rx="18" ry="14" fill="url(#blouseGrad)" stroke="#3A0812" strokeWidth="0.8" />
-                      <path d="M 175,58 L 177,76 L 163,79 L 158,60 Z" fill="url(#blouseGrad)" stroke="#3A0812" strokeWidth="0.8" />
-                      <path d="M 177,76 L 178,80 L 164,83 L 163,79 Z" fill="url(#zariGrad)" />
-                    </g>
-                  )}
-
-                  {selectedSleeve.id === 'cap' && (
-                    <g id="cap-sleeves">
-                      <path d="M 52,38 Q 30,48 42,62 L 64,52 Z" fill="url(#blouseGrad)" stroke="#3A0812" strokeWidth="0.8" />
-                      <path d="M 148,38 Q 170,48 158,62 L 136,52 Z" fill="url(#blouseGrad)" stroke="#3A0812" strokeWidth="0.8" />
-                    </g>
-                  )}
-
-                  {selectedSleeve.id === 'full-sheer' && (
-                    <g id="full-sheer-sleeves" opacity="0.85">
-                      <path d="M 52,38 L 15,135 L 28,138 L 64,52 Z" fill={selectedFabric.hex} fillOpacity="0.4" stroke="#DFBF77" strokeWidth="0.8" />
-                      <rect x="14" y="133" width="15" height="6" rx="2" fill="url(#zariGrad)" />
-                      <path d="M 148,38 L 185,135 L 172,138 L 136,52 Z" fill={selectedFabric.hex} fillOpacity="0.4" stroke="#DFBF77" strokeWidth="0.8" />
-                      <rect x="171" y="133" width="15" height="6" rx="2" fill="url(#zariGrad)" />
-                    </g>
-                  )}
-
-                  {/* ── MAIN BODICE SILHOUETTE ── */}
-                  <path
-                    d="M 52,38 L 75,32 L 125,32 L 148,38 L 138,105 L 62,105 Z"
-                    fill="url(#blouseGrad)"
-                    stroke="#2D060E"
-                    strokeWidth="1"
-                  />
-
-                  {/* Front/Back Waistband Zari Trim */}
-                  <path d="M 62,101 L 138,101 L 138,105 L 62,105 Z" fill="url(#zariGrad)" stroke="#9E7D3B" strokeWidth="0.5" />
-
-                  {/* Princess Cut Seam Lines */}
-                  <path d="M 78,48 Q 80,75 74,101" stroke="#3A0812" strokeWidth="0.8" fill="none" opacity="0.6" />
-                  <path d="M 122,48 Q 120,75 126,101" stroke="#3A0812" strokeWidth="0.8" fill="none" opacity="0.6" />
-
-                  {/* ── FRONT VIEW CUTOUT & DETAILS ── */}
-                  {viewSide === 'front' && (
-                    <g id="front-neck-render">
-                      {/* Neck Cutout */}
-                      <path
-                        d={selectedFrontNeck.pathD}
-                        fill="#F3EDE2"
-                        stroke="#DFBF77"
-                        strokeWidth={hasPearlPiping ? "2.5" : "1.2"}
-                        strokeDasharray={hasPearlPiping ? "2,2" : undefined}
-                      />
-
-                      {/* Front Placket & Lotus Crest */}
-                      <circle cx="100" cy="80" r="1.5" fill="#DFBF77" />
-                      <circle cx="100" cy="90" r="1.5" fill="#DFBF77" />
-                      <circle cx="100" cy="99" r="1.5" fill="#DFBF77" />
-                    </g>
-                  )}
-
-                  {/* ── BACK VIEW CUTOUT & DETAILS ── */}
-                  {viewSide === 'back' && (
-                    <g id="back-neck-render">
-                      {/* Back Cutout */}
-                      <path
-                        d={selectedBackCut.pathD}
-                        fill={selectedBackCut.id === 'sheer-organza' ? 'rgba(243,237,226,0.5)' : '#F3EDE2'}
-                        stroke="#DFBF77"
-                        strokeWidth={hasPearlPiping ? "2.5" : "1.2"}
-                        strokeDasharray={hasPearlPiping ? "2,2" : undefined}
-                      />
-
-                      {/* Gold Dori Strings and Latkan Tassels */}
-                      {(selectedBackCut.hasDori || hasLatkanTassels) && (
-                        <g id="latkan-tassels">
-                          {/* Top Tie Bow */}
-                          <path d="M 76,36 Q 100,48 124,36" stroke="#DFBF77" strokeWidth="1.5" fill="none" />
-                          <circle cx="100" cy="42" r="2.5" fill="#C5A059" />
-
-                          {/* Left Hanging Dori & Tassel */}
-                          <path d="M 98,42 Q 92,65 88,88" stroke="#DFBF77" strokeWidth="1.2" fill="none" />
-                          <path d="M 88,88 L 84,98 L 92,98 Z" fill="url(#zariGrad)" stroke="#9E7D3B" strokeWidth="0.5" />
-                          <circle cx="88" cy="100" r="1.5" fill="#701626" />
-
-                          {/* Right Hanging Dori & Tassel */}
-                          <path d="M 102,42 Q 108,65 112,88" stroke="#DFBF77" strokeWidth="1.2" fill="none" />
-                          <path d="M 112,88 L 108,98 L 116,98 Z" fill="url(#zariGrad)" stroke="#9E7D3B" strokeWidth="0.5" />
-                          <circle cx="112" cy="100" r="1.5" fill="#701626" />
-                        </g>
-                      )}
-
-                      {/* Closed Back 12 Potli Buttons */}
-                      {selectedBackCut.id === 'closed-potli' && (
-                        <g id="potli-buttons">
-                          {[38, 44, 50, 56, 62, 68, 74, 80, 86, 92, 98].map((y) => (
-                            <circle key={y} cx="100" cy={y} r="1.5" fill="#DFBF77" />
-                          ))}
-                        </g>
-                      )}
-                    </g>
-                  )}
-
-                  {/* Scalloped Pearl Trim Accent Indicator */}
-                  {hasPearlPiping && (
-                    <circle cx="100" cy="32" r="3" fill="#FFF8EE" stroke="#C5A059" strokeWidth="0.5" />
-                  )}
-                </svg>
-              </motion.div>
-            </AnimatePresence>
-          </div>
-
-          {/* Active Silhouette Summary Pill */}
-          <div className="p-3 bg-white rounded-2xl border border-[#C5A059]/30 text-left space-y-1">
-            <div className="flex justify-between items-center text-xs">
-              <span className="font-bold text-[#110B0E]">Front: {selectedFrontNeck.name}</span>
-              <span className="text-[10px] text-[#701626] font-bold uppercase">{viewSide} view</span>
+                <button
+                  type="button"
+                  onClick={() => setIsMobileExpanded(true)}
+                  className="p-1.5 rounded-xl bg-white hover:bg-gray-100 text-[#110B0E] border border-[#C5A059]/25 cursor-pointer"
+                  title="Enlarge preview"
+                >
+                  <Maximize2 className="w-3.5 h-3.5" />
+                </button>
+              </div>
             </div>
-            <p className="text-[11px] text-[#6D6268]">
-              Back: {selectedBackCut.name} · Sleeve: {selectedSleeve.name}
-            </p>
+          )}
+
+          {/* ── FULL SIZE CANVAS (Desktop always; Mobile when at top or expanded) ── */}
+          <div className={`${isScrolledOnMobile && !isMobileExpanded ? 'hidden lg:block' : 'block'} space-y-4 sm:space-y-5`}>
+            {/* Canvas Top Bar: Flip View & Active Fabric */}
+            <div className="flex items-center justify-between pb-3 border-b border-[#C5A059]/20">
+              <div className="flex items-center gap-2">
+                <span className="w-2.5 h-2.5 rounded-full animate-pulse" style={{ backgroundColor: selectedFabric.hex }} />
+                <span className="text-xs font-bold text-[#110B0E] font-display">
+                  {selectedFabric.name}
+                </span>
+              </div>
+
+              <div className="flex items-center gap-1.5">
+                {/* Flip Front/Back Button */}
+                <button
+                  onClick={() => setViewSide(viewSide === 'front' ? 'back' : 'front')}
+                  className="px-3.5 py-1.5 rounded-xl bg-white border border-[#C5A059]/40 hover:bg-[#701626] hover:text-white text-xs font-bold text-[#701626] transition-all flex items-center gap-1.5 shadow-xs cursor-pointer"
+                >
+                  <RotateCw className="w-3.5 h-3.5" />
+                  <span>{viewSide === 'front' ? 'Flip to Back View' : 'Flip to Front View'}</span>
+                </button>
+
+                {/* Minimize button if expanded while scrolled on mobile */}
+                {isScrolledOnMobile && isMobileExpanded && (
+                  <button
+                    type="button"
+                    onClick={() => setIsMobileExpanded(false)}
+                    className="lg:hidden p-1.5 rounded-xl bg-white border border-[#C5A059]/30 text-[#110B0E] hover:bg-[#701626] hover:text-white transition-colors cursor-pointer"
+                    title="Minimize to sticky bar"
+                  >
+                    <Minimize2 className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* ── SVG 2D BLOUSE VECTOR CANVAS ── */}
+            <div className="relative w-full aspect-square max-w-sm mx-auto flex items-center justify-center p-4">
+              <AnimatePresence mode="wait">
+                <motion.div
+                  key={viewSide}
+                  initial={{ rotateY: 90, opacity: 0 }}
+                  animate={{ rotateY: 0, opacity: 1 }}
+                  exit={{ rotateY: -90, opacity: 0 }}
+                  transition={{ duration: 0.35 }}
+                  className="w-full h-full"
+                >
+                  {renderBlouseSvg()}
+                </motion.div>
+              </AnimatePresence>
+            </div>
+
+            {/* Active Silhouette Summary Pill */}
+            <div className="p-3 bg-white rounded-2xl border border-[#C5A059]/30 text-left space-y-1">
+              <div className="flex justify-between items-center text-xs">
+                <span className="font-bold text-[#110B0E]">Front: {selectedFrontNeck.name}</span>
+                <span className="text-[10px] text-[#701626] font-bold uppercase">{viewSide} view</span>
+              </div>
+              <p className="text-[11px] text-[#6D6268]">
+                Back: {selectedBackCut.name} · Sleeve: {selectedSleeve.name}
+              </p>
+            </div>
           </div>
         </div>
 
