@@ -80,7 +80,13 @@ export async function initiatePaymentsLkCheckout(
         phone: params.customer.phone || undefined,
       },
       successUrl: params.successUrl || `${origin}/order-success/${params.orderId}?payments_lk=success`,
+      returnUrl: params.successUrl || `${origin}/order-success/${params.orderId}?payments_lk=success`,
+      return_url: params.successUrl || `${origin}/order-success/${params.orderId}?payments_lk=success`,
+      success_url: params.successUrl || `${origin}/order-success/${params.orderId}?payments_lk=success`,
+      redirectUrl: params.successUrl || `${origin}/order-success/${params.orderId}?payments_lk=success`,
+      redirect_url: params.successUrl || `${origin}/order-success/${params.orderId}?payments_lk=success`,
       cancelUrl: params.cancelUrl || `${origin}/checkout?status=cancelled&order_id=${params.orderId}`,
+      cancel_url: params.cancelUrl || `${origin}/checkout?status=cancelled&order_id=${params.orderId}`,
     };
 
     const response = await fetch('/api/create-payments-lk-checkout', {

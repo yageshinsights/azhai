@@ -127,7 +127,13 @@ export default defineConfig(({ mode }) => {
                       reference: String(parsed.orderId),
                       customer: parsed.customer,
                       successUrl: parsed.successUrl,
+                      returnUrl: parsed.returnUrl || parsed.successUrl,
+                      return_url: parsed.return_url || parsed.successUrl,
+                      success_url: parsed.success_url || parsed.successUrl,
+                      redirectUrl: parsed.redirectUrl || parsed.successUrl,
+                      redirect_url: parsed.redirect_url || parsed.successUrl,
                       cancelUrl: parsed.cancelUrl,
+                      cancel_url: parsed.cancel_url || parsed.cancelUrl,
                     }),
                   });
                   const data: any = await pResp.json();

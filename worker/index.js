@@ -114,20 +114,29 @@ export default {
             );
           }
 
-          const checkoutPayload = {
-            amountCents,
-            description: description || `Azhai Order #${orderId}`,
-            reference: String(orderId),
-            customer: customer
-              ? {
-                  name: customer.name,
-                  email: customer.email,
-                  phone: customer.phone || undefined,
-                }
-              : undefined,
-            successUrl: successUrl || `${url.origin}/order-success/${orderId}?payments_lk=success`,
-            cancelUrl: cancelUrl || `${url.origin}/checkout?status=cancelled&order_id=${orderId}`,
-          };
+            const finalSuccessUrl = successUrl || `${url.origin}/order-success/${orderId}?payments_lk=success`;
+            const finalCancelUrl = cancelUrl || `${url.origin}/checkout?status=cancelled&order_id=${orderId}`;
+
+            const checkoutPayload = {
+              amountCents,
+              description: description || `Azhai Order #${orderId}`,
+              reference: String(orderId),
+              customer: customer
+                ? {
+                    name: customer.name,
+                    email: customer.email,
+                    phone: customer.phone || undefined,
+                  }
+                : undefined,
+              successUrl: finalSuccessUrl,
+              returnUrl: finalSuccessUrl,
+              return_url: finalSuccessUrl,
+              success_url: finalSuccessUrl,
+              redirectUrl: finalSuccessUrl,
+              redirect_url: finalSuccessUrl,
+              cancelUrl: finalCancelUrl,
+              cancel_url: finalCancelUrl,
+            };
 
           const pResp = await fetch('https://api.payments.lk/v1/checkouts', {
             method: 'POST',
