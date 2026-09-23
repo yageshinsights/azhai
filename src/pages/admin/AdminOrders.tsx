@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { 
   Package, 
@@ -24,7 +24,11 @@ export default function AdminOrders() {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [paymentFilter, setPaymentFilter] = useState<string>('all');
-  const [selectedOrder, setSelectedOrder] = useState<AdminOrder | null>(null);
+  const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
+  const selectedOrder = useMemo(() => {
+    if (!selectedOrderId) return null;
+    return orders.find((o) => o.orderId === selectedOrderId) || null;
+  }, [orders, selectedOrderId]);
   const [printOrder, setPrintOrder] = useState<AdminOrder | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
@@ -266,7 +270,7 @@ export default function AdminOrders() {
                             <Printer className="w-4 h-4" />
                           </button>
                           <button
-                            onClick={() => setSelectedOrder(order)}
+                            onClick={() => setSelectedOrderId(order.orderId)}
                             className="px-3 py-1.5 bg-[#701626] text-white hover:bg-[#8E1E34] rounded-xl text-xs font-bold transition-all cursor-pointer shadow-sm whitespace-nowrap"
                           >
                             Edit
@@ -292,7 +296,7 @@ export default function AdminOrders() {
       <OrderDetailDrawer
         order={selectedOrder}
         isOpen={!!selectedOrder}
-        onClose={() => setSelectedOrder(null)}
+        onClose={() => setSelectedOrderId(null)}
       />
 
       {/* Printable Slip Modal */}

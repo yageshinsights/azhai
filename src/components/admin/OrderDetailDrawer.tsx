@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   X, 
@@ -70,8 +70,24 @@ interface OrderDetailDrawerProps {
   onClose: () => void;
 }
 
-export default function OrderDetailDrawer({ order, isOpen, onClose }: OrderDetailDrawerProps) {
-  const { updateOrderStatus, verifyBankTransferPayment, uploadOrderBankSlip, products } = useAdminStore();
+export default function OrderDetailDrawer({ order: propOrder, isOpen, onClose }: OrderDetailDrawerProps) {
+  const { 
+    orders: storeOrders, 
+    updateOrderStatus, 
+    updateOrderPaymentStatus, 
+    verifyBankTransferPayment, 
+    uploadOrderBankSlip, 
+    products 
+  } = useAdminStore();
+
+  // Always resolve to the latest live order from the admin store by orderId
+  const liveOrder = useMemo(() => {
+    if (!propOrder) return null;
+    return storeOrders.find((o) => o.orderId === propOrder.orderId) || propOrder;
+  }, [storeOrders, propOrder]);
+  const order = liveOrder || propOrder;
+
+  const [currentStatus, setCurrentStatus] = useState<OrderStatus>(order?.status || 'pending');
   const [courierPartner, setCourierPartner] = useState<AdminOrder['courierPartner']>(order?.courierPartner || 'Sri Lanka Post');
   const [trackingNumber, setTrackingNumber] = useState(order?.trackingNumber || '');
   const [adminNotes, setAdminNotes] = useState(order?.adminNotes || '');
@@ -92,6 +108,7 @@ export default function OrderDetailDrawer({ order, isOpen, onClose }: OrderDetai
   // Synchronize local form inputs when active order changes
   useEffect(() => {
     if (order) {
+      setCurrentStatus(order.status);
       setCourierPartner(order.courierPartner || 'Sri Lanka Post');
       setTrackingNumber(order.trackingNumber || '');
       setAdminNotes(order.adminNotes || '');
@@ -103,7 +120,7 @@ export default function OrderDetailDrawer({ order, isOpen, onClose }: OrderDetai
         extractPaymentIdFromNotes(order.adminNotes);
       setRefundPaymentId(initialPid || '');
     }
-  }, [order?.orderId, order?.total, order?.adminNotes]);
+  }, [order?.orderId, order?.status, order?.total, order?.adminNotes]);
 
   if (!isOpen || !order) return null;
 
@@ -113,6 +130,7 @@ export default function OrderDetailDrawer({ order, isOpen, onClose }: OrderDetai
   };
 
   const handleStatusChange = async (status: OrderStatus) => {
+    setCurrentStatus(status);
     updateOrderStatus(order.orderId, status, courierPartner, trackingNumber, adminNotes);
     showToast(`Status updated to "${status.toUpperCase()}"!`);
 
@@ -190,11 +208,12 @@ export default function OrderDetailDrawer({ order, isOpen, onClose }: OrderDetai
 
   const handleSaveDispatch = async (e: React.FormEvent) => {
     e.preventDefault();
-    updateOrderStatus(order.orderId, order.status, courierPartner, trackingNumber, adminNotes);
+    if (!order) return;
+    updateOrderStatus(order.orderId, currentStatus, courierPartner, trackingNumber, adminNotes);
     showToast('Dispatch & tracking number saved!');
 
     // If already shipped, send tracking update
-    if (order.status === 'shipped' && order.customer.email) {
+    if (currentStatus === 'shipped' && order.customer.email) {
       await sendBrevoEmail({
         to: [{ email: order.customer.email, name: order.customer.fullName }],
         subject: `🚚 Tracking Updated #${order.orderId} — ${courierPartner} ${trackingNumber}`,
@@ -383,11 +402,12 @@ export default function OrderDetailDrawer({ order, isOpen, onClose }: OrderDetai
 
       // Update Order Status to Refunded in Admin store
       const isFullRefund = refundAmountLKR >= order.total;
-      const newStatus = isFullRefund ? 'cancelled' : order.status;
+      const newStatus = isFullRefund ? 'cancelled' : currentStatus;
       const resolvedPid = res.data?.paymentId || trimmedPid;
       const refundNote = `Refunded LKR ${refundAmountLKR.toLocaleString()} via Payments.lk on ${new Date().toLocaleDateString()} (${refundReason})${resolvedPid ? ` [Payment ID: ${resolvedPid}]` : ''}`;
       const updatedAdminNotes = adminNotes ? `${adminNotes}\n${refundNote}` : refundNote;
 
+      setCurrentStatus(newStatus);
       updateOrderStatus(order.orderId, newStatus, courierPartner, trackingNumber, updatedAdminNotes);
 
       // Update status in Supabase if configured
@@ -684,7 +704,7 @@ export default function OrderDetailDrawer({ order, isOpen, onClose }: OrderDetai
                   if (!isCardOrder) return null;
 
                   const isPaid = order.paymentStatus === 'paid';
-                  const isRefunded = order.paymentStatus === 'refunded' || order.status === 'cancelled';
+                  const isRefunded = order.paymentStatus === 'refunded' || currentStatus === 'cancelled';
                   const isPartiallyRefunded = order.paymentStatus === 'partially_refunded';
 
                   return (
@@ -715,9 +735,22 @@ export default function OrderDetailDrawer({ order, isOpen, onClose }: OrderDetai
                             <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> Paid &amp; Captured
                           </span>
                         ) : (
-                          <span className="text-[10.5px] font-bold text-purple-800 bg-purple-50 px-2.5 py-1 rounded-full border border-purple-300 flex items-center gap-1">
-                            <Clock className="w-3.5 h-3.5 text-purple-600 animate-pulse" /> Awaiting 3DS Payment
-                          </span>
+                          <div className="flex items-center gap-2">
+                            <span className="text-[10.5px] font-bold text-purple-800 bg-purple-50 px-2.5 py-1 rounded-full border border-purple-300 flex items-center gap-1">
+                              <Clock className="w-3.5 h-3.5 text-purple-600 animate-pulse" /> Awaiting 3DS Payment
+                            </span>
+                            <button
+                              type="button"
+                              onClick={async () => {
+                                updateOrderPaymentStatus(order.orderId, 'paid');
+                                showToast('Payment status marked as PAID!');
+                              }}
+                              className="text-[10.5px] font-bold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 px-2.5 py-1 rounded-full transition-colors cursor-pointer"
+                              title="Manually mark card payment as paid/approved"
+                            >
+                              Mark as Paid
+                            </button>
+                          </div>
                         )}
                       </div>
 
@@ -788,7 +821,7 @@ export default function OrderDetailDrawer({ order, isOpen, onClose }: OrderDetai
                         type="button"
                         onClick={() => handleStatusChange(st.key as OrderStatus)}
                         className={`py-2 px-2.5 sm:px-3 rounded-xl text-xs font-bold transition-all cursor-pointer truncate ${
-                          order.status === st.key
+                          currentStatus === st.key
                             ? 'bg-[#701626] text-white shadow-md'
                             : 'bg-[#F7F4EE] text-[#6D6268] border border-[#C5A059]/20 hover:border-[#701626]'
                         }`}

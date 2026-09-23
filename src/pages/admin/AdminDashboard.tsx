@@ -24,7 +24,11 @@ import OrderDetailDrawer from '@/components/admin/OrderDetailDrawer';
 
 export default function AdminDashboard() {
   const { orders, products, customers, inquiries, settings } = useAdminStore();
-  const [selectedOrder, setSelectedOrder] = useState<AdminOrder | null>(null);
+  const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
+  const selectedOrder = useMemo(() => {
+    if (!selectedOrderId) return null;
+    return orders.find((o) => o.orderId === selectedOrderId) || null;
+  }, [orders, selectedOrderId]);
 
   // Financial Metrics Calculations
   const grossRevenue = orders
@@ -431,7 +435,7 @@ export default function AdminDashboard() {
                     </td>
                     <td className="p-3.5 text-right whitespace-nowrap">
                       <button
-                        onClick={() => setSelectedOrder(order)}
+                        onClick={() => setSelectedOrderId(order.orderId)}
                         className="px-3 py-1.5 bg-[#F7F4EE] hover:bg-[#701626] hover:text-white rounded-xl text-xs font-bold text-[#110B0E] transition-colors cursor-pointer border border-[#C5A059]/25 whitespace-nowrap"
                       >
                         Manage
@@ -547,7 +551,7 @@ export default function AdminDashboard() {
       <OrderDetailDrawer
         order={selectedOrder}
         isOpen={!!selectedOrder}
-        onClose={() => setSelectedOrder(null)}
+        onClose={() => setSelectedOrderId(null)}
       />
     </AdminLayout>
   );

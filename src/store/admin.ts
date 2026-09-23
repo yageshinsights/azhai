@@ -976,7 +976,8 @@ export const useAdminStore = create<AdminState>()(
         }
       },
 
-      updateOrderPaymentStatus: (orderId, paymentStatus, paymentId) => {
+      updateOrderPaymentStatus: async (orderId, paymentStatus, paymentId) => {
+        let finalNotes: string | undefined;
         set((state) => ({
           orders: state.orders.map((ord) => {
             if (ord.orderId !== orderId) return ord;
@@ -986,6 +987,7 @@ export const useAdminStore = create<AdminState>()(
                   ? `${ord.adminNotes}\nPayment ID: ${paymentId}`
                   : `Payment ID: ${paymentId}`
                 : ord.adminNotes;
+            finalNotes = updatedAdminNotes;
             return {
               ...ord,
               paymentStatus,
@@ -995,6 +997,41 @@ export const useAdminStore = create<AdminState>()(
             };
           }),
         }));
+
+        // Synchronize updated payment status to localStorage auth store
+        try {
+          const authKey = 'azhai-auth-store-v2';
+          const storedAuth = localStorage.getItem(authKey);
+          if (storedAuth) {
+            const parsed = JSON.parse(storedAuth);
+            if (parsed?.state) {
+              if (Array.isArray(parsed.state.orders)) {
+                parsed.state.orders = parsed.state.orders.map((ord: any) => {
+                  if (ord.orderId !== orderId) return ord;
+                  return { ...ord, paymentStatus };
+                });
+              }
+              localStorage.setItem(authKey, JSON.stringify(parsed));
+            }
+          }
+        } catch (syncErr) {
+          console.warn('[Admin to Auth Payment Sync Notice]:', syncErr);
+        }
+
+        if (isSupabaseConfigured()) {
+          try {
+            await supabase
+              .from('orders')
+              .update({
+                payment_status: paymentStatus,
+                admin_notes: finalNotes,
+                updated_at: new Date().toISOString(),
+              })
+              .eq('order_code', orderId);
+          } catch (err) {
+            console.error('[Supabase Payment Status Update Error]:', err);
+          }
+        }
       },
 
       deleteOrder: async (orderId: string) => {
