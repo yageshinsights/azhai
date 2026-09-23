@@ -334,6 +334,10 @@ export const useAuthStore = create<AuthState>()(
         let supabaseUserId: string | null = null;
         if (isSupabaseConfigured()) {
           try {
+            const siteUrl =
+              import.meta.env.VITE_STORE_URL ||
+              (typeof window !== 'undefined' ? window.location.origin : 'https://azhaiclothing.lk');
+
             const { data: sbData, error: sbErr } = await supabase.auth.signUp({
               email: normalizedEmail,
               password: data.password,
@@ -342,6 +346,7 @@ export const useAuthStore = create<AuthState>()(
                   full_name: data.fullName.trim(),
                   phone: data.phone.trim(),
                 },
+                emailRedirectTo: `${siteUrl}/account`,
               },
             });
 
@@ -469,9 +474,29 @@ export const useAuthStore = create<AuthState>()(
       requestPasswordReset: async (email) => {
         const normalizedEmail = email.trim().toLowerCase();
         const accounts = get().accounts;
-        const exists = accounts.some((a) => a.email.toLowerCase() === normalizedEmail);
+        const existsLocally = accounts.some((a) => a.email.toLowerCase() === normalizedEmail);
 
-        if (!exists) {
+        // Trigger Supabase Auth password reset if configured
+        let supabaseSuccess = false;
+        if (isSupabaseConfigured()) {
+          try {
+            const siteUrl =
+              import.meta.env.VITE_STORE_URL ||
+              (typeof window !== 'undefined' ? window.location.origin : 'https://azhaiclothing.lk');
+            const { error: sbErr } = await supabase.auth.resetPasswordForEmail(normalizedEmail, {
+              redirectTo: `${siteUrl}/reset-password`,
+            });
+            if (!sbErr) {
+              supabaseSuccess = true;
+            } else {
+              console.warn('[Supabase Reset Password Notice]:', sbErr.message);
+            }
+          } catch (sbEx) {
+            console.warn('[Supabase Reset Password Exception]:', sbEx);
+          }
+        }
+
+        if (!existsLocally && !supabaseSuccess) {
           return { success: false, error: 'No account registered with this email.' };
         }
 
@@ -489,8 +514,27 @@ export const useAuthStore = create<AuthState>()(
       },
 
       resetPassword: async (token, newPassword) => {
+        let sbUpdated = false;
+        // If Supabase is configured, update Supabase user password
+        if (isSupabaseConfigured()) {
+          try {
+            const { error: sbErr } = await supabase.auth.updateUser({ password: newPassword });
+            if (!sbErr) {
+              sbUpdated = true;
+            } else {
+              console.warn('[Supabase Reset Password Sync Notice]:', sbErr.message);
+            }
+          } catch (sbEx) {
+            console.warn('[Supabase Reset Password Sync Exception]:', sbEx);
+          }
+        }
+
         const record = get().resetTokens.find((r) => r.token === token && r.expiresAt > Date.now());
         if (!token || !record) {
+          // If token wasn't found in local store, but Supabase user was updated successfully
+          if (sbUpdated) {
+            return { success: true };
+          }
           return { success: false, error: 'Invalid or expired password reset link.' };
         }
 

@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Lock, Eye, EyeOff, KeyRound, Sparkles, CheckCircle2, ArrowLeft, Check } from 'lucide-react';
 import { useAuthStore } from '@/store/auth';
 import { getPasswordStrength } from '@/lib/auth-utils';
+import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import SEOHead from '@/components/SEOHead';
 
 export default function ResetPassword() {
@@ -16,18 +17,54 @@ export default function ResetPassword() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const [isSupabaseRecovery, setIsSupabaseRecovery] = useState(false);
+  const [checkingSession, setCheckingSession] = useState(true);
 
   const { resetPassword } = useAuthStore();
   const navigate = useNavigate();
 
   const strength = getPasswordStrength(newPassword);
 
+  useEffect(() => {
+    const hash = window.location.hash;
+    const hasRecoveryHash = hash.includes('type=recovery') || hash.includes('access_token');
+    const hasCode = searchParams.has('code');
+
+    if (hasRecoveryHash || hasCode) {
+      setIsSupabaseRecovery(true);
+    }
+
+    if (isSupabaseConfigured()) {
+      const {
+        data: { subscription },
+      } = supabase.auth.onAuthStateChange((event) => {
+        if (event === 'PASSWORD_RECOVERY') {
+          setIsSupabaseRecovery(true);
+        }
+      });
+
+      supabase.auth.getSession().then(({ data: { session } }) => {
+        if (session && (hasRecoveryHash || hasCode)) {
+          setIsSupabaseRecovery(true);
+        }
+        setCheckingSession(false);
+      });
+
+      return () => {
+        subscription.unsubscribe();
+      };
+    } else {
+      setCheckingSession(false);
+    }
+  }, [searchParams]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
 
-    if (!token) {
-      setError('Invalid or missing password reset token. Please request a new link.');
+    const hasBrevoToken = !!token;
+    if (!hasBrevoToken && !isSupabaseRecovery) {
+      setError('Invalid or missing password reset link. Please request a new recovery link.');
       return;
     }
 
@@ -42,16 +79,43 @@ export default function ResetPassword() {
     }
 
     setLoading(true);
-    const res = await resetPassword(token, newPassword);
+
+    let resetSucceeded = false;
+    let errorMessage = '';
+
+    // 1. Supabase Auth password update
+    if (isSupabaseConfigured() && isSupabaseRecovery) {
+      try {
+        const { error: sbErr } = await supabase.auth.updateUser({ password: newPassword });
+        if (sbErr) {
+          errorMessage = sbErr.message;
+        } else {
+          resetSucceeded = true;
+        }
+      } catch (sbEx: any) {
+        errorMessage = sbEx?.message || 'Failed to update Supabase password';
+      }
+    }
+
+    // 2. Local token reset
+    if (hasBrevoToken) {
+      const res = await resetPassword(token, newPassword);
+      if (res.success) {
+        resetSucceeded = true;
+      } else if (!resetSucceeded) {
+        errorMessage = res.error || 'Failed to reset password.';
+      }
+    }
+
     setLoading(false);
 
-    if (res.success) {
+    if (resetSucceeded) {
       setSuccess(true);
       setTimeout(() => {
         navigate('/login');
       }, 2500);
     } else {
-      setError(res.error || 'Failed to reset password.');
+      setError(errorMessage || 'Failed to reset password.');
     }
   };
 
@@ -108,6 +172,26 @@ export default function ResetPassword() {
                 </Link>
               </div>
             </motion.div>
+          ) : !checkingSession && !token && !isSupabaseRecovery ? (
+            <div className="space-y-4 text-center py-4">
+              <div className="w-12 h-12 rounded-full bg-rose-100 text-[#701626] flex items-center justify-center mx-auto">
+                <KeyRound className="w-6 h-6" />
+              </div>
+              <div className="space-y-1">
+                <p className="font-display text-lg font-bold text-[#110B0E]">No Reset Token Found</p>
+                <p className="text-xs text-[#6D6268] font-light">
+                  This reset link is either missing or invalid. Please request a new recovery link.
+                </p>
+              </div>
+              <div className="pt-2">
+                <Link
+                  to="/forgot-password"
+                  className="inline-flex items-center gap-1.5 text-xs font-bold text-white bg-[#701626] px-5 py-2.5 rounded-xl hover:bg-[#8E1E34] transition-colors"
+                >
+                  Request Reset Link
+                </Link>
+              </div>
+            </div>
           ) : (
             <>
               {error && (
