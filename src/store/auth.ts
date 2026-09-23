@@ -340,7 +340,19 @@ export const useAuthStore = create<AuthState>()(
               supabaseUserId = sbData.user.id;
             } else if (sbErr) {
               console.warn('[Supabase Auth Signup Notice]:', sbErr.message);
-              return { success: false, error: sbErr.message };
+              const isEmailSendingError =
+                sbErr.message?.toLowerCase().includes('confirmation email') ||
+                sbErr.message?.toLowerCase().includes('error sending') ||
+                sbErr.message?.toLowerCase().includes('email rate limit');
+
+              if (isEmailSendingError) {
+                console.warn(
+                  '[Supabase Auth Notice]: Supabase mailer could not deliver verification email (SMTP rate-limit or unconfigured mailer). Proceeding with local vault registration and Brevo welcome email so patron is not blocked.'
+                );
+                // Graceful fallback: do not block patron signup; let account creation proceed
+              } else {
+                return { success: false, error: sbErr.message };
+              }
             }
           } catch (sbEx: any) {
             console.warn('[Supabase Signup Exception]:', sbEx);
