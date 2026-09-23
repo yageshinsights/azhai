@@ -130,6 +130,15 @@ export const useAuthStore = create<AuthState>()(
               password,
             });
 
+            if (sbError) {
+              if (sbError.message?.toLowerCase().includes('email not confirmed')) {
+                return {
+                  success: false,
+                  error: 'Your email is not confirmed yet in Supabase. Please turn off "Confirm email" in Supabase Dashboard (Authentication > Providers > Email) or click "Confirm user" in Authentication > Users.',
+                };
+              }
+            }
+
             if (sbData?.user && !sbError) {
               const su = sbData.user;
               // Fetch user profile from Supabase
