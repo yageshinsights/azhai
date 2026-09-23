@@ -3,15 +3,16 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
   ArrowLeft, Package, Truck, CheckCircle2, Clock, MapPin, MessageCircle, 
   CreditCard, Sparkles, AlertCircle, Building2, Copy, Check, Upload, 
-  FileCheck, ExternalLink, RefreshCw 
+  FileCheck, ExternalLink, RefreshCw, Star 
 } from 'lucide-react';
-import type { PlacedOrder } from '@/store/cart';
+import type { PlacedOrder, CartItem } from '@/store/cart';
 import { useAdminStore, cleanWhatsAppDigits } from '@/store/admin';
 import { useCartStore } from '@/store/cart';
 import { STORE_WHATSAPP_NUMBER } from '@/lib/constants';
 import BankBadge from '@/components/BankBadge';
 import { compressToWebP } from '@/lib/image-compressor';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
+import OrderReviewModal from '@/components/OrderReviewModal';
 import { 
   sendBrevoEmail, 
   buildBankSlipReceivedCustomerHtml, 
@@ -34,6 +35,25 @@ export default function OrderDetail({ order, onBack }: OrderDetailProps) {
   const [localSlipUrl, setLocalSlipUrl] = useState<string | null>(null);
   const [referenceInput, setReferenceInput] = useState('');
   const [previewModalUrl, setPreviewModalUrl] = useState<string | null>(null);
+  const [reviewModalItem, setReviewModalItem] = useState<CartItem | null>(null);
+
+  // Track reviewed items for this specific order
+  const [reviewedItems, setReviewedItems] = useState<string[]>(() => {
+    try {
+      const keys = Object.keys(localStorage).filter((k) =>
+        k.startsWith(`azhai_reviewed_${order.orderId}_`)
+      );
+      return keys.map((k) => k.replace(`azhai_reviewed_${order.orderId}_`, ''));
+    } catch {
+      return [];
+    }
+  });
+
+  const isItemReviewed = (itemName: string) => reviewedItems.includes(itemName);
+
+  const handleReviewSubmitted = (itemName: string) => {
+    setReviewedItems((prev) => (prev.includes(itemName) ? prev : [...prev, itemName]));
+  };
 
   const handleCopy = (text: string, field: string) => {
     navigator.clipboard.writeText(text);
@@ -239,6 +259,40 @@ export default function OrderDetail({ order, onBack }: OrderDetailProps) {
           )}
         </div>
 
+        {/* Delivered Celebration & Review Banner */}
+        {currentStatus === 'delivered' && (
+          <div className="bg-gradient-to-r from-[#701626]/8 via-[#C5A059]/15 to-[#701626]/8 rounded-3xl p-5 sm:p-6 border border-[#C5A059]/40 shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div className="flex items-center gap-3.5">
+              <div className="w-12 h-12 rounded-2xl bg-[#701626] text-[#C5A059] flex items-center justify-center shrink-0 shadow-sm border border-[#C5A059]/30">
+                <Star className="w-6 h-6 fill-[#C5A059]" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] uppercase tracking-[0.2em] font-bold text-[#701626]">
+                    Delivered to Doorstep
+                  </span>
+                </div>
+                <h4 className="font-display text-base sm:text-lg font-bold text-[#110B0E]">
+                  How was your bespoke fitting &amp; craftsmanship?
+                </h4>
+                <p className="text-xs text-[#6D6268] font-light">
+                  Share your verified patron review on fabric quality, drape, and silhouette.
+                </p>
+              </div>
+            </div>
+            {liveOrder.items.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setReviewModalItem(liveOrder.items[0])}
+                className="px-5 py-2.5 bg-[#701626] hover:bg-[#8E1E34] text-white text-xs font-bold uppercase tracking-wider rounded-xl transition-all shadow-sm flex items-center gap-2 whitespace-nowrap cursor-pointer shrink-0"
+              >
+                <Star className="w-4 h-4 fill-[#C5A059] text-[#C5A059]" />
+                <span>Write Review</span>
+              </button>
+            )}
+          </div>
+        )}
+
         {/* Items & Shipping Split Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Ordered Pieces (2 cols) */}
@@ -269,10 +323,28 @@ export default function OrderDetail({ order, onBack }: OrderDetailProps) {
                       <span>Qty: {item.quantity}</span>
                     </div>
                   </div>
-                  <div className="text-right shrink-0">
+                  <div className="text-right shrink-0 space-y-1.5">
                     <p className="text-xs sm:text-sm font-bold text-[#701626] font-display">
                       {item.price}
                     </p>
+                    {currentStatus === 'delivered' && (
+                      <div>
+                        {isItemReviewed(item.name) ? (
+                          <span className="inline-flex items-center gap-1 text-[10.5px] font-bold text-emerald-800 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200">
+                            <Check className="w-3 h-3 text-emerald-600" /> Reviewed
+                          </span>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => setReviewModalItem(item)}
+                            className="inline-flex items-center gap-1.5 text-xs font-bold text-[#701626] bg-[#701626]/8 hover:bg-[#701626] hover:text-white px-2.5 py-1 rounded-xl border border-[#C5A059]/30 transition-all cursor-pointer whitespace-nowrap"
+                          >
+                            <Star className="w-3 h-3 fill-[#C5A059] text-[#C5A059]" />
+                            <span>Review Piece</span>
+                          </button>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
               ))}
@@ -638,6 +710,17 @@ export default function OrderDetail({ order, onBack }: OrderDetailProps) {
             </div>
           )}
         </AnimatePresence>
+
+        {/* Verified Order Review Modal */}
+        <OrderReviewModal
+          isOpen={!!reviewModalItem}
+          onClose={() => setReviewModalItem(null)}
+          item={reviewModalItem}
+          orderId={liveOrder.orderId}
+          defaultLocation={liveOrder.customer.city ? `${liveOrder.customer.city}, Sri Lanka` : 'Colombo, Sri Lanka'}
+          onReviewSubmitted={handleReviewSubmitted}
+        />
       </div>
     );
   }
+

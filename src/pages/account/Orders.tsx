@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { Package, ChevronRight, ShoppingBag } from 'lucide-react';
+import { Package, ChevronRight, ShoppingBag, Star } from 'lucide-react';
 import { useAuthStore } from '@/store/auth';
 import { useAdminStore } from '@/store/admin';
 import OrderDetail from './OrderDetail';
@@ -158,11 +158,16 @@ export default function Orders() {
             >
               {/* Order Meta & Thumbnails */}
               <div className="space-y-3 w-full sm:w-auto">
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-3 flex-wrap">
                   <span className="font-display text-lg font-bold text-[#110B0E] group-hover:text-[#701626] transition-colors">
                     #{order.orderId}
                   </span>
                   {getStatusBadge(order.status)}
+                  {order.status === 'delivered' && (
+                    <span className="inline-flex items-center gap-1 text-[10.5px] font-bold text-[#701626] bg-[#701626]/8 px-2.5 py-0.5 rounded-full border border-[#C5A059]/30">
+                      <Star className="w-3 h-3 fill-[#C5A059] text-[#C5A059]" /> Write Review
+                    </span>
+                  )}
                   <span className="text-xs text-[#6D6268]">· {formattedDate}</span>
                 </div>
 
@@ -198,7 +203,7 @@ export default function Orders() {
                 </div>
 
                 <div className="flex items-center gap-1 text-xs font-bold text-[#701626] group-hover:text-[#C5A059] transition-colors sm:pt-1">
-                  <span>View Details</span>
+                  <span>{order.status === 'delivered' ? 'Review & Details' : 'View Details'}</span>
                   <ChevronRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
                 </div>
               </div>
