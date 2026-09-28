@@ -114,10 +114,10 @@ export default function OrderSuccess() {
     }
   }, [orderId, lastOrder, authOrders, adminOrders]);
 
-  // Handle return from Payments.lk 3D Secure Hosted Checkout (?payments_lk=success)
+  // Handle return from PayHere Payment Gateway (?payhere=success or legacy ?payments_lk=success)
   useEffect(() => {
     const searchParams = new URLSearchParams(location.search);
-    const isPaymentSuccess = searchParams.get('payments_lk') === 'success';
+    const isPaymentSuccess = searchParams.get('payhere') === 'success' || searchParams.get('payments_lk') === 'success';
     const returnedPaymentId =
       searchParams.get('payment_id') ||
       searchParams.get('paymentId') ||
@@ -149,7 +149,9 @@ export default function OrderSuccess() {
           status: 'pending',
         };
         if (returnedPaymentId) {
-          updatePayload.admin_notes = `Paid via Payments.lk 3DS (Payment ID: ${returnedPaymentId})`;
+          updatePayload.admin_notes = `Paid via PayHere (Payment ID: ${returnedPaymentId})`;
+        } else {
+          updatePayload.admin_notes = 'Paid via PayHere';
         }
 
         supabase
@@ -158,7 +160,7 @@ export default function OrderSuccess() {
           .eq('order_code', orderId)
           .then(({ error }) => {
             if (error) {
-              console.warn('[Payments.lk Return DB Update Warning]:', error);
+              console.warn('[PayHere Return DB Update Warning]:', error);
             }
           });
       }
@@ -293,10 +295,10 @@ export default function OrderSuccess() {
     return lastOrder || null;
   }, [orderId, lastOrder, authOrders, adminOrders, dbOrder]);
 
-  // Trigger Brevo receipt and admin alert for verified Payments.lk card returns
+  // Trigger Brevo receipt and admin alert for verified card returns
   useEffect(() => {
     const searchParams = new URLSearchParams(location.search);
-    const isPaymentSuccess = searchParams.get('payments_lk') === 'success';
+    const isPaymentSuccess = searchParams.get('payhere') === 'success' || searchParams.get('payments_lk') === 'success';
 
     if (!isPaymentSuccess || !orderId || !order || !order.customer?.email) return;
 
@@ -318,7 +320,7 @@ export default function OrderSuccess() {
           tailoring: i.tailoring,
         })),
         deliveryMethod: order.deliveryMethod || 'Sri Lanka Post',
-        paymentMethod: order.paymentMethod || 'Online Card & LankaQR (Payments.lk)',
+        paymentMethod: order.paymentMethod || 'Online Card & LankaQR (PayHere)',
       });
 
       createOrUpdateBrevoContact({
@@ -358,7 +360,7 @@ export default function OrderSuccess() {
           tailoring: i.tailoring,
         })),
         deliveryMethod: order.deliveryMethod || 'Sri Lanka Post',
-        paymentMethod: order.paymentMethod || 'Online Card & LankaQR (Payments.lk)',
+        paymentMethod: order.paymentMethod || 'Online Card & LankaQR (PayHere)',
       });
 
       sendBrevoEmail({
@@ -428,8 +430,10 @@ export default function OrderSuccess() {
           {/* Top Celebration / Status Badge */}
           {(() => {
             const searchParams = new URLSearchParams(location.search);
-            const isPaymentSuccess = searchParams.get('payments_lk') === 'success';
+            const isPaymentSuccess = searchParams.get('payhere') === 'success' || searchParams.get('payments_lk') === 'success';
             const isPaymentFailed = 
+              searchParams.get('payhere') === 'failed' || 
+              searchParams.get('payhere') === 'cancelled' || 
               searchParams.get('payments_lk') === 'failed' || 
               searchParams.get('payments_lk') === 'cancelled' || 
               searchParams.get('status') === 'cancelled';
@@ -545,8 +549,10 @@ export default function OrderSuccess() {
           {/* Email Confirmation Alert Banner */}
           {(() => {
             const searchParams = new URLSearchParams(location.search);
-            const isPaymentSuccess = searchParams.get('payments_lk') === 'success';
+            const isPaymentSuccess = searchParams.get('payhere') === 'success' || searchParams.get('payments_lk') === 'success';
             const isPaymentFailed = 
+              searchParams.get('payhere') === 'failed' || 
+              searchParams.get('payhere') === 'cancelled' || 
               searchParams.get('payments_lk') === 'failed' || 
               searchParams.get('payments_lk') === 'cancelled' || 
               searchParams.get('status') === 'cancelled';

@@ -62,7 +62,7 @@ export default function AdminTailoring() {
   const [isPresetModalOpen, setIsPresetModalOpen] = useState(false);
   const [editPreset, setEditPreset] = useState<SizePreset | null>(null);
 
-  // Payments.lk Bespoke Payment Link Modal
+  // PayHere Bespoke Payment Link Modal
   const [isPaymentLinkModalOpen, setIsPaymentLinkModalOpen] = useState(false);
 
   // Filtered dress types for Tab 1
@@ -485,7 +485,7 @@ export default function AdminTailoring() {
         }}
       />
 
-      {/* Payments.lk Bespoke Tailoring Payment Link Modal */}
+      {/* PayHere Bespoke Tailoring Payment Link Modal */}
       <PaymentLinkModal
         isOpen={isPaymentLinkModalOpen}
         onClose={() => setIsPaymentLinkModalOpen(false)}

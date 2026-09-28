@@ -76,7 +76,7 @@ export default function AdminCustomers() {
   // Per-inquiry local notes draft state for fast editing
   const [inquiryNotesDrafts, setInquiryNotesDrafts] = useState<Record<string, string>>({});
 
-  // Payments.lk Bespoke Payment Link Modal State
+  // PayHere Bespoke Payment Link Modal State
   const [isPaymentLinkModalOpen, setIsPaymentLinkModalOpen] = useState(false);
   const [paymentLinkDefaults, setPaymentLinkDefaults] = useState<{
     title: string;
@@ -808,7 +808,7 @@ export default function AdminCustomers() {
           )}
         </AnimatePresence>
 
-        {/* Payments.lk Bespoke Payment Link Modal */}
+        {/* PayHere Bespoke Payment Link Modal */}
         <PaymentLinkModal
           isOpen={isPaymentLinkModalOpen}
           onClose={() => setIsPaymentLinkModalOpen(false)}

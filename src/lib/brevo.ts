@@ -1381,7 +1381,7 @@ export function buildConciergePaymentLinkEmailHtml(params: {
       </a>
 
       <p style="font-size: 11px; color: #9E9399; margin: 14px 0 0 0;">
-        Powered by Payments.lk · Visa, Mastercard, and LankaQR accepted
+        Powered by PayHere · Visa, Mastercard, and LankaQR accepted
       </p>
     </div>
   `;

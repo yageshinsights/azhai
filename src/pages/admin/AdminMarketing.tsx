@@ -197,7 +197,7 @@ export default function AdminMarketing() {
         ],
         total: 14500,
         deliveryMethod: 'Sri Lanka Post Speed Post (Zone A)',
-        paymentMethod: 'Payments.lk (Online Card & LankaQR)',
+        paymentMethod: 'PayHere (Online Card & LankaQR)',
       });
     } else if (type === 'abandoned') {
       subject = '✨ [TEST] Your Azhai bag is waiting for you (Enjoy 5% privilege)';
@@ -273,7 +273,7 @@ export default function AdminMarketing() {
         customerName: 'Preethi',
         title: 'Bespoke Atelier Tailoring Deposit (Order #AZH-84920)',
         amount: 5000,
-        paymentUrl: 'https://payments.lk/pay/azhai-sample-link',
+        paymentUrl: 'https://sandbox.payhere.lk/pay/azhai-sample-link',
         description: 'Advance deposit for custom handloom weaving and artisan tailoring.',
       });
     }
@@ -743,7 +743,7 @@ export default function AdminMarketing() {
                   {
                     type: 'payment-link',
                     title: '10. Direct 3DS Payment Link Invoice',
-                    desc: 'Dispatched to customer email with title, amount, and 1-click Payments.lk checkout link.',
+                    desc: 'Dispatched to customer email with title, amount, and 1-click PayHere checkout link.',
                     tag: 'Invoice',
                     previewUrl: '#'
                   }

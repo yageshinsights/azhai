@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Link2, Copy, Check, ExternalLink, MessageCircle, RefreshCw, X, Mail, Send } from 'lucide-react';
-import { createPaymentsLkPaymentLink } from '@/lib/payments-lk';
+import { createPayHerePaymentLink } from '@/lib/payhere';
 import { sendBrevoEmail, buildConciergePaymentLinkEmailHtml } from '@/lib/brevo';
 
 interface PaymentLinkModalProps {
@@ -50,20 +50,24 @@ export default function PaymentLinkModal({
     setErrorMessage(null);
 
     try {
-      const amountCents = Math.round(amount * 100);
-      const res = await createPaymentsLkPaymentLink({
+      const res = await createPayHerePaymentLink({
         title: title.trim(),
-        amountCents,
+        amount,
         description: description.trim() || undefined,
+        customer: {
+          name: recipientName.trim(),
+          email: recipientEmail.trim(),
+          phone: customerPhone.trim(),
+        },
       });
 
       if (res.success && res.url) {
         setGeneratedUrl(res.url);
       } else {
-        setErrorMessage(res.error || 'Failed to generate link. Check Payments.lk connection.');
+        setErrorMessage(res.error || 'Failed to generate link. Check PayHere connection.');
       }
     } catch (err: any) {
-      setErrorMessage(err?.message || 'Error communicating with Payments.lk');
+      setErrorMessage(err?.message || 'Error communicating with PayHere');
     } finally {
       setIsGenerating(false);
     }
@@ -130,7 +134,7 @@ export default function PaymentLinkModal({
               </div>
               <div>
                 <h3 className="font-display text-base sm:text-lg font-bold text-[#110B0E]">
-                  Create Payments.lk Link
+                  Create PayHere Link
                 </h3>
                 <p className="text-[10px] text-[#6D6268]">
                   Shareable 3D Secure link for custom quotes, tailoring & VIP patrons
@@ -216,7 +220,7 @@ export default function PaymentLinkModal({
                   className="px-5 py-2.5 rounded-xl bg-[#701626] hover:bg-[#8E1E34] text-white text-xs font-bold uppercase tracking-wider transition-colors shadow-sm flex items-center gap-2 cursor-pointer disabled:opacity-50"
                 >
                   <RefreshCw className={`w-3.5 h-3.5 ${isGenerating ? 'animate-spin' : ''}`} />
-                  <span>{isGenerating ? 'Generating Link...' : 'Generate Payments.lk Link'}</span>
+                  <span>{isGenerating ? 'Generating Link...' : 'Generate PayHere Link'}</span>
                 </button>
               </div>
             </form>

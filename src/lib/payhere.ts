@@ -1,11 +1,44 @@
 /**
- * @deprecated Superceded by Payments.lk Gateway (src/lib/payments-lk.ts)
- * Retained for legacy reference and backward compatibility with previous orders.
+ * PayHere.lk Payment Gateway Integration
+ * Central Bank of Sri Lanka (CBSL) Compliant Payment Gateway
+ * Supports: Visa, MasterCard, AMEX, LankaQR, eZ Cash, mCash, Genie, FriMi
  */
 
-const PAYHERE_MERCHANT_ID = import.meta.env.VITE_PAYHERE_MERCHANT_ID || '1237099';
-const PAYHERE_SECRET = import.meta.env.VITE_PAYHERE_SECRET || '';
-const IS_SANDBOX = import.meta.env.VITE_PAYHERE_SANDBOX !== 'false';
+export function getPayHereSandboxMode(): boolean {
+  return import.meta.env.VITE_PAYHERE_SANDBOX !== 'false';
+}
+
+export interface PayHereCustomer {
+  name?: string;
+  firstName?: string;
+  lastName?: string;
+  email?: string;
+  phone?: string;
+  address?: string;
+  city?: string;
+  postalCode?: string;
+  country?: string;
+}
+
+export interface PayHerePaymentDetails {
+  orderId: string;
+  itemsName?: string;
+  description?: string;
+  amount: number;
+  amountCents?: number;
+  currency?: string;
+  customer: PayHereCustomer;
+  autoRedirect?: boolean;
+}
+
+export interface PayHereCheckoutResult {
+  success: boolean;
+  orderId: string;
+  paymentId?: string;
+  checkoutUrl?: string;
+  error?: string;
+  dismissed?: boolean;
+}
 
 // ── Pure JavaScript MD5 Implementation (RFC 1321) ─────────────
 function md5cycle(x: number[], k: number[]) {
@@ -135,23 +168,9 @@ export function generatePayHereHash(
   merchantSecret: string
 ): string {
   const formattedAmount = amount.toFixed(2);
-  const hashedSecret = md5(merchantSecret).toUpperCase();
+  const hashedSecret = md5(merchantSecret || '').toUpperCase();
   const dataToHash = `${merchantId}${orderId}${formattedAmount}${currency}${hashedSecret}`;
   return md5(dataToHash).toUpperCase();
-}
-
-export interface PayHerePaymentDetails {
-  orderId: string;
-  itemsName: string;
-  amount: number;
-  currency?: string;
-  firstName: string;
-  lastName: string;
-  email: string;
-  phone: string;
-  address: string;
-  city: string;
-  country?: string;
 }
 
 declare global {
@@ -161,81 +180,189 @@ declare global {
 }
 
 /**
- * Initializes and triggers PayHere Payment Modal
+ * Ensures PayHere JS SDK script is loaded
  */
-export function startPayHerePayment(
-  paymentData: PayHerePaymentDetails,
-  onSuccess: (orderId: string) => void,
-  onDismissed: () => void,
-  onError: (error: string) => void
-) {
-  // Ensure PayHere JS SDK is loaded dynamically
-  if (!window.payhere) {
+export function loadPayHereSdk(): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (window.payhere) {
+      resolve();
+      return;
+    }
+    const existing = document.querySelector('script[src*="payhere.js"]');
+    if (existing) {
+      existing.addEventListener('load', () => resolve());
+      existing.addEventListener('error', () => reject(new Error('Failed to load PayHere SDK')));
+      return;
+    }
     const script = document.createElement('script');
     script.src = 'https://www.payhere.lk/lib/payhere.js';
-    script.onload = () => launchPayHereModal(paymentData, onSuccess, onDismissed, onError);
-    script.onerror = () => onError('Failed to load PayHere payment SDK');
+    script.async = true;
+    script.onload = () => resolve();
+    script.onerror = () => reject(new Error('Failed to load PayHere SDK script'));
     document.body.appendChild(script);
-  } else {
-    launchPayHereModal(paymentData, onSuccess, onDismissed, onError);
+  });
+}
+
+/**
+ * Initiates PayHere Checkout (Onsite Popup Modal with fallback)
+ */
+export async function initiatePayHereCheckout(
+  params: PayHerePaymentDetails
+): Promise<PayHereCheckoutResult> {
+  try {
+    const finalAmount = params.amount || (params.amountCents ? params.amountCents / 100 : 0);
+
+    // 1. Request secure checkout payload with server-calculated MD5 hash
+    const response = await fetch('/api/payhere-initiate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        orderId: params.orderId,
+        amount: finalAmount,
+        currency: params.currency || 'LKR',
+        items: params.itemsName || params.description || `Azhai Order #${params.orderId}`,
+        customer: params.customer,
+      }),
+    });
+
+    if (!response.ok) {
+      const errData = await response.json().catch(() => ({ error: 'Failed to initiate payment session' }));
+      throw new Error(errData.error || `HTTP ${response.status} from payment initiator`);
+    }
+
+    const session = await response.json();
+
+    // 2. Load PayHere JavaScript SDK
+    await loadPayHereSdk();
+
+    if (!window.payhere) {
+      throw new Error('PayHere SDK is unavailable in window');
+    }
+
+    // 3. Launch PayHere Popup Modal
+    return new Promise<PayHereCheckoutResult>((resolve) => {
+      window.payhere.onCompleted = function (completedOrderId: string) {
+        console.log('[PayHere] Payment completed for order:', completedOrderId);
+        resolve({
+          success: true,
+          orderId: completedOrderId,
+          checkoutUrl: session.return_url,
+        });
+      };
+
+      window.payhere.onDismissed = function () {
+        console.log('[PayHere] Customer closed checkout modal');
+        resolve({
+          success: false,
+          dismissed: true,
+          orderId: params.orderId,
+          error: 'Payment was dismissed. Your cart items are preserved.',
+        });
+      };
+
+      window.payhere.onError = function (error: string) {
+        console.error('[PayHere SDK Error]:', error);
+        resolve({
+          success: false,
+          orderId: params.orderId,
+          error: error || 'Payment failed. Please try again.',
+        });
+      };
+
+      window.payhere.startPayment({
+        sandbox: session.sandbox,
+        merchant_id: session.merchant_id,
+        return_url: session.return_url,
+        cancel_url: session.cancel_url,
+        notify_url: session.notify_url,
+        order_id: session.order_id,
+        items: session.items,
+        amount: session.amount,
+        currency: session.currency,
+        hash: session.hash,
+        first_name: session.first_name,
+        last_name: session.last_name,
+        email: session.email,
+        phone: session.phone,
+        address: session.address,
+        city: session.city,
+        country: session.country,
+        delivery_address: session.delivery_address,
+        delivery_city: session.delivery_city,
+        delivery_country: session.delivery_country,
+      });
+    });
+  } catch (err: any) {
+    console.error('[PayHere Checkout Initiation Error]:', err);
+    return {
+      success: false,
+      orderId: params.orderId,
+      error: err?.message || 'Could not connect to payment gateway.',
+    };
   }
 }
 
-function launchPayHereModal(
-  paymentData: PayHerePaymentDetails,
-  onSuccess: (orderId: string) => void,
-  onDismissed: () => void,
-  onError: (error: string) => void
-) {
-  if (!window.payhere) {
-    onError('PayHere SDK unavailable');
-    return;
+/**
+ * 1-Click Partial/Full Card Refund via PayHere API
+ */
+export async function requestPayHereRefund(params: {
+  orderId?: string;
+  reference?: string;
+  paymentId?: string;
+  amount?: number;
+  amountCents?: number;
+  reason?: string;
+  adminNotes?: string;
+}): Promise<{ success: boolean; data?: any; error?: string }> {
+  try {
+    const res = await fetch('/api/payhere-refund', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(params),
+    });
+
+    const data = await res.json();
+    if (!res.ok || data.error) {
+      return { success: false, error: data.error || 'Failed to process refund at PayHere.' };
+    }
+
+    return { success: true, data };
+  } catch (err: any) {
+    return { success: false, error: err?.message || 'Network error reaching PayHere refund API' };
   }
-
-  window.payhere.onCompleted = function (orderId: string) {
-    console.log('[PayHere] Payment completed for order:', orderId);
-    onSuccess(orderId);
-  };
-
-  window.payhere.onDismissed = function () {
-    console.log('[PayHere] Payment dismissed by user');
-    onDismissed();
-  };
-
-  window.payhere.onError = function (error: string) {
-    console.error('[PayHere Error]:', error);
-    onError(error);
-  };
-
-  const currency = paymentData.currency || 'LKR';
-  const amountFormatted = paymentData.amount.toFixed(2);
-  const hash = PAYHERE_SECRET
-    ? generatePayHereHash(PAYHERE_MERCHANT_ID, paymentData.orderId, paymentData.amount, currency, PAYHERE_SECRET)
-    : undefined;
-
-  const payment: Record<string, any> = {
-    sandbox: IS_SANDBOX,
-    merchant_id: PAYHERE_MERCHANT_ID,
-    return_url: `${window.location.origin}/order-success/${paymentData.orderId}`,
-    cancel_url: `${window.location.origin}/checkout`,
-    notify_url: import.meta.env.VITE_PAYHERE_NOTIFY_URL || `${window.location.origin}/api/payhere-notify`,
-    order_id: paymentData.orderId,
-    items: paymentData.itemsName,
-    amount: amountFormatted,
-    currency,
-    first_name: paymentData.firstName,
-    last_name: paymentData.lastName,
-    email: paymentData.email,
-    phone: paymentData.phone,
-    address: paymentData.address,
-    city: paymentData.city,
-    country: paymentData.country || 'Sri Lanka',
-  };
-
-  if (hash) {
-    payment.hash = hash;
-  }
-
-  console.log(`[PayHere] Launching ${IS_SANDBOX ? 'Sandbox' : 'Production'} Payment for Order: ${paymentData.orderId}, Merchant: ${PAYHERE_MERCHANT_ID}`);
-  window.payhere.startPayment(payment);
 }
+
+/**
+ * Generate Shareable Hosted Payment Link for Bespoke Couture / Custom Tailoring
+ */
+export async function createPayHerePaymentLink(params: {
+  title: string;
+  amount?: number;
+  amountCents?: number;
+  orderId?: string;
+  description?: string;
+  customer?: PayHereCustomer;
+}): Promise<{ success: boolean; id?: string; url?: string; error?: string }> {
+  try {
+    const res = await fetch('/api/payhere-payment-link', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(params),
+    });
+
+    const data = await res.json();
+    if (!res.ok || data.error) {
+      return { success: false, error: data.error || 'Failed to generate payment link' };
+    }
+
+    return { success: true, id: data.id || data.orderId, url: data.url };
+  } catch (err: any) {
+    return { success: false, error: err?.message || 'Network error communicating with PayHere' };
+  }
+}
+
+// ── Backward Compatibility Aliases ──────────────────────────
+export const initiatePaymentsLkCheckout = initiatePayHereCheckout;
+export const requestPaymentsLkRefund = requestPayHereRefund;
+export const createPaymentsLkPaymentLink = createPayHerePaymentLink;
+export const getPaymentsLkMode = () => (getPayHereSandboxMode() ? 'sandbox' : 'live');

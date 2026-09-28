@@ -26,7 +26,7 @@ import { useAdminStore } from '@/store/admin';
 import BankBadge from '@/components/BankBadge';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import { sendBrevoEmail, buildOrderConfirmationHtml, buildAdminOrderAlertHtml, createOrUpdateBrevoContact, BREVO_LISTS } from '@/lib/brevo';
-import { initiatePaymentsLkCheckout } from '@/lib/payments-lk';
+import { initiatePayHereCheckout } from '@/lib/payhere';
 import { isUUID } from '@/lib/auth-utils';
 import SEOHead from '@/components/SEOHead';
 import { 
@@ -482,7 +482,7 @@ export default function Checkout() {
       placedAt: new Date().toISOString(),
     };
 
-    // If Online Card Payment selected, route through Payments.lk 3D Secure Hosted Checkout
+    // If Online Card Payment selected, route through PayHere Payment Gateway
     if (paymentMethod === 'card') {
       if (finalTotal <= 0) {
         // Zero-balance orders (e.g. 100% discount promo) bypass external payment gateways
@@ -492,32 +492,10 @@ export default function Checkout() {
         return;
       }
 
-      // Step 1: Request Payments.lk 3D Secure session FIRST before creating database records
-      const checkoutRes = await initiatePaymentsLkCheckout({
-        orderId: generatedOrderId,
-        amount: finalTotal,
-        description: `Azhai Boutique Order #${generatedOrderId}`,
-        customer: {
-          name: fullName.trim(),
-          email: email.trim(),
-          phone: phone.replace(/[^\d+]/g, '').trim(),
-          address,
-          city,
-          postalCode,
-          country: 'Sri Lanka',
-        },
-        autoRedirect: false,
-      });
-
-      if (!checkoutRes.success || !checkoutRes.checkoutUrl) {
-        setIsSubmitting(false);
-        alert(`Could not initiate secure card checkout: ${checkoutRes.error || 'Please verify your contact details or choose Direct Bank Deposit / Cash on Delivery.'}`);
-        return;
-      }
-
-      // Step 2: Session created successfully on Payments.lk! Save order as pending_card before redirecting
+      // Step 1: Pre-save order as pending_card before launching payment
       orderData.paymentStatus = 'pending_card';
       orderData.status = 'pending';
+      orderData.paymentMethod = 'Online Card & LankaQR (PayHere)';
       setLastOrder(orderData);
       useAdminStore.getState().syncNewOrder(orderData);
 
@@ -538,7 +516,7 @@ export default function Checkout() {
               total: orderData.total,
               cost_price: Math.round(orderData.subtotal * 0.45),
               delivery_method: orderData.deliveryMethod,
-              payment_method: 'Online Card & LankaQR (Payments.lk)',
+              payment_method: 'Online Card & LankaQR (PayHere)',
               payment_status: 'pending_card',
               status: 'pending',
               courier_partner: orderData.courierPartner || 'Sri Lanka Post',
@@ -548,7 +526,7 @@ export default function Checkout() {
             .single();
 
           if (orderErr) {
-            console.error('[Payments.lk Pre-Save Error]:', orderErr);
+            console.error('[PayHere Pre-Save Error]:', orderErr);
           }
 
           if (insertedOrder) {
@@ -570,7 +548,7 @@ export default function Checkout() {
               }));
               const { error: itemsErr } = await supabase.from('order_items').insert(withMeasurements);
               if (itemsErr) {
-                console.warn('[Payments.lk Pre-Save Items with measurements notice, falling back to base payload]:', itemsErr);
+                console.warn('[PayHere Pre-Save Items with measurements notice, falling back to base payload]:', itemsErr);
                 await supabase.from('order_items').insert(baseOrderItems);
               }
             } else {
@@ -578,12 +556,41 @@ export default function Checkout() {
             }
           }
         } catch (dbErr) {
-          console.warn('[Payments.lk Pre-Save Warning]:', dbErr);
+          console.warn('[PayHere Pre-Save Warning]:', dbErr);
         }
       }
 
-      // Step 3: Direct patron to Payments.lk hosted 3D Secure page
-      window.location.href = checkoutRes.checkoutUrl;
+      // Step 2: Launch PayHere Modal Checkout
+      const checkoutRes = await initiatePayHereCheckout({
+        orderId: generatedOrderId,
+        amount: finalTotal,
+        description: `Azhai Boutique Order #${generatedOrderId}`,
+        customer: {
+          name: fullName.trim(),
+          email: email.trim(),
+          phone: phone.replace(/[^\d+]/g, '').trim(),
+          address,
+          city,
+          postalCode,
+          country: 'Sri Lanka',
+        },
+      });
+
+      if (checkoutRes.success) {
+        // Payment authorized successfully! Navigate to OrderSuccess
+        navigate(`/order-success/${generatedOrderId}?payhere=success`);
+        return;
+      }
+
+      setIsSubmitting(false);
+
+      if (checkoutRes.dismissed) {
+        // Patron dismissed modal — cart remains intact
+        alert('Payment was dismissed or closed. Your bag items are saved, and you can retry payment whenever ready.');
+      } else {
+        alert(`Payment could not be completed: ${checkoutRes.error || 'Please try again or select Direct Bank Deposit.'}`);
+      }
+      return;
     } else {
       // COD, Bank Deposit
       finalizeOrderPlacement(orderData);
@@ -1072,7 +1079,7 @@ export default function Checkout() {
                     </div>
                   )}
 
-                  {/* Online Card (Payments.lk 3D Secure Hosted Checkout) */}
+                  {/* Online Card (PayHere 3D Secure Modal Checkout) */}
                   <label className={`p-4 rounded-2xl border cursor-pointer transition-all flex flex-col justify-between space-y-2 ${
                     paymentMethod === 'card'
                       ? 'border-[#701626] bg-[#701626]/5 ring-1 ring-[#701626]'
@@ -1098,7 +1105,7 @@ export default function Checkout() {
                       <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-200">LankaQR</span>
                     </div>
                     <p className="text-[11px] text-[#6D6268]">
-                      Certified 3D Secure hosted checkout powered by <strong>Payments.lk (Payable)</strong>.
+                      Certified 3D Secure checkout powered by <strong>PayHere Payment Gateway</strong>.
                     </p>
                   </label>
 

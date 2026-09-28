@@ -615,7 +615,9 @@ export const useAdminStore = create<AdminState>()(
                 o.payment_id ||
                 (o.admin_notes
                   ? o.admin_notes.match(/Payment ID:\s*([a-zA-Z0-9_\-]+)/i)?.[1] ||
-                    o.admin_notes.match(/pay_[a-zA-Z0-9_\-]+/i)?.[0]
+                    o.admin_notes.match(/PayHere.*?(\d{6,16})/i)?.[1] ||
+                    o.admin_notes.match(/pay_[a-zA-Z0-9_\-]+/i)?.[0] ||
+                    o.admin_notes.match(/\b\d{6,16}\b/)?.[0]
                   : undefined);
 
               return {
@@ -642,6 +644,7 @@ export const useAdminStore = create<AdminState>()(
                 status: o.status as OrderStatus,
                 paymentStatus: o.payment_status,
                 paymentId: extractedPaymentId || undefined,
+                payherePaymentId: extractedPaymentId || undefined,
                 paymentsLkPaymentId: extractedPaymentId || undefined,
                 courierPartner: o.courier_partner || undefined,
                 trackingNumber: o.tracking_number || undefined,
@@ -992,6 +995,7 @@ export const useAdminStore = create<AdminState>()(
               ...ord,
               paymentStatus,
               paymentId: paymentId || ord.paymentId,
+              payherePaymentId: paymentId || ord.payherePaymentId,
               paymentsLkPaymentId: paymentId || ord.paymentsLkPaymentId,
               adminNotes: updatedAdminNotes,
             };

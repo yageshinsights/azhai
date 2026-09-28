@@ -53,14 +53,15 @@ import {
   generateSLPostTrackingNumber, 
   getSLPostTrackingUrl 
 } from '@/lib/slpost-calculator';
-import { requestPaymentsLkRefund } from '@/lib/payments-lk';
+import { requestPayHereRefund } from '@/lib/payhere';
 
 function extractPaymentIdFromNotes(notes?: string): string {
   if (!notes) return '';
   const match =
     notes.match(/Payment ID:\s*([a-zA-Z0-9_\-]+)/i) ||
+    notes.match(/PayHere.*?(\d{6,16})/i) ||
     notes.match(/pay_[a-zA-Z0-9_\-]+/i) ||
-    notes.match(/payment[_-]?id[:\s]+([a-zA-Z0-9_\-]+)/i);
+    notes.match(/\b\d{8,16}\b/);
   return match ? (match[1] || match[0]) : '';
 }
 
@@ -116,6 +117,7 @@ export default function OrderDetailDrawer({ order: propOrder, isOpen, onClose }:
       setRefundAmountLKR(order.total);
       const initialPid =
         (order as any).paymentId ||
+        (order as any).payherePaymentId ||
         (order as any).paymentsLkPaymentId ||
         extractPaymentIdFromNotes(order.adminNotes);
       setRefundPaymentId(initialPid || '');
@@ -364,8 +366,8 @@ export default function OrderDetailDrawer({ order: propOrder, isOpen, onClose }:
     }
   };
 
-  // Manual Trigger: 1-Click Card Refund via Payments.lk Gateway
-  const handleProcessPaymentsLkRefund = async () => {
+  // Manual Trigger: 1-Click Card Refund via PayHere Gateway
+  const handleProcessPayHereRefund = async () => {
     if (!refundAmountLKR || refundAmountLKR <= 0) {
       alert('Please enter a valid refund amount.');
       return;
@@ -378,25 +380,23 @@ export default function OrderDetailDrawer({ order: propOrder, isOpen, onClose }:
 
     const trimmedPid = refundPaymentId.trim();
     if (trimmedPid && trimmedPid.startsWith('AZH-')) {
-      alert(`"${trimmedPid}" is the Order Reference code, not a Payments.lk transaction ID. Please enter the Payment ID (which usually starts with "pay_") from your Payments.lk Merchant Portal, or leave it blank to attempt auto-resolution.`);
+      alert(`"${trimmedPid}" is the Order Reference code, not a PayHere Payment ID. Please enter the numeric Payment ID from your PayHere Dashboard, or leave it blank to attempt auto-resolution.`);
       return;
     }
 
     setIsProcessingRefund(true);
     try {
-      const amountCents = Math.round(refundAmountLKR * 100);
-
-      const res = await requestPaymentsLkRefund({
+      const res = await requestPayHereRefund({
         paymentId: trimmedPid || undefined,
         orderId: order.orderId,
         reference: order.orderId,
         adminNotes: order.adminNotes,
-        amountCents,
+        amount: refundAmountLKR,
         reason: refundReason,
       });
 
       if (!res.success) {
-        alert(`Payments.lk Refund Failed: ${res.error || 'Check payment status on Payments.lk portal.'}`);
+        alert(`PayHere Refund Failed: ${res.error || 'Check payment status on PayHere dashboard.'}`);
         return;
       }
 
@@ -404,7 +404,7 @@ export default function OrderDetailDrawer({ order: propOrder, isOpen, onClose }:
       const isFullRefund = refundAmountLKR >= order.total;
       const newStatus = isFullRefund ? 'cancelled' : currentStatus;
       const resolvedPid = res.data?.paymentId || trimmedPid;
-      const refundNote = `Refunded LKR ${refundAmountLKR.toLocaleString()} via Payments.lk on ${new Date().toLocaleDateString()} (${refundReason})${resolvedPid ? ` [Payment ID: ${resolvedPid}]` : ''}`;
+      const refundNote = `Refunded LKR ${refundAmountLKR.toLocaleString()} via PayHere on ${new Date().toLocaleDateString()} (${refundReason})${resolvedPid ? ` [Payment ID: ${resolvedPid}]` : ''}`;
       const updatedAdminNotes = adminNotes ? `${adminNotes}\n${refundNote}` : refundNote;
 
       setCurrentStatus(newStatus);
@@ -431,7 +431,7 @@ export default function OrderDetailDrawer({ order: propOrder, isOpen, onClose }:
               orderId: order.orderId,
               customerName: order.customer.fullName,
               reason: refundReason,
-              refundNote: `Refunded LKR ${refundAmountLKR.toLocaleString()} to your card via Payments.lk.`,
+              refundNote: `Refunded LKR ${refundAmountLKR.toLocaleString()} to your card via PayHere.`,
             }),
           });
         } catch (mailErr) {
@@ -440,10 +440,10 @@ export default function OrderDetailDrawer({ order: propOrder, isOpen, onClose }:
       }
 
       setIsRefundModalOpen(false);
-      showToast(`Successfully refunded LKR ${refundAmountLKR.toLocaleString()} via Payments.lk!`);
+      showToast(`Successfully refunded LKR ${refundAmountLKR.toLocaleString()} via PayHere!`);
     } catch (err: any) {
-      console.error('[Payments.lk Refund Exception]:', err);
-      alert(`Refund error: ${err?.message || 'Network error while reaching Payments.lk'}`);
+      console.error('[PayHere Refund Exception]:', err);
+      alert(`Refund error: ${err?.message || 'Network error while reaching PayHere'}`);
     } finally {
       setIsProcessingRefund(false);
     }
@@ -690,12 +690,13 @@ export default function OrderDetailDrawer({ order: propOrder, isOpen, onClose }:
                   );
                 })()}
 
-                {/* 💳 Payments.lk Online Card Payment & 1-Click Refund Card */}
+                {/* 💳 PayHere Online Card Payment & 1-Click Refund Card */}
                 {(() => {
                   const isCardOrder = 
                     (order.paymentMethod && (
                       order.paymentMethod.toLowerCase().includes('card') || 
                       order.paymentMethod.toLowerCase().includes('visa') ||
+                      order.paymentMethod.toLowerCase().includes('payhere') ||
                       order.paymentMethod.toLowerCase().includes('payments.lk') ||
                       order.paymentMethod.toLowerCase().includes('lankaqr')
                     )) ||
@@ -714,10 +715,10 @@ export default function OrderDetailDrawer({ order: propOrder, isOpen, onClose }:
                           <CreditCard className="w-5 h-5 text-[#701626]" />
                           <div>
                             <h3 className="font-display text-sm sm:text-base font-bold text-[#110B0E]">
-                              Payments.lk (3D Secure Card &amp; LankaQR)
+                              PayHere (Card &amp; LankaQR)
                             </h3>
                             <p className="text-[10px] text-[#6D6268]">
-                              CBSL Licensed · Powered by Payable Gateway
+                              Central Bank of Sri Lanka (CBSL) Compliant Gateway
                             </p>
                           </div>
                         </div>
@@ -1135,7 +1136,7 @@ export default function OrderDetailDrawer({ order: propOrder, isOpen, onClose }:
         )}
       </AnimatePresence>
 
-      {/* Payments.lk 1-Click Card Refund Modal */}
+      {/* PayHere 1-Click Card Refund Modal */}
       <AnimatePresence>
         {isRefundModalOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
@@ -1149,7 +1150,7 @@ export default function OrderDetailDrawer({ order: propOrder, isOpen, onClose }:
                 <div className="flex items-center gap-2">
                   <RefreshCw className="w-5 h-5 text-rose-700" />
                   <h4 className="font-display text-base sm:text-lg font-bold text-[#110B0E]">
-                    Issue Card Refund via Payments.lk
+                    Issue Card Refund via PayHere
                   </h4>
                 </div>
                 <button
@@ -1181,7 +1182,7 @@ export default function OrderDetailDrawer({ order: propOrder, isOpen, onClose }:
                 <div className="space-y-1.5">
                   <div className="flex items-center justify-between">
                     <label className="block text-[11px] font-bold text-[#110B0E] uppercase tracking-wider">
-                      Payments.lk Transaction ID (Payment ID)
+                      PayHere Payment ID (Numeric)
                     </label>
                     {refundPaymentId && !refundPaymentId.startsWith('AZH-') ? (
                       <span className="text-[10px] text-emerald-700 font-bold bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
@@ -1195,13 +1196,13 @@ export default function OrderDetailDrawer({ order: propOrder, isOpen, onClose }:
                   </div>
                   <input
                     type="text"
-                    placeholder="e.g. pay_281a8b9c... or leave blank for auto-lookup"
+                    placeholder="e.g. 320025071278 or leave blank for auto-lookup"
                     value={refundPaymentId}
                     onChange={(e) => setRefundPaymentId(e.target.value)}
                     className="w-full px-3.5 py-2 text-xs font-mono font-bold rounded-xl bg-white border border-[#C5A059]/40 focus:outline-none focus:border-[#701626]"
                   />
                   <p className="text-[10px] text-[#6D6268]">
-                    Found in your <strong className="text-[#110B0E]">Payments.lk Merchant Portal</strong> under <em>Payments &gt; Transactions</em>.
+                    Found in your <strong className="text-[#110B0E]">PayHere Merchant Dashboard</strong> under <em>Payments &gt; History</em>.
                   </p>
                 </div>
 
@@ -1269,12 +1270,12 @@ export default function OrderDetailDrawer({ order: propOrder, isOpen, onClose }:
                 </button>
                 <button
                   type="button"
-                  onClick={handleProcessPaymentsLkRefund}
+                  onClick={handleProcessPayHereRefund}
                   disabled={isProcessingRefund}
                   className="px-5 py-2.5 rounded-xl bg-rose-700 hover:bg-rose-800 text-white text-xs font-bold uppercase tracking-wider transition-colors shadow-sm flex items-center gap-2 cursor-pointer disabled:opacity-50"
                 >
                   <RefreshCw className={`w-3.5 h-3.5 ${isProcessingRefund ? 'animate-spin' : ''}`} />
-                  <span>{isProcessingRefund ? 'Processing with Payments.lk...' : `Confirm Refund of LKR ${refundAmountLKR.toLocaleString()}`}</span>
+                  <span>{isProcessingRefund ? 'Processing with PayHere...' : `Confirm Refund of LKR ${refundAmountLKR.toLocaleString()}`}</span>
                 </button>
               </div>
             </motion.div>
