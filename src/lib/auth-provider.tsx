@@ -147,6 +147,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (ordersErr) {
           console.warn('[AuthProvider Sync Orders Warning]:', ordersErr.message);
         } else if (dbOrders) {
+          // Automatic backfill: Link prior unlinked guest orders for this user
+          const unlinkedOrderIds = dbOrders
+            .filter((o: any) => (!o.user_id || o.user_id !== user.id) && o.id)
+            .map((o: any) => o.id);
+          if (unlinkedOrderIds.length > 0 && user?.id) {
+            supabase
+              .from('orders')
+              .update({ user_id: user.id })
+              .in('id', unlinkedOrderIds)
+              .then(({ error: updateErr }) => {
+                if (updateErr) {
+                  console.warn('[AuthProvider Backfill User ID Warning]:', updateErr.message);
+                }
+              });
+          }
+
           const mappedOrders = dbOrders.map((o: any) => ({
             orderId: o.order_code,
             items: (o.order_items || []).map((item: any) => ({

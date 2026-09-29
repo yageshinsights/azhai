@@ -4,17 +4,17 @@ import { useLocation, useNavigate, Link } from 'react-router-dom';
 import { 
   ShoppingBag, 
   ArrowLeft, 
+  ArrowRight,
   Check, 
   ShieldCheck, 
   Truck, 
   CreditCard, 
   Banknote, 
   Sparkles, 
-  Crown, 
-  Tag, 
   Lock,
+  Eye,
+  EyeOff,
   Building2,
-  Calendar,
   Copy,
   AlertCircle,
   ChevronDown,
@@ -70,7 +70,7 @@ export default function Checkout() {
   const state = (location.state as { appliedCoupon?: string; discountAmount?: number; giftNote?: string }) || {};
 
   const { items, removeItem, clearCart, setLastOrder, totalPrice } = useCartStore();
-  const { user, isAuthenticated, addresses, addAddress, addOrder } = useAuthStore();
+  const { user, isAuthenticated, addresses, addAddress, addOrder, login } = useAuthStore();
   const settings = useAdminStore((s) => s.settings);
   const adminProducts = useAdminStore((s) => s.products);
 
@@ -102,6 +102,86 @@ export default function Checkout() {
   const [selectedAddrId, setSelectedAddrId] = useState<string>(defaultAddr?.id || '');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showMobileSummary, setShowMobileSummary] = useState(false);
+
+  // Existing Account Detection & Mandatory Inline Authentication
+  const [existingProfile, setExistingProfile] = useState<{ id: string; fullName: string; email: string } | null>(null);
+  const [isCheckingAccount, setIsCheckingAccount] = useState(false);
+  const [checkoutPassword, setCheckoutPassword] = useState('');
+  const [showCheckoutPassword, setShowCheckoutPassword] = useState(false);
+  const [inlineAuthLoading, setInlineAuthLoading] = useState(false);
+  const [inlineAuthError, setInlineAuthError] = useState<string | null>(null);
+
+  const checkExistingAccount = async (targetEmail: string) => {
+    const cleanEmail = targetEmail.trim().toLowerCase();
+    if (!isSupabaseConfigured() || isAuthenticated || !cleanEmail || !cleanEmail.includes('@') || cleanEmail.length < 5) {
+      setExistingProfile(null);
+      setInlineAuthError(null);
+      return;
+    }
+
+    setIsCheckingAccount(true);
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, full_name, email')
+        .eq('email', cleanEmail)
+        .maybeSingle();
+
+      if (!error && data) {
+        setExistingProfile({
+          id: data.id,
+          fullName: data.full_name || 'Valued Patron',
+          email: data.email,
+        });
+      } else {
+        setExistingProfile(null);
+      }
+    } catch {
+      setExistingProfile(null);
+    } finally {
+      setIsCheckingAccount(false);
+    }
+  };
+
+  const handleInlineLogin = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!checkoutPassword) {
+      setInlineAuthError('Please enter your password to sign in.');
+      return;
+    }
+    setInlineAuthLoading(true);
+    setInlineAuthError(null);
+
+    const res = await login(email.trim().toLowerCase(), checkoutPassword);
+    setInlineAuthLoading(false);
+
+    if (res.success) {
+      setExistingProfile(null);
+      setCheckoutPassword('');
+      const authState = useAuthStore.getState();
+      const currentUser = authState.user;
+      const userAddrs = authState.addresses;
+      const defAddr = userAddrs.find((a) => a.isDefault) || userAddrs[0];
+
+      if (currentUser?.fullName && !fullName) {
+        setFullName(currentUser.fullName);
+      }
+      if (currentUser?.phone && !phone) {
+        setPhone(currentUser.phone);
+      }
+      if (defAddr) {
+        setSelectedAddrId(defAddr.id);
+        setAddress(defAddr.address);
+        setCity(defAddr.city);
+        setDistrict(defAddr.district);
+        setPostalCode(defAddr.postalCode || '');
+        if (defAddr.fullName) setFullName(defAddr.fullName);
+        if (defAddr.phone) setPhone(defAddr.phone);
+      }
+    } else {
+      setInlineAuthError(res.error || 'Incorrect password. Please try again or reset your password.');
+    }
+  };
   const searchParams = new URLSearchParams(location.search);
   const isCancelledPayment = searchParams.get('status') === 'cancelled';
   const cancelledOrderId = searchParams.get('order_id');
@@ -192,12 +272,13 @@ export default function Checkout() {
   };
 
   const handleEmailBlur = () => {
+    checkExistingAccount(email);
     if (isSupabaseConfigured() && email.trim().includes('@') && items.length > 0) {
       supabase
         .from('abandoned_carts')
         .upsert(
           {
-            user_id: user?.id && isUUID(user.id) ? user.id : null,
+            user_id: user?.id && isUUID(user.id) ? user.id : existingProfile?.id && isUUID(existingProfile.id) ? existingProfile.id : null,
             customer_name: fullName.trim() || 'Valued Patron',
             customer_email: email.toLowerCase().trim(),
             items: items.map((i) => ({
@@ -256,11 +337,12 @@ export default function Checkout() {
     // 2. Sync Order to Supabase Postgres (If Configured)
     if (isSupabaseConfigured()) {
       try {
+        const resolvedUserId = user?.id || (existingProfile?.id && isUUID(existingProfile.id) ? existingProfile.id : null);
         const { data: insertedOrder, error: orderErr } = await supabase
           .from('orders')
           .insert({
             order_code: orderData.orderId,
-            user_id: user?.id || null,
+            user_id: resolvedUserId,
             customer_details: {
               ...orderData.customer,
               bank_transfer_details: orderData.bankTransferDetails || null,
@@ -419,6 +501,35 @@ export default function Checkout() {
       }
     }
 
+    // Mandatory Authentication Guard for Registered Accounts
+    if (!isAuthenticated) {
+      let matchedProfile = existingProfile;
+      if (!matchedProfile && isSupabaseConfigured() && email) {
+        try {
+          const { data: p } = await supabase
+            .from('profiles')
+            .select('id, full_name, email')
+            .eq('email', email.trim().toLowerCase())
+            .maybeSingle();
+          if (p) {
+            matchedProfile = {
+              id: p.id,
+              fullName: p.full_name || 'Valued Patron',
+              email: p.email,
+            };
+            setExistingProfile(matchedProfile);
+          }
+        } catch {}
+      }
+
+      if (matchedProfile) {
+        setInlineAuthError('An Azhai account is registered to this email. Please enter your password to proceed.');
+        const el = document.getElementById('checkout-password-input');
+        if (el) el.focus();
+        return;
+      }
+    }
+
     setIsSubmitting(true);
 
     const generatedOrderId = `AZH-${Date.now().toString(36).toUpperCase()}-${Math.floor(1000 + Math.random() * 9000)}`;
@@ -501,11 +612,12 @@ export default function Checkout() {
 
       if (isSupabaseConfigured()) {
         try {
+          const resolvedUserId = user?.id || (existingProfile?.id && isUUID(existingProfile.id) ? existingProfile.id : null);
           const { data: insertedOrder, error: orderErr } = await supabase
             .from('orders')
             .insert({
               order_code: orderData.orderId,
-              user_id: user?.id || null,
+              user_id: resolvedUserId,
               customer_details: orderData.customer,
               delivery_notes: deliveryNotes.trim() || null,
               gift_note: state.giftNote || null,
@@ -755,15 +867,25 @@ export default function Checkout() {
                     <label className="block text-[11px] uppercase tracking-wider text-[#6D6268] font-bold mb-1.5">
                       Email Address
                     </label>
-                    <input
-                      type="email"
-                      required
-                      placeholder="name@example.com"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      onBlur={handleEmailBlur}
-                      className="w-full px-4 py-3 text-xs bg-[#FCFBF8] border border-[#C5A059]/50 rounded-xl text-[#110B0E] focus:outline-none focus:border-[#701626]"
-                    />
+                    <div className="relative">
+                      <input
+                        type="email"
+                        required
+                        placeholder="name@example.com"
+                        value={email}
+                        onChange={(e) => {
+                          setEmail(e.target.value);
+                          if (existingProfile) setExistingProfile(null);
+                        }}
+                        onBlur={handleEmailBlur}
+                        className="w-full px-4 py-3 text-xs bg-[#FCFBF8] border border-[#C5A059]/50 rounded-xl text-[#110B0E] focus:outline-none focus:border-[#701626]"
+                      />
+                      {isCheckingAccount && (
+                        <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                          <div className="w-3.5 h-3.5 border-2 border-[#701626] border-t-transparent rounded-full animate-spin" />
+                        </div>
+                      )}
+                    </div>
                   </div>
                   <div>
                     <label className="block text-[11px] uppercase tracking-wider text-[#6D6268] font-bold mb-1.5">
@@ -779,6 +901,99 @@ export default function Checkout() {
                     />
                   </div>
                 </div>
+
+                {/* Existing Account Detected — Mandatory Inline Sign-In Card */}
+                <AnimatePresence>
+                  {existingProfile && !isAuthenticated && (
+                    <motion.div
+                      initial={{ opacity: 0, height: 0, y: -10 }}
+                      animate={{ opacity: 1, height: 'auto', y: 0 }}
+                      exit={{ opacity: 0, height: 0, y: -10 }}
+                      transition={{ duration: 0.35 }}
+                      className="p-4 sm:p-5 rounded-2xl bg-[#701626]/5 border border-[#C5A059]/60 space-y-3.5 mt-4"
+                    >
+                      <div className="flex items-start gap-3">
+                        <div className="w-8 h-8 rounded-full bg-[#701626] text-white flex items-center justify-center shrink-0 mt-0.5 shadow-sm">
+                          <Lock className="w-4 h-4 text-[#DFBF77]" />
+                        </div>
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2">
+                            <span className="text-[10px] uppercase font-bold tracking-wider text-[#701626] bg-[#701626]/10 px-2 py-0.5 rounded-full border border-[#C5A059]/40">
+                              Azhai Patron Account Found
+                            </span>
+                          </div>
+                          <p className="text-xs font-bold text-[#110B0E]">
+                            Welcome back, {existingProfile.fullName}!
+                          </p>
+                          <p className="text-[11.5px] text-[#6D6268] leading-relaxed">
+                            An account is registered to <span className="font-semibold text-[#110B0E]">{existingProfile.email}</span>. Please enter your password to sign in and complete this order.
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="space-y-2 pt-2 border-t border-[#C5A059]/30">
+                        <div className="flex flex-col sm:flex-row gap-2.5">
+                          <div className="relative flex-1">
+                            <input
+                              id="checkout-password-input"
+                              type={showCheckoutPassword ? 'text' : 'password'}
+                              placeholder="Enter your account password"
+                              value={checkoutPassword}
+                              onChange={(e) => {
+                                setCheckoutPassword(e.target.value);
+                                setInlineAuthError(null);
+                              }}
+                              className="w-full px-4 py-2.5 pr-10 text-xs bg-white border border-[#C5A059]/60 rounded-xl text-[#110B0E] focus:outline-none focus:border-[#701626]"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => setShowCheckoutPassword(!showCheckoutPassword)}
+                              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-[#701626] cursor-pointer"
+                            >
+                              {showCheckoutPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                            </button>
+                          </div>
+                          <button
+                            type="button"
+                            disabled={inlineAuthLoading}
+                            onClick={handleInlineLogin}
+                            className="px-5 py-2.5 bg-[#701626] hover:bg-[#8E1E34] text-white text-xs font-bold uppercase tracking-wider rounded-xl transition-all shadow-sm flex items-center justify-center gap-1.5 disabled:opacity-50 shrink-0 cursor-pointer"
+                          >
+                            {inlineAuthLoading ? (
+                              <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                            ) : (
+                              <>
+                                <span>Sign In</span>
+                                <ArrowRight className="w-3.5 h-3.5 text-[#DFBF77]" />
+                              </>
+                            )}
+                          </button>
+                        </div>
+
+                        {inlineAuthError && (
+                          <p className="text-[11px] text-rose-700 flex items-center gap-1 font-medium">
+                            <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                            <span>{inlineAuthError}</span>
+                          </p>
+                        )}
+
+                        <div className="flex items-center justify-between pt-1 text-[11px]">
+                          <Link
+                            to={`/forgot-password?email=${encodeURIComponent(existingProfile.email)}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-[#701626] hover:underline font-medium"
+                          >
+                            Forgot your password?
+                          </Link>
+                          <span className="text-[10.5px] text-[#6D6268]">
+                            Your cart items remain saved
+                          </span>
+                        </div>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </div>
 
               {/* 2. Sri Lanka Delivery Address */}

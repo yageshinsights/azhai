@@ -16,8 +16,17 @@ export default function Login() {
   const { login, isAuthenticated } = useAuthStore();
   const navigate = useNavigate();
   const location = useLocation();
+  const searchParams = new URLSearchParams(location.search);
+  const emailParam = searchParams.get('email');
+  const redirectParam = searchParams.get('redirect');
 
-  const from = (location.state as { from?: { pathname: string } })?.from?.pathname || '/account';
+  const from = redirectParam || (location.state as { from?: { pathname: string } })?.from?.pathname || '/account';
+
+  useEffect(() => {
+    if (emailParam && !email) {
+      setEmail(emailParam);
+    }
+  }, [emailParam]);
 
   // Auto-redirect if already logged in
   useEffect(() => {
@@ -164,7 +173,7 @@ export default function Login() {
             <p className="text-xs text-[#6D6268]">
               Don&apos;t have an account yet?{' '}
               <Link
-                to="/signup"
+                to={`/signup${location.search || ''}`}
                 className="font-bold text-[#701626] hover:text-[#C5A059] transition-colors inline-flex items-center gap-1"
               >
                 Create Account <ArrowRight className="w-3 h-3" />

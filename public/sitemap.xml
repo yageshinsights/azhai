@@ -56,87 +56,67 @@
     <priority>0.4</priority>
   </url>
   <url>
-    <loc>https://azhaiclothing.lk/collections/kurties</loc>
+    <loc>https://azhaiclothing.lk/collections/festive-kurtis</loc>
     <lastmod>2026-09-29</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://azhaiclothing.lk/collections/sarees</loc>
+    <loc>https://azhaiclothing.lk/collections/handloom-silk</loc>
     <lastmod>2026-09-29</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://azhaiclothing.lk/collections/Anarkali</loc>
+    <loc>https://azhaiclothing.lk/collections/bridal-couture</loc>
     <lastmod>2026-09-29</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://azhaiclothing.lk/collections/Cord sets</loc>
+    <loc>https://azhaiclothing.lk/collections/luxury-dupattas</loc>
     <lastmod>2026-09-29</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://azhaiclothing.lk/products/dusty-plum</loc>
+    <loc>https://azhaiclothing.lk/products/the-empress-anarkali-kurti</loc>
     <lastmod>2026-09-29</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.85</priority>
     <image:image>
-      <image:loc>https://hrmcxxcrnxqhesiywqsc.supabase.co/storage/v1/object/public/product-images/products/prod-1790013444986-s086i2.webp</image:loc>
-      <image:title>Dusty plum anarkali</image:title>
+      <image:loc>https://images.unsplash.com/photo-1610030469983-98e550d6193c?auto=format&amp;fit=crop&amp;w=1200&amp;q=85</image:loc>
+      <image:title>The Empress Anarkali Kurti</image:title>
     </image:image>
   </url>
   <url>
-    <loc>https://azhaiclothing.lk/products/ruby-minimal</loc>
+    <loc>https://azhaiclothing.lk/products/lotus-blossom-organza-saree</loc>
     <lastmod>2026-09-29</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.85</priority>
     <image:image>
-      <image:loc>https://hrmcxxcrnxqhesiywqsc.supabase.co/storage/v1/object/public/product-images/products/prod-1790014385760-iuondr.webp</image:loc>
-      <image:title>Ruby minimal cord set</image:title>
+      <image:loc>https://images.unsplash.com/photo-1583391733956-3750e0ff4e8b?auto=format&amp;fit=crop&amp;w=1200&amp;q=85</image:loc>
+      <image:title>Lotus Blossom Organza Saree</image:title>
     </image:image>
   </url>
   <url>
-    <loc>https://azhaiclothing.lk/products/burgundy-muse</loc>
+    <loc>https://azhaiclothing.lk/products/nilawela-royal-silk-ensemble</loc>
     <lastmod>2026-09-29</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.85</priority>
     <image:image>
-      <image:loc>https://hrmcxxcrnxqhesiywqsc.supabase.co/storage/v1/object/public/product-images/products/prod-1790079662184-re8h3h.webp</image:loc>
-      <image:title>Burgundy muse anarkali</image:title>
+      <image:loc>https://images.unsplash.com/photo-1617627143750-d86bc21e42bb?auto=format&amp;fit=crop&amp;w=1200&amp;q=85</image:loc>
+      <image:title>Nilawela Royal Silk Ensemble</image:title>
     </image:image>
   </url>
   <url>
-    <loc>https://azhaiclothing.lk/products/kalyani-cotton</loc>
+    <loc>https://azhaiclothing.lk/products/mayura-golden-brocade-dupatta</loc>
     <lastmod>2026-09-29</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.85</priority>
     <image:image>
-      <image:loc>https://hrmcxxcrnxqhesiywqsc.supabase.co/storage/v1/object/public/product-images/products/prod-1790180937143-bnbrn6.webp</image:loc>
-      <image:title>Kalyani cotton</image:title>
-    </image:image>
-  </url>
-  <url>
-    <loc>https://azhaiclothing.lk/products/indigo-cord-set</loc>
-    <lastmod>2026-09-29</lastmod>
-    <changefreq>daily</changefreq>
-    <priority>0.85</priority>
-    <image:image>
-      <image:loc>https://hrmcxxcrnxqhesiywqsc.supabase.co/storage/v1/object/public/product-images/products/prod-1790403332386-0mqics.webp</image:loc>
-      <image:title>Indigo cord set</image:title>
-    </image:image>
-  </url>
-  <url>
-    <loc>https://azhaiclothing.lk/products/mangalkari-kurthi</loc>
-    <lastmod>2026-09-29</lastmod>
-    <changefreq>daily</changefreq>
-    <priority>0.85</priority>
-    <image:image>
-      <image:loc>https://hrmcxxcrnxqhesiywqsc.supabase.co/storage/v1/object/public/product-images/products/prod-1790403629609-s5in2o.webp</image:loc>
-      <image:title>Mangalkari Kurthi</image:title>
+      <image:loc>https://images.unsplash.com/photo-1567401893414-76b7b1e5a7a5?auto=format&amp;fit=crop&amp;w=1200&amp;q=85</image:loc>
+      <image:title>Mayura Golden Brocade Dupatta</image:title>
     </image:image>
   </url>
 </urlset>

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { User, Mail, Phone, Lock, Eye, EyeOff, UserPlus, Sparkles, ArrowRight, ShieldCheck, Check } from 'lucide-react';
 import { useAuthStore } from '@/store/auth';
@@ -20,13 +20,24 @@ export default function Signup() {
 
   const { signup, isAuthenticated } = useAuthStore();
   const navigate = useNavigate();
+  const location = useLocation();
+  const searchParams = new URLSearchParams(location.search);
+  const emailParam = searchParams.get('email');
+  const redirectParam = searchParams.get('redirect');
+  const from = redirectParam || '/account';
+
+  useEffect(() => {
+    if (emailParam && !email) {
+      setEmail(emailParam);
+    }
+  }, [emailParam]);
 
   // Auto-redirect if already logged in
   useEffect(() => {
     if (isAuthenticated) {
-      navigate('/account', { replace: true });
+      navigate(from, { replace: true });
     }
-  }, [isAuthenticated, navigate]);
+  }, [isAuthenticated, navigate, from]);
 
   const strength = getPasswordStrength(password);
 
@@ -89,7 +100,7 @@ export default function Signup() {
         htmlContent: buildWelcomeEmailHtml({ customerName: fullName.trim(), email: email.trim() }),
       }).catch((err) => console.error('[Welcome Email Error]:', err));
 
-      navigate('/account', { replace: true });
+      navigate(from, { replace: true });
     } else {
       setError(res.error || 'Failed to create account.');
     }
@@ -313,7 +324,7 @@ export default function Signup() {
             <p className="text-xs text-[#6D6268]">
               Already have an Azhai account?{' '}
               <Link
-                to="/login"
+                to={`/login${location.search || ''}`}
                 className="font-bold text-[#701626] hover:text-[#C5A059] transition-colors inline-flex items-center gap-1"
               >
                 Sign In <ArrowRight className="w-3 h-3" />

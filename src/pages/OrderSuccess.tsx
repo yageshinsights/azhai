@@ -2,7 +2,7 @@ import { useParams, Link, useLocation } from 'react-router-dom';
 import { useMemo, useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
-  CheckCircle2, Truck, ArrowRight, Crown, UserPlus, FileText, Mail, 
+  CheckCircle2, Truck, ArrowRight, Crown, UserPlus, LogIn, FileText, Mail, 
   Sparkles, AlertCircle, Building2, Copy, Check, Upload, FileCheck, 
   MessageCircle, ExternalLink, RefreshCw 
 } from 'lucide-react';
@@ -42,6 +42,7 @@ export default function OrderSuccess() {
   const [previewModalUrl, setPreviewModalUrl] = useState<string | null>(null);
   const [dbOrder, setDbOrder] = useState<any>(null);
   const [isFetchingDb, setIsFetchingDb] = useState(false);
+  const [hasExistingAccount, setHasExistingAccount] = useState<boolean | null>(null);
 
   const handleCopy = (text: string, field: string) => {
     navigator.clipboard.writeText(text);
@@ -294,6 +295,35 @@ export default function OrderSuccess() {
 
     return lastOrder || null;
   }, [orderId, lastOrder, authOrders, adminOrders, dbOrder]);
+
+  // Check if unauthenticated customer email already has an atelier account
+  useEffect(() => {
+    if (isAuthenticated || !order?.customer?.email || !isSupabaseConfigured()) {
+      setHasExistingAccount(false);
+      return;
+    }
+
+    let isMounted = true;
+    (async () => {
+      try {
+        const { data } = await supabase
+          .from('profiles')
+          .select('id')
+          .ilike('email', order.customer.email.trim())
+          .maybeSingle();
+
+        if (isMounted) {
+          setHasExistingAccount(Boolean(data?.id));
+        }
+      } catch {
+        if (isMounted) setHasExistingAccount(false);
+      }
+    })();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [isAuthenticated, order?.customer?.email]);
 
   // Trigger Brevo receipt and admin alert for verified card returns
   useEffect(() => {
@@ -1044,9 +1074,17 @@ export default function OrderSuccess() {
                   <FileText className="w-4 h-4" />
                   <span>View in My Orders</span>
                 </Link>
+              ) : hasExistingAccount ? (
+                <Link
+                  to={`/login?email=${encodeURIComponent(order?.customer?.email || '')}&redirect=${encodeURIComponent(`/account?tab=orders&order=${order.orderId}`)}`}
+                  className="px-7 py-3.5 bg-[#701626] hover:bg-[#8E1E34] text-white text-xs uppercase tracking-[0.2em] font-bold rounded-2xl flex items-center justify-center gap-2 shadow-md transition-colors"
+                >
+                  <LogIn className="w-4 h-4" />
+                  <span>Log In to Track Order</span>
+                </Link>
               ) : (
                 <Link
-                  to="/signup"
+                  to={`/signup?email=${encodeURIComponent(order?.customer?.email || '')}&redirect=${encodeURIComponent(`/account?tab=orders&order=${order.orderId}`)}`}
                   className="px-7 py-3.5 bg-[#701626] hover:bg-[#8E1E34] text-white text-xs uppercase tracking-[0.2em] font-bold rounded-2xl flex items-center justify-center gap-2 shadow-md transition-colors"
                 >
                   <UserPlus className="w-4 h-4" />
