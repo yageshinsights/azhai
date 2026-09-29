@@ -2,18 +2,13 @@ import { useParams, Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useState, useMemo, useEffect } from 'react';
 import { 
-  ArrowLeft, 
   ShoppingBag, 
   Heart, 
-  Package, 
-  RotateCcw, 
-  Shield, 
   Check, 
   Star, 
   ChevronDown, 
   ChevronUp, 
   Sparkles,
-  Truck,
   Maximize2,
   Share2,
   Ruler,
@@ -41,7 +36,8 @@ import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 export default function ProductDetail() {
   const { slug } = useParams<{ slug: string }>();
   const adminProducts = useAdminStore((s) => s.products);
-  const allProducts = Array.isArray(adminProducts) ? adminProducts : PRODUCTS;
+  const isSupabaseDataLoaded = useAdminStore((s) => s.isSupabaseDataLoaded);
+  const allProducts = Array.isArray(adminProducts) && adminProducts.length > 0 ? adminProducts : PRODUCTS;
   
   const product = allProducts.find((p) => p.slug === slug);
   const [selectedSize, setSelectedSize] = useState<string>('');
@@ -188,26 +184,28 @@ export default function ProductDetail() {
   const companionSizes = companionProduct?.attributes[0]?.options || ['Free Size'];
   const [companionSize, setCompanionSize] = useState<string>('');
   const [bundleAdded, setBundleAdded] = useState(false);
-
-  if (!product) {
-    return (
-      <div className="min-h-screen flex items-center justify-center text-[#6D6268] font-display text-2xl bg-[#FCFBF8]">
-        Product not found.
-      </div>
-    );
-  }
-
-  const isWishlisted = isInWishlist(product.slug);
-  const sizes = product.attributes[0]?.options || [];
-
   const [quantity, setQuantity] = useState(1);
-  const availableStock = product.stockQuantity !== undefined 
-    ? product.stockQuantity 
-    : (product.quantity !== undefined ? product.quantity : 15);
+  const [showStickyBar, setShowStickyBar] = useState(false);
+
+  useEffect(() => {
+    const onScroll = () => {
+      setShowStickyBar(window.scrollY > 600);
+    };
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
+
+  const isWishlisted = product ? isInWishlist(product.slug) : false;
+  const sizes = product?.attributes[0]?.options || [];
+  const availableStock = product
+    ? (product.stockQuantity !== undefined 
+        ? product.stockQuantity 
+        : (product.quantity !== undefined ? product.quantity : 15))
+    : 0;
   const isOutOfStock = availableStock === 0;
 
   const handleAddToCart = () => {
-    if (isOutOfStock) return;
+    if (!product || isOutOfStock) return;
     addItem({
       id: product.id,
       name: product.name,
@@ -220,17 +218,8 @@ export default function ProductDetail() {
     setTimeout(() => setJustAdded(false), 2000);
   };
 
-  const [showStickyBar, setShowStickyBar] = useState(false);
-
-  useEffect(() => {
-    const onScroll = () => {
-      setShowStickyBar(window.scrollY > 600);
-    };
-    window.addEventListener('scroll', onScroll, { passive: true });
-    return () => window.removeEventListener('scroll', onScroll);
-  }, []);
-
   const handleNativeShare = async () => {
+    if (!product) return;
     if (typeof navigator !== 'undefined' && navigator.share) {
       try {
         await navigator.share({
@@ -247,7 +236,7 @@ export default function ProductDetail() {
   };
 
   const handleAddBundle = () => {
-    if (!companionProduct) return;
+    if (!product || !companionProduct) return;
 
     // 1. Add current main product
     addItem({
@@ -287,6 +276,17 @@ export default function ProductDetail() {
   const toggleAccordion = (id: 'fabric' | 'shipping' | 'care') => {
     setOpenAccordion(openAccordion === id ? null : id);
   };
+
+  if (!product && !isSupabaseDataLoaded) {
+    return (
+      <div className="min-h-screen bg-[#FCFBF8] flex flex-col items-center justify-center pt-32 pb-20 text-[#110B0E]">
+        <div className="w-12 h-12 border-2 border-[#C5A059] border-t-transparent rounded-full animate-spin mb-4" />
+        <p className="font-serif text-[#701626] text-sm tracking-widest uppercase">
+          Unveiling Artisan Creation...
+        </p>
+      </div>
+    );
+  }
 
   if (!product) {
     return (

@@ -174,6 +174,8 @@ interface AdminState {
   tailoringFabrics: TailoringFabric[];
   measurementFields: MeasurementField[];
   sizePresets: SizePreset[];
+  // Data loading flags
+  isSupabaseDataLoaded: boolean;
 
   // Actions
   fetchSupabaseData: () => Promise<void>;
@@ -389,6 +391,7 @@ export const useAdminStore = create<AdminState>()(
       tailoringFabrics: DEFAULT_FABRICS,
       measurementFields: DEFAULT_MEASUREMENT_FIELDS,
       sizePresets: DEFAULT_SIZE_PRESETS,
+      isSupabaseDataLoaded: !isSupabaseConfigured(),
 
       fetchSupabaseData: async () => {
         if (!isSupabaseConfigured()) return;
@@ -837,6 +840,8 @@ export const useAdminStore = create<AdminState>()(
           }
         } catch (err) {
           console.error('[AdminStore Fetch Supabase Error]:', err);
+        } finally {
+          set({ isSupabaseDataLoaded: true });
         }
       },
 
