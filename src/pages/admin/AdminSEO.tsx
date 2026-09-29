@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import AdminLayout from '@/components/admin/AdminLayout';
 import { useAdminStore } from '@/store/admin';
+import { STORE_PHONE, STORE_ADDRESS_FULL } from '@/lib/constants';
 
 export default function AdminSEO() {
   const { products, settings, updateSettings } = useAdminStore();
@@ -47,11 +48,11 @@ export default function AdminSEO() {
     name: 'Azhai Clothing by Preethi',
     image: 'https://azhaiclothing.lk/logo-light.png',
     url: 'https://azhaiclothing.lk',
-    telephone: settings.phoneNumber || '+94 77 123 4567',
+    telephone: settings.phoneNumber || STORE_PHONE,
     priceRange: 'LKR 8,500 - LKR 45,000',
     address: {
       '@type': 'PostalAddress',
-      streetAddress: settings.atelierAddress || '42/A Temple Road, Kollupitiya',
+      streetAddress: settings.atelierAddress || STORE_ADDRESS_FULL,
       addressLocality: 'Colombo',
       postalCode: '00300',
       addressCountry: 'LK',

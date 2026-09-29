@@ -48,7 +48,7 @@ export default function TermsConditions() {
           <div className="space-y-2">
             <h2 className="font-display text-lg font-bold text-[#110B0E]">1. Overview & Business Identity</h2>
             <p>
-              Azhai Boutique is an artisanal couture atelier based in Colombo, Western Province, Sri Lanka ({STORE_ADDRESS_FULL}). All purchases and tailoring commissions made through our web portal or official concierge are governed under the laws of the Democratic Socialist Republic of Sri Lanka.
+              Azhai Boutique is an artisanal couture atelier based in Colombo, Western Province, Sri Lanka ({activeAddress}). All purchases and tailoring commissions made through our web portal or official concierge are governed under the laws of the Democratic Socialist Republic of Sri Lanka.
             </p>
           </div>
 

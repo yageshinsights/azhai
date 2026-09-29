@@ -5,6 +5,7 @@ import { useLocation } from 'react-router-dom';
 import LotusIcon from '@/components/LotusIcon';
 import { useAdminStore, cleanWhatsAppDigits } from '@/store/admin';
 import { useCartStore } from '@/store/cart';
+import { STORE_PHONE } from '@/lib/constants';
 
 export default function WhatsAppConcierge() {
   const [isOpen, setIsOpen] = useState(false);
@@ -106,7 +107,7 @@ export default function WhatsAppConcierge() {
                           Live Atelier Assistance
                         </p>
                         <p className="text-[10px] text-[#701626] font-semibold pt-0.5">
-                          WhatsApp: {whatsappNumber || '+94 77 123 4567'}
+                          WhatsApp: {whatsappNumber || STORE_PHONE}
                         </p>
                       </div>
                     </div>

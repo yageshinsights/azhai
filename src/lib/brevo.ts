@@ -5,10 +5,38 @@
  * Official Inquiries & Orders: orders@azhaiclothing.lk
  */
 
+import { STORE_EMAIL, STORE_PHONE, STORE_WHATSAPP_NUMBER, STORE_SUPPORT_EMAIL } from '@/lib/constants';
+import { useAdminStore, cleanWhatsAppDigits } from '@/store/admin';
+
 const BREVO_API_KEY = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_BREVO_API_KEY) || '';
 const SENDER_EMAIL = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_SENDER_EMAIL) || 'orders@azhaiclothing.lk';
 const SENDER_NAME = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_SENDER_NAME) || 'Azhai Clothing by Preethi';
 const STORE_URL = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_STORE_URL) || 'https://azhaiclothing.lk';
+
+export function getEmailContactDetails() {
+  let settings: any = null;
+  try {
+    if (typeof window !== 'undefined') {
+      settings = useAdminStore.getState()?.settings;
+    }
+  } catch {
+    // fallback to constants
+  }
+
+  const supportEmail = settings?.studio?.supportEmail || settings?.studio?.email || STORE_SUPPORT_EMAIL || STORE_EMAIL;
+  const ordersEmail = settings?.studio?.email || STORE_EMAIL;
+  const phone = settings?.phoneNumber || STORE_PHONE;
+  const whatsappNumber = settings?.whatsappNumber || STORE_PHONE;
+  const whatsappDigits = cleanWhatsAppDigits(whatsappNumber) || STORE_WHATSAPP_NUMBER;
+
+  return {
+    supportEmail,
+    ordersEmail,
+    phone,
+    whatsappNumber,
+    whatsappDigits,
+  };
+}
 
 // Supabase Public Storage Brand Asset URL (Publicly accessible in all email inboxes)
 export const LOGO_URL = 
@@ -181,6 +209,7 @@ export async function createOrUpdateBrevoContact(
 
 // ── SHARED LUXURY EMAIL WRAPPER WITH EXACT BRAND LOGO & GOLD TRIM ──
 function wrapEmailLayout(title: string, bodyContent: string): string {
+  const { supportEmail } = getEmailContactDetails();
   return `
 <!DOCTYPE html>
 <html lang="en">
@@ -255,7 +284,7 @@ function wrapEmailLayout(title: string, bodyContent: string): string {
               <p style="margin: 0 0 6px 0; font-weight: bold; color: #701626; text-transform: uppercase; letter-spacing: 1.5px;">Azhai Clothing Colombo</p>
               <p style="margin: 0 0 8px 0;">Handloom, Mulberry Silk & Bespoke Tailoring · Colombo, Sri Lanka</p>
               <p style="margin: 0; font-size: 10.5px; color: #9B9197;">
-                Inquiries & Sizing Concierge: <a href="mailto:orders@azhaiclothing.lk" style="color: #701626; font-weight: bold; text-decoration: none;">orders@azhaiclothing.lk</a>
+                Inquiries & Sizing Concierge: <a href="mailto:${supportEmail}" style="color: #701626; font-weight: bold; text-decoration: none;">${supportEmail}</a>
               </p>
             </td>
           </tr>
@@ -334,6 +363,7 @@ export function buildOrderConfirmationHtml(order: {
   };
 }): string {
   const firstName = order.customerName ? order.customerName.split(' ')[0] : 'Valued Patron';
+  const { whatsappNumber } = getEmailContactDetails();
   const isBankTransfer = 
     Boolean(order.bankTransferDetails) || 
     (order.paymentMethod && order.paymentMethod.toLowerCase().includes('bank'));
@@ -413,7 +443,7 @@ export function buildOrderConfirmationHtml(order: {
               </tr>
             </table>
             <p style="font-size: 11px; color: #6D6268; margin: 12px 0 0 0; line-height: 1.5;">
-              Once deposited, please reply to this email with your slip or send it to our WhatsApp concierge (+94 77 123 4567). Your order will be confirmed and processed immediately upon verification.
+              Once deposited, please reply to this email with your slip or send it to our WhatsApp concierge (${whatsappNumber}). Your order will be confirmed and processed immediately upon verification.
             </p>
           </td>
         </tr>
@@ -1224,6 +1254,7 @@ export function buildCustomerInquiryConfirmationHtml(params: {
   messageSnippet?: string;
 }): string {
   const firstName = params.customerName ? params.customerName.split(' ')[0] : 'Valued Patron';
+  const { whatsappNumber, whatsappDigits } = getEmailContactDetails();
 
   const body = `
     <div style="text-align: center; margin-bottom: 24px;">
@@ -1251,8 +1282,8 @@ export function buildCustomerInquiryConfirmationHtml(params: {
 
     <div style="background-color: #F7F4EE; border-radius: 14px; padding: 16px; margin-bottom: 24px; text-align: center;">
       <p style="font-size: 11.5px; color: #6D6268; margin: 0 0 8px 0;">Need immediate bridal consultation or sizing assistance?</p>
-      <a href="https://wa.me/94777595955" style="display: inline-block; font-size: 12px; font-weight: bold; color: #25D366; text-decoration: none;">
-        💬 Chat on WhatsApp with Preethi (+94 77 759 5955)
+      <a href="https://wa.me/${whatsappDigits}" style="display: inline-block; font-size: 12px; font-weight: bold; color: #25D366; text-decoration: none;">
+        💬 Chat on WhatsApp with Preethi (${whatsappNumber})
       </a>
     </div>
 

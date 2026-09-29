@@ -8,7 +8,7 @@ import {
 import type { PlacedOrder, CartItem } from '@/store/cart';
 import { useAdminStore, cleanWhatsAppDigits } from '@/store/admin';
 import { useCartStore } from '@/store/cart';
-import { STORE_WHATSAPP_NUMBER } from '@/lib/constants';
+import { STORE_WHATSAPP_NUMBER, STORE_EMAIL } from '@/lib/constants';
 import BankBadge from '@/components/BankBadge';
 import { compressToWebP } from '@/lib/image-compressor';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
@@ -486,8 +486,9 @@ export default function OrderDetail({ order, onBack }: OrderDetailProps) {
                   }
 
                   // 2. Send Admin Alert
+                  const adminAlertEmail = import.meta.env.VITE_ADMIN_NOTIFICATION_EMAIL || settings?.studio?.email || STORE_EMAIL;
                   sendBrevoEmail({
-                    to: [{ email: 'orders@azhaiclothing.lk', name: 'Azhai Atelier Operations' }],
+                    to: [{ email: adminAlertEmail, name: 'Azhai Atelier Operations' }],
                     subject: `🔔 [Action Required] Bank Slip Uploaded: Order #${liveOrder.orderId}`,
                     htmlContent: buildBankSlipAdminAlertHtml({
                       orderId: liveOrder.orderId,

@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import AdminLayout from '@/components/admin/AdminLayout';
 import { useAdminStore, type Coupon } from '@/store/admin';
+import { STORE_EMAIL } from '@/lib/constants';
 import CouponModal from '@/components/admin/CouponModal';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import { 
@@ -653,7 +654,7 @@ export default function AdminMarketing() {
               ) : (
                 <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-800 flex items-center gap-2 font-bold">
                   <Check className="w-4 h-4 text-emerald-600" />
-                  <span>Brevo Email Engine Connected & Live ({import.meta.env.VITE_SENDER_EMAIL || 'orders@azhaiclothing.lk'})</span>
+                  <span>Brevo Email Engine Connected & Live ({import.meta.env.VITE_SENDER_EMAIL || STORE_EMAIL})</span>
                 </div>
               )}
 

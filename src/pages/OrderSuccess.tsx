@@ -10,7 +10,7 @@ import { useCartStore } from '@/store/cart';
 import { useAuthStore } from '@/store/auth';
 import { useAdminStore, cleanWhatsAppDigits } from '@/store/admin';
 import SEOHead from '@/components/SEOHead';
-import { STORE_PHONE } from '@/lib/constants';
+import { STORE_PHONE, STORE_EMAIL } from '@/lib/constants';
 import BankBadge from '@/components/BankBadge';
 import { compressToWebP } from '@/lib/image-compressor';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
@@ -371,7 +371,7 @@ export default function OrderSuccess() {
         htmlContent: emailHtml,
       }).catch((err) => console.error('[Brevo Card Confirmation Email Error]:', err));
 
-      const adminEmail = import.meta.env.VITE_ADMIN_NOTIFICATION_EMAIL || 'orders@azhaiclothing.lk';
+      const adminEmail = import.meta.env.VITE_ADMIN_NOTIFICATION_EMAIL || settings?.studio?.email || STORE_EMAIL;
       const adminHtml = buildAdminOrderAlertHtml({
         orderId: order.orderId,
         customerName: order.customer.fullName || 'Valued Patron',
@@ -733,8 +733,9 @@ export default function OrderSuccess() {
                 }
 
                 // 2. Send Admin Alert to Atelier Operations
+                const adminAlertEmail = import.meta.env.VITE_ADMIN_NOTIFICATION_EMAIL || settings?.studio?.email || STORE_EMAIL;
                 sendBrevoEmail({
-                  to: [{ email: 'orders@azhaiclothing.lk', name: 'Azhai Atelier Operations' }],
+                  to: [{ email: adminAlertEmail, name: 'Azhai Atelier Operations' }],
                   subject: `🔔 [Action Required] Bank Slip Uploaded: Order #${order.orderId}`,
                   htmlContent: buildBankSlipAdminAlertHtml({
                     orderId: order.orderId,

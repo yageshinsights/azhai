@@ -23,6 +23,7 @@ import {
 import { useCartStore, type PlacedOrder } from '@/store/cart';
 import { useAuthStore } from '@/store/auth';
 import { useAdminStore } from '@/store/admin';
+import { STORE_EMAIL } from '@/lib/constants';
 import BankBadge from '@/components/BankBadge';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import { sendBrevoEmail, buildOrderConfirmationHtml, buildAdminOrderAlertHtml, createOrUpdateBrevoContact, BREVO_LISTS } from '@/lib/brevo';
@@ -447,7 +448,7 @@ export default function Checkout() {
       });
 
       // Also send Admin Notification to Store Owner
-      const adminEmail = import.meta.env.VITE_ADMIN_NOTIFICATION_EMAIL || 'orders@azhaiclothing.lk';
+      const adminEmail = import.meta.env.VITE_ADMIN_NOTIFICATION_EMAIL || settings?.studio?.email || STORE_EMAIL;
       const adminHtml = buildAdminOrderAlertHtml({
         orderId: orderData.orderId,
         customerName: fullName,
