@@ -46,67 +46,82 @@ export default function TermsConditions() {
         <div className="bg-white rounded-3xl p-6 sm:p-9 border border-[#C5A059]/30 shadow-sm space-y-8 text-xs text-[#6D6268] leading-relaxed">
           
           <div className="space-y-2">
-            <h2 className="font-display text-lg font-bold text-[#110B0E]">1. Overview & Business Identity</h2>
+            <h2 className="font-display text-lg font-bold text-[#110B0E]">1. Overview & Use of the Website</h2>
             <p>
-              Azhai Boutique is an artisanal couture atelier based in Colombo, Western Province, Sri Lanka ({activeAddress}). All purchases and tailoring commissions made through our web portal or official concierge are governed under the laws of the Democratic Socialist Republic of Sri Lanka.
+              Welcome to <strong>Azhai Clothing</strong> (<code className="text-[#701626] font-mono">azhaiclothing.lk</code>). These Terms and Conditions govern your use of our website and the purchase of bespoke couture, handloom silks, and readymade apparel from our platform.
+            </p>
+            <ul className="list-disc pl-5 space-y-1">
+              <li>You must be at least 18 years old or under parental guidance to use our website or place orders.</li>
+              <li>You are responsible for maintaining the confidentiality of your customer account credentials.</li>
+              <li>You agree to provide true, accurate, and current contact and delivery information during checkout.</li>
+              <li>You may not use our website for any unlawful or unauthorized purposes.</li>
+            </ul>
+          </div>
+
+          <div className="space-y-2">
+            <h2 className="font-display text-lg font-bold text-[#110B0E]">2. Product Information & Pricing</h2>
+            <p>
+              We strive to provide accurate product descriptions, handloom specifications, measurements, and pricing. All prices displayed on this website are denominated in Sri Lankan Rupees (LKR). Prices are inclusive of local atelier crafting duties and exclude shipping fees where applicable. Azhai reserves the right to correct accidental typographical errors in pricing prior to order confirmation.
             </p>
           </div>
 
           <div className="space-y-2">
-            <h2 className="font-display text-lg font-bold text-[#110B0E]">2. Pricing & Currency</h2>
+            <h2 className="font-display text-lg font-bold text-[#110B0E]">3. Orders & Payment Processing</h2>
             <p>
-              All prices displayed on this website are denominated in Sri Lankan Rupees (LKR). Prices are inclusive of local atelier crafting duties and exclude shipping fees where applicable. Azhai reserves the right to correct accidental typographical price discrepancies prior to order dispatch.
+              By placing an order on our website, you are making an offer to purchase the selected items. We reserve the right to refuse or cancel any order for reasons including fabric availability, pricing errors, or suspected fraudulent activity.
             </p>
-          </div>
-
-          <div className="space-y-2">
-            <h2 className="font-display text-lg font-bold text-[#110B0E]">3. Payment Processing & Security</h2>
             <p>
-              We accept online credit and debit card payments (Visa, Mastercard, AMEX) and LankaQR via Central Bank of Sri Lanka-certified payment gateways (PayHere Payment Gateway), Cash on Delivery (subject to order limits), and verified Direct Bank Deposits. Online transactions are encrypted under 256-bit TLS protocols with 3D Secure verification. We do not store credit card numbers on our servers.
+              We accept online payments via Central Bank of Sri Lanka-certified payment gateways (PayHere Payment Gateway), including Visa, Mastercard, AMEX, and LankaQR. We use trusted third-party payment processors to handle payment information securely; we do not store full credit card numbers or CVV on our servers.
             </p>
           </div>
 
           <div className="space-y-2">
             <h2 className="font-display text-lg font-bold text-[#110B0E]">4. Bespoke & Custom Tailoring Terms</h2>
             <p>
-              Garments crafted via our Tailoring Studio (custom blouse designs, bespoke neckline finishing, made-to-measure kurtis) are crafted specifically to the measurements provided by the patron.
-            </p>
-            <ul className="list-disc pl-5 space-y-1 pt-1">
-              <li>Patrons are responsible for submitting accurate measurement profiles.</li>
-              <li>Bespoke pieces require a standard crafting lead time of 3 to 7 business days prior to parcel dispatch.</li>
-              <li>Because customized items are individually cut to personal dimensions, they are non-refundable once fabric cutting has commenced; however, our atelier offers complimentary alteration adjustments if the fit differs from submitted specifications.</li>
-            </ul>
-          </div>
-
-          <div className="space-y-2">
-            <h2 className="font-display text-lg font-bold text-[#110B0E]">5. Shipping, Transit & Cash on Delivery (COD)</h2>
-            <p>
-              Parcels are dispatched island-wide across all 25 districts of Sri Lanka via Sri Lanka Post Speed Post Courier. Official transit SLAs are within 24 hours for Western Province (Zone A) and within 48 hours for outstation destinations (Zone B).
-            </p>
-            <p>
-              Cash on Delivery (COD) orders are accepted up to a maximum declared value of LKR 100,000 per postal regulations. The recipient must provide exact cash upon doorstep delivery to the postal officer. In the event of an uncontactable recipient or repeated refusal, Azhai reserves the right to restrict future COD privileges.
+              Garments crafted via our Tailoring Studio are cut and stitched to the measurements submitted by the patron. Standard bespoke lead times are 3 to 7 business days prior to dispatch. Customized items are non-refundable once cutting begins, but qualify for complimentary fit alterations.
             </p>
           </div>
 
           <div className="space-y-2">
-            <h2 className="font-display text-lg font-bold text-[#110B0E]">6. Return, Refund & Cancellation Policy</h2>
+            <h2 className="font-display text-lg font-bold text-[#110B0E]">5. Shipping & Delivery</h2>
             <p>
-              Standard unworn catalog pieces in original condition with intact atelier tags may be eligible for sizing exchanges or returns within 7 days of delivery. Refer to our <Link to="/returns-exchanges" className="text-[#701626] font-bold underline">Atelier Returns & Refund Policy</Link> for full details.
+              We make reasonable efforts to ensure timely delivery via registered domestic couriers (including Sri Lanka Post Speed Post). Standard estimated transit is 24 hours for Western Province and 48 hours outstation. Cash on Delivery (COD) is available subject to order verification.
             </p>
-            <p className="font-medium text-[#110B0E]">
-              <strong>Refund Processing:</strong> In the event of an approved refund, the full refunded amount will be credited back directly to the <strong>payment initiated media itself</strong> (the original debit card, credit card, bank account, or digital payment method used at the time of purchase). Under no circumstances will refunds be issued via third-party bank accounts or cash vouchers. Refunds reflect within 5 to 7 business days following merchant approval.
+          </div>
+
+          <div className="space-y-2">
+            <h2 className="font-display text-lg font-bold text-[#110B0E]">6. Returns, Refunds & Cancellations</h2>
+            <p>
+              Our <Link to="/returns-exchanges" className="text-[#701626] font-bold underline">Returns & Refund Policy</Link> governs the process and conditions for returning products and seeking refunds.
+            </p>
+            <p className="font-medium text-[#110B0E] p-3 rounded-xl bg-[#F7F4EE] border border-[#C5A059]/30">
+              <strong>Refund Processing:</strong> In the event of an approved refund, the full refunded amount will be credited back directly to the <strong>payment initiated media itself</strong> (the original debit card, credit card, bank account, or digital payment method used at the time of purchase). Refunds reflect within 5 to 7 business days following merchant approval.
             </p>
           </div>
 
           <div className="space-y-2">
             <h2 className="font-display text-lg font-bold text-[#110B0E]">7. Intellectual Property</h2>
             <p>
-              All visual lookbooks, garment silhouettes, editorial photographs, brand marks, and software customizations on <code className="font-mono text-[#701626]">azhaiclothing.lk</code> are the proprietary intellectual property of Preethi and Azhai Clothing. Unauthorized commercial reproduction or scraping is strictly prohibited.
+              All visual lookbooks, garment silhouettes, editorial photographs, brand marks, and software customizations on <code className="font-mono text-[#701626]">azhaiclothing.lk</code> are the proprietary intellectual property of Preethi and Azhai Clothing.
             </p>
           </div>
 
           <div className="space-y-2">
-            <h2 className="font-display text-lg font-bold text-[#110B0E]">8. Inquiries & Concierge Assistance</h2>
+            <h2 className="font-display text-lg font-bold text-[#110B0E]">8. Limitation of Liability</h2>
+            <p>
+              In no event shall Azhai Clothing, its proprietors, or artisans be liable for any indirect, incidental, or consequential damages arising out of your use of our website or the purchase and use of our products.
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <h2 className="font-display text-lg font-bold text-[#110B0E]">9. Amendments & Termination</h2>
+            <p>
+              We reserve the right to modify or update these Terms and Conditions at any time without prior notice. Continued use of our website constitutes acceptance of the modified terms.
+            </p>
+          </div>
+
+          <div className="space-y-2 pt-2 border-t border-[#C5A059]/20">
+            <h2 className="font-display text-lg font-bold text-[#110B0E]">10. Inquiries & Concierge Assistance</h2>
             <p>
               For legal inquiries, business correspondence, or order adjustments, please contact our Colombo atelier:
             </p>

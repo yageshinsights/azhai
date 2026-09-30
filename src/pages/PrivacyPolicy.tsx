@@ -36,32 +36,73 @@ export default function PrivacyPolicy() {
 
         {/* Policy Body */}
         <div className="bg-white rounded-3xl p-6 sm:p-9 border border-[#C5A059]/30 shadow-sm space-y-6 text-xs text-[#6D6268] leading-relaxed">
+          <p className="text-sm text-[#110B0E]">
+            At <strong>Azhai Clothing</strong> (azhaiclothing.lk), we are committed to protecting the privacy and security of our customers' personal information. This Privacy Policy outlines how we collect, use, and safeguard your information when you visit or make a purchase on our website. By using our website, you consent to the practices described in this policy.
+          </p>
+
           <div className="space-y-2">
             <h2 className="font-display text-lg font-bold text-[#110B0E]">1. Information We Collect</h2>
+            <p>When you visit our website, we may collect certain information about you, including:</p>
+            <ul className="list-disc pl-5 space-y-1">
+              <li><strong>Personal Identification Information:</strong> Such as your name, email address, delivery address, and phone number provided voluntarily by you during account registration, bespoke tailoring inquiry, or checkout.</li>
+              <li><strong>Payment and Billing Information:</strong> Necessary to process your orders, which are securely handled by trusted third-party payment processors (PayHere Payment Gateway). We do not store or have access to your full credit/debit card numbers or CVV.</li>
+              <li><strong>Browsing Information:</strong> Such as your IP address, browser type, and device information, collected automatically using cookies and similar web analytics technologies.</li>
+            </ul>
+          </div>
+
+          <div className="space-y-2">
+            <h2 className="font-display text-lg font-bold text-[#110B0E]">2. Use of Information</h2>
+            <p>We use the collected information for the following business purposes:</p>
+            <ul className="list-disc pl-5 space-y-1">
+              <li>To process and fulfill your orders, including dispatch, delivery tracking, and bespoke tailoring fitting confirmations.</li>
+              <li>To communicate with you regarding your purchases, provide customer concierge support, and respond to WhatsApp/email inquiries.</li>
+              <li>To improve our boutique website, garment collections, and tailoring services based on patron feedback.</li>
+              <li>To detect and prevent fraudulent transactions, unauthorized access, and abuse of our platform.</li>
+            </ul>
+          </div>
+
+          <div className="space-y-2">
+            <h2 className="font-display text-lg font-bold text-[#110B0E]">3. Information Sharing</h2>
             <p>
-              When you purchase or register an account at Azhai, we collect your name, delivery address, phone number, and email address solely for fulfilling courier dispatch and providing order updates.
+              We respect your privacy and do not sell, trade, or rent your personal information to third parties. We share information only under strict circumstances:
+            </p>
+            <ul className="list-disc pl-5 space-y-1">
+              <li><strong>Trusted Service Providers:</strong> We share delivery coordinates with registered domestic courier partners (such as Sri Lanka Post Speed Post) solely to deliver your orders, and payment data with certified payment gateway processors (PayHere). These providers are contractually obligated to handle your data securely.</li>
+              <li><strong>Legal Requirements:</strong> We may disclose information if required to do so by applicable Sri Lankan laws or valid court orders.</li>
+            </ul>
+          </div>
+
+          <div className="space-y-2">
+            <h2 className="font-display text-lg font-bold text-[#110B0E]">4. Data Security</h2>
+            <p>
+              We implement industry-standard 256-bit TLS encryption and bank-grade security protocols to protect your personal information from unauthorized access, alteration, disclosure, or destruction. Online payment processing adheres to 3D Secure bank authorization standards.
             </p>
           </div>
 
           <div className="space-y-2">
-            <h2 className="font-display text-lg font-bold text-[#110B0E]">2. Payment Security</h2>
+            <h2 className="font-display text-lg font-bold text-[#110B0E]">5. Cookies and Tracking Technologies</h2>
             <p>
-              We never store your credit or debit card numbers on our servers. All card transactions are processed securely through Central Bank of Sri Lanka-certified payment gateways (PayHere Payment Gateway) using 256-bit TLS bank-grade encryption with 3D Secure verification.
+              We use functional cookies to remember your shopping cart items, preserve your customer account session, and analyze general site traffic. You may disable cookies through your browser settings, though certain personalized shopping features may be affected.
             </p>
           </div>
 
           <div className="space-y-2">
-            <h2 className="font-display text-lg font-bold text-[#110B0E]">3. Courier Data Sharing</h2>
+            <h2 className="font-display text-lg font-bold text-[#110B0E]">6. Changes to This Privacy Policy</h2>
             <p>
-              Your contact details (name, delivery address, phone number) are shared strictly with our verified delivery partner (Sri Lanka Post Speed Post Courier) solely for delivering your parcel and dispatch status verification.
+              We reserve the right to update this Privacy Policy periodically. Any updates will be published directly on this page with a revised effective date.
             </p>
           </div>
 
-          <div className="space-y-2">
-            <h2 className="font-display text-lg font-bold text-[#110B0E]">4. Your Privacy Rights</h2>
+          <div className="space-y-2 pt-2 border-t border-[#C5A059]/20">
+            <h2 className="font-display text-lg font-bold text-[#110B0E]">7. Contact Us</h2>
             <p>
-              You have the right to request a copy of your personal data or permanently delete your Azhai account at any time through your Account Settings panel.
+              If you have any questions, requests to access or delete your stored data, please contact our Colombo atelier:
             </p>
+            <div className="p-4 rounded-2xl bg-[#F7F4EE] border border-[#C5A059]/30 space-y-1 font-mono text-[11px] text-[#110B0E]">
+              <p>Email: orders@azhaiclothing.lk | support@azhaiclothing.lk</p>
+              <p>Hotline: +94 77 123 4567</p>
+              <p>Atelier Showroom: 42/A Temple Road, Kollupitiya, Colombo 03, Sri Lanka</p>
+            </div>
           </div>
         </div>
 
