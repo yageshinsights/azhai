@@ -6,6 +6,9 @@
   "observability": {
     "enabled": true
   },
+  "vars": {
+    "VITE_GTM_ID": "GTM-5JFH9Q8R"
+  },
   "assets": {
     "directory": "./dist",
     "not_found_handling": "single-page-application",

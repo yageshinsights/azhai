@@ -11,6 +11,14 @@ declare global {
   }
 }
 
+export const DEFAULT_GTM_ID = 'GTM-5JFH9Q8R';
+
+export function isLocalhost(): boolean {
+  if (typeof window === 'undefined') return false;
+  const host = window.location.hostname;
+  return host === 'localhost' || host === '127.0.0.1' || host === '::1';
+}
+
 /**
  * Initializes Google Tag Manager in <head> and <body>.
  * Safe to call multiple times (guarded against duplicate injection).
@@ -18,7 +26,12 @@ declare global {
 export function initGTM(customId?: string): void {
   if (typeof window === 'undefined') return;
 
-  const gtmId = (customId || import.meta.env.VITE_GTM_ID || '').trim();
+  // Never track on localhost to prevent test data pollution
+  if (isLocalhost() || import.meta.env.DEV) {
+    return;
+  }
+
+  const gtmId = (customId || import.meta.env.VITE_GTM_ID || DEFAULT_GTM_ID).trim();
 
   // If no container ID is configured, exit silently without error
   if (!gtmId) {
@@ -79,6 +92,7 @@ export function initGTM(customId?: string): void {
  */
 export function pushGTMEvent(event: string, params: Record<string, unknown> = {}): void {
   if (typeof window === 'undefined') return;
+  if (isLocalhost() || import.meta.env.DEV) return;
   window.dataLayer = window.dataLayer || [];
   window.dataLayer.push({
     event,
