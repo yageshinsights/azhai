@@ -89,9 +89,12 @@ export default function TermsConditions() {
           </div>
 
           <div className="space-y-2">
-            <h2 className="font-display text-lg font-bold text-[#110B0E]">6. Exchange & Sizing Policy</h2>
+            <h2 className="font-display text-lg font-bold text-[#110B0E]">6. Return, Refund & Cancellation Policy</h2>
             <p>
-              Standard unworn catalog pieces in original condition with intact atelier tags may be eligible for sizing exchanges. Refer to our <Link to="/returns-exchanges" className="text-[#701626] font-bold underline">Atelier Exchanges Policy</Link> for step-by-step instructions.
+              Standard unworn catalog pieces in original condition with intact atelier tags may be eligible for sizing exchanges or returns within 7 days of delivery. Refer to our <Link to="/returns-exchanges" className="text-[#701626] font-bold underline">Atelier Returns & Refund Policy</Link> for full details.
+            </p>
+            <p className="font-medium text-[#110B0E]">
+              <strong>Refund Processing:</strong> In the event of an approved refund, the full refunded amount will be credited back directly to the <strong>payment initiated media itself</strong> (the original debit card, credit card, bank account, or digital payment method used at the time of purchase). Under no circumstances will refunds be issued via third-party bank accounts or cash vouchers. Refunds reflect within 5 to 7 business days following merchant approval.
             </p>
           </div>
 

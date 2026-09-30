@@ -99,9 +99,12 @@ function AnimatedRoutes() {
             <Route path="/shipping-policy" element={<ShippingPolicy />} />
             <Route path="/returns-exchanges" element={<ReturnsExchanges />} />
             <Route path="/returns" element={<Navigate to="/returns-exchanges" replace />} />
+            <Route path="/refund-policy" element={<ReturnsExchanges />} />
+            <Route path="/refunds" element={<Navigate to="/returns-exchanges" replace />} />
             <Route path="/privacy-policy" element={<PrivacyPolicy />} />
             <Route path="/privacy" element={<Navigate to="/privacy-policy" replace />} />
             <Route path="/terms" element={<TermsConditions />} />
+            <Route path="/terms-and-conditions" element={<Navigate to="/terms" replace />} />
             <Route path="/coming-soon" element={<ComingSoon />} />
 
             {/* ── MASTER ADMIN PORTAL ROUTES ── */}

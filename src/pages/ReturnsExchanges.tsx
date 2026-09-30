@@ -72,21 +72,49 @@ export default function ReturnsExchanges() {
           </div>
         </div>
 
+        {/* Refund Policy (PayHere Bank Compliance) */}
+        <div className="bg-white rounded-3xl p-6 sm:p-8 border border-[#C5A059]/35 shadow-sm space-y-4 text-xs text-[#6D6268] leading-relaxed">
+          <div className="flex items-center gap-2">
+            <RotateCcw className="w-5 h-5 text-[#701626]" />
+            <h2 className="font-display text-xl font-bold text-[#110B0E]">
+              Refund Policy & Payment Processing
+            </h2>
+          </div>
+          <p>
+            At Azhai, we take immense pride in the craftsmanship of our handcrafted sarees, silk kurti sets, and bespoke tailoring. In the rare circumstance where an exchange cannot be fulfilled, or if an item arrives damaged or defective, an approved refund will be issued.
+          </p>
+          <div className="p-4 rounded-2xl bg-[#F7F4EE] border border-[#C5A059]/30 space-y-2">
+            <h4 className="font-display text-sm font-bold text-[#701626]">
+              Refund Method & Processing Timeline:
+            </h4>
+            <p className="text-[12px] text-[#110B0E] font-medium leading-relaxed">
+              <strong>All approved refunds will be credited back directly to the original payment method / payment initiated media</strong> from which the initial transaction was placed (e.g., the original Visa/Mastercard credit or debit card, bank account, or electronic payment method). No cash or alternative account substitutions are permitted.
+            </p>
+            <p className="text-[11px] text-[#6D6268]">
+              Once an inspection and approval are completed, the refund is initiated within <strong>2 business days</strong>. Funds typically appear on your statement within <strong>5 to 7 business days</strong>, depending on your card-issuing bank's standard processing cycles.
+            </p>
+          </div>
+        </div>
+
         {/* Conditions */}
         <div className="bg-white rounded-3xl p-6 sm:p-8 border border-[#C5A059]/30 shadow-sm space-y-4 text-xs text-[#6D6268] leading-relaxed">
-          <h3 className="font-display text-lg font-bold text-[#110B0E]">Eligibility Criteria:</h3>
+          <h3 className="font-display text-lg font-bold text-[#110B0E]">Eligibility & Cancellation Criteria:</h3>
           <ul className="space-y-2">
             <li className="flex items-start gap-2">
               <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-              <span>Garments must be unworn, unwashed, and with all original Azhai boutique brand tags attached.</span>
+              <span>Garments must be unworn, unwashed, odor-free, and in their original packaging with all Azhai atelier tags intact.</span>
             </li>
             <li className="flex items-start gap-2">
               <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-              <span>Exchange requests must be submitted promptly upon receiving your delivery.</span>
+              <span>Return or exchange notifications must be submitted within 7 days of parcel receipt.</span>
             </li>
             <li className="flex items-start gap-2">
               <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
-              <span>Custom altered or tailored blouses are non-exchangeable unless defective upon arrival.</span>
+              <span>Custom altered or bespoke tailored garments (made to specific personal dimensions) are non-refundable once cutting begins, but qualify for complimentary atelier fit alterations.</span>
+            </li>
+            <li className="flex items-start gap-2">
+              <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+              <span>Order cancellations prior to dispatch are processed immediately, with 100% of the funds returned to the payment initiated media.</span>
             </li>
           </ul>
         </div>

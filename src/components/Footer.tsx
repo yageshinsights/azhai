@@ -230,7 +230,7 @@ export default function Footer() {
               </li>
               <li>
                 <Link to="/returns-exchanges" className="text-[#6D6268] hover:text-[#701626] transition-colors">
-                  Atelier Returns & Exchanges
+                  Returns & Refund Policy
                 </Link>
               </li>
               <li>
