@@ -88,15 +88,8 @@ export default function Checkout() {
   const [postalCode, setPostalCode] = useState(defaultAddr?.postalCode || '');
   const [deliveryMethod, setDeliveryMethod] = useState<'standard' | 'express'>('standard');
   const [paymentMethod, setPaymentMethod] = useState<'cod' | 'card' | 'bank'>(
-    settings.enableCOD ? 'cod' : 'card'
+    settings.enableCOD ? 'cod' : 'bank'
   );
-
-  // Auto-switch away from COD if admin disables it
-  useEffect(() => {
-    if (!settings.enableCOD && paymentMethod === 'cod') {
-      setPaymentMethod('card');
-    }
-  }, [settings.enableCOD, paymentMethod]);
 
   const [deliveryNotes, setDeliveryNotes] = useState('');
   const [saveAddressToAccount, setSaveAddressToAccount] = useState(false);
@@ -258,6 +251,17 @@ export default function Checkout() {
 
   const finalTotal = Math.max(0, rawTotal - discount + shippingFee);
   const maxAllowedCOD = Math.min(settings.maxCODAmount || SL_POST_MAX_COD_VALUE_LKR, SL_POST_MAX_COD_VALUE_LKR);
+
+  // Auto-switch payment method away from disabled options (Card disabled for now; COD disabled if admin turned off or over limit)
+  useEffect(() => {
+    if (paymentMethod === 'card') {
+      setPaymentMethod(settings.enableCOD && finalTotal <= maxAllowedCOD ? 'cod' : 'bank');
+    } else if (!settings.enableCOD && paymentMethod === 'cod') {
+      setPaymentMethod('bank');
+    } else if (finalTotal > maxAllowedCOD && paymentMethod === 'cod') {
+      setPaymentMethod('bank');
+    }
+  }, [settings.enableCOD, paymentMethod, finalTotal, maxAllowedCOD]);
 
   const handleSelectSavedAddress = (id: string) => {
     setSelectedAddrId(id);
@@ -594,7 +598,15 @@ export default function Checkout() {
       placedAt: new Date().toISOString(),
     };
 
-    // If Online Card Payment selected, route through PayHere Payment Gateway
+    // Online Card Payment (Temporarily disabled until live API access is activated)
+    const ENABLE_CARD_PAYMENT = false;
+    if (paymentMethod === 'card' && !ENABLE_CARD_PAYMENT) {
+      setIsSubmitting(false);
+      setPaymentMethod(settings.enableCOD && finalTotal <= maxAllowedCOD ? 'cod' : 'bank');
+      alert('Online Card & LankaQR payments are coming soon! Please choose Direct Bank Transfer or Cash on Delivery.');
+      return;
+    }
+
     if (paymentMethod === 'card') {
       if (finalTotal <= 0) {
         // Zero-balance orders (e.g. 100% discount promo) bypass external payment gateways
@@ -1279,7 +1291,7 @@ export default function Checkout() {
                       </div>
                       <p className="text-[11px] text-[#6D6268]">
                         {finalTotal > maxAllowedCOD
-                          ? `COD limited to orders up to LKR ${maxAllowedCOD.toLocaleString()} (Sri Lanka Post max limit). Please use Card/Bank.`
+                          ? `COD limited to orders up to LKR ${maxAllowedCOD.toLocaleString()} (Sri Lanka Post max limit). Please use Direct Bank Transfer.`
                           : 'Official SL Post COD. Delivering post office phones you prior to delivery so cash can be ready.'}
                       </p>
                     </label>
@@ -1290,40 +1302,32 @@ export default function Checkout() {
                         <span className="font-bold text-gray-500">Cash on Delivery (Disabled)</span>
                       </div>
                       <p className="text-[10.5px] text-gray-400">
-                        COD is currently paused by the atelier. Please pay via Online Card or Bank Transfer.
+                        COD is currently paused by the atelier. Please pay via Direct Bank Transfer.
                       </p>
                     </div>
                   )}
 
-                  {/* Online Card (PayHere 3D Secure Modal Checkout) */}
-                  <label className={`p-4 rounded-2xl border cursor-pointer transition-all flex flex-col justify-between space-y-2 ${
-                    paymentMethod === 'card'
-                      ? 'border-[#701626] bg-[#701626]/5 ring-1 ring-[#701626]'
-                      : 'border-[#C5A059]/30 bg-[#FCFBF8] hover:border-[#C5A059]'
-                  }`}>
+                  {/* Online Card (Temporarily Disabled - Coming Soon!) */}
+                  <div className="p-4 rounded-2xl border border-dashed border-[#C5A059]/40 bg-[#FCFBF8]/80 opacity-80 cursor-not-allowed flex flex-col justify-between space-y-2 select-none">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
-                        <CreditCard className="w-4 h-4 text-[#701626]" />
-                        <span className="text-xs font-bold text-[#110B0E]">Online Card & LankaQR</span>
+                        <CreditCard className="w-4 h-4 text-[#6D6268]" />
+                        <span className="text-xs font-bold text-[#6D6268]">Online Card & LankaQR</span>
                       </div>
-                      <input
-                        type="radio"
-                        name="payment"
-                        checked={paymentMethod === 'card'}
-                        onChange={() => setPaymentMethod('card')}
-                        className="text-[#701626]"
-                      />
+                      <span className="text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-[#701626]/10 text-[#701626] border border-[#C5A059]/40 flex items-center gap-1 shadow-xs">
+                        <Sparkles className="w-2.5 h-2.5 text-[#C5A059]" /> Coming Soon!
+                      </span>
                     </div>
-                    <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
-                      <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-[#701626]/8 text-[#701626] border border-[#C5A059]/30">Visa</span>
-                      <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-[#701626]/8 text-[#701626] border border-[#C5A059]/30">Mastercard</span>
-                      <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-[#701626]/8 text-[#701626] border border-[#C5A059]/30">AMEX</span>
-                      <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-200">LankaQR</span>
+                    <div className="flex flex-wrap items-center gap-1.5 pt-0.5 opacity-60">
+                      <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-gray-100 text-gray-600 border border-gray-200">Visa</span>
+                      <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-gray-100 text-gray-600 border border-gray-200">Mastercard</span>
+                      <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-gray-100 text-gray-600 border border-gray-200">AMEX</span>
+                      <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-gray-100 text-gray-600 border border-gray-200">LankaQR</span>
                     </div>
-                    <p className="text-[11px] text-[#6D6268]">
-                      Certified 3D Secure checkout powered by <strong>PayHere Payment Gateway</strong>.
+                    <p className="text-[11px] text-[#6D6268] leading-relaxed">
+                      Online card payments are currently being integrated with our acquiring bank and will launch soon. Please choose <strong>Cash on Delivery (COD)</strong> or <strong>Direct Bank Transfer</strong> for your order.
                     </p>
-                  </label>
+                  </div>
 
                   {/* Direct Bank Deposit */}
                   <label className={`p-4 rounded-2xl border cursor-pointer transition-all flex flex-col justify-between space-y-2 ${
