@@ -1309,13 +1309,14 @@ export default function Checkout() {
 
                   {/* Online Card (Temporarily Disabled - Coming Soon!) */}
                   <div className="p-4 rounded-2xl border border-dashed border-[#C5A059]/40 bg-[#FCFBF8]/80 opacity-80 cursor-not-allowed flex flex-col justify-between space-y-2 select-none">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <CreditCard className="w-4 h-4 text-[#6D6268]" />
-                        <span className="text-xs font-bold text-[#6D6268]">Online Card & LankaQR</span>
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <CreditCard className="w-4 h-4 text-[#6D6268] shrink-0" />
+                        <span className="text-xs font-bold text-[#6D6268] whitespace-nowrap">Online Card & LankaQR</span>
                       </div>
-                      <span className="text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-[#701626]/10 text-[#701626] border border-[#C5A059]/40 flex items-center gap-1 shadow-xs">
-                        <Sparkles className="w-2.5 h-2.5 text-[#C5A059]" /> Coming Soon!
+                      <span className="text-[9px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-[#701626]/10 text-[#701626] border border-[#C5A059]/40 flex items-center gap-1 shadow-xs whitespace-nowrap shrink-0">
+                        <Sparkles className="w-2.5 h-2.5 text-[#C5A059] shrink-0" />
+                        <span>Coming Soon!</span>
                       </span>
                     </div>
                     <div className="flex flex-wrap items-center gap-1.5 pt-0.5 opacity-60">
