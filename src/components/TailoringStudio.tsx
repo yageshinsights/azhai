@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Scissors, Ruler, Palette, ShoppingBag, ChevronRight, ChevronLeft, Check, Clock, Sparkles, Layers } from 'lucide-react';
+import { Scissors, Ruler, Palette, ShoppingBag, ChevronRight, ChevronLeft, Check, Clock, Sparkles } from 'lucide-react';
 import { useAdminStore } from '@/store/admin';
 import { useAuthStore } from '@/store/auth';
 import { useCartStore } from '@/store/cart';
@@ -12,7 +12,6 @@ import {
   DEFAULT_DRESS_TYPES,
   DEFAULT_FABRICS,
   DEFAULT_MEASUREMENT_FIELDS,
-  DEFAULT_SIZE_PRESETS,
   formatMeasurement,
   formatLKR,
 } from '@/lib/tailoring';
@@ -25,12 +24,10 @@ export default function TailoringStudio() {
   const storeDressTypes = useAdminStore((s) => s.dressTypes);
   const storeFabrics = useAdminStore((s) => s.tailoringFabrics);
   const storeFields = useAdminStore((s) => s.measurementFields);
-  const storePresets = useAdminStore((s) => s.sizePresets);
 
   const dressTypes = storeDressTypes && storeDressTypes.length > 0 ? storeDressTypes : DEFAULT_DRESS_TYPES;
   const fabrics = storeFabrics && storeFabrics.length > 0 ? storeFabrics : DEFAULT_FABRICS;
   const measurementFields = storeFields && storeFields.length > 0 ? storeFields : DEFAULT_MEASUREMENT_FIELDS;
-  const sizePresets = storePresets && storePresets.length > 0 ? storePresets : DEFAULT_SIZE_PRESETS;
 
   // Cart Store & Auth Store
   const addItem = useCartStore((s) => s.addItem);
@@ -42,7 +39,7 @@ export default function TailoringStudio() {
   const [selectedDressType, setSelectedDressType] = useState<DressType | null>(null);
   const [selectedFabric, setSelectedFabric] = useState<TailoringFabric | null>(null);
   const [unit, setUnit] = useState<'inches' | 'cm'>('inches');
-  const [sizeLabel, setSizeLabel] = useState<string>('M');
+  const [sizeLabel, setSizeLabel] = useState<string>('Custom Fit');
   const [measurements, setMeasurements] = useState<Record<string, number>>({});
   const [isSuccess, setIsSuccess] = useState(false);
 
@@ -105,35 +102,25 @@ export default function TailoringStudio() {
       .sort((a, b) => a.displayOrder - b.displayOrder);
   }, [fabrics, selectedDressType]);
 
+  // Measurement fields for the selected garment collection
   const currentMeasurementFields = useMemo(() => {
-    if (!selectedDressType) return [];
+    if (!selectedCollection) return [];
     return measurementFields
-      .filter(f => f.dressTypeId === selectedDressType.id)
+      .filter(f => f.categorySlug === selectedCollection.slug)
       .sort((a, b) => a.displayOrder - b.displayOrder);
-  }, [measurementFields, selectedDressType]);
+  }, [measurementFields, selectedCollection]);
 
-  const currentSizePresets = useMemo(() => {
-    if (!selectedDressType) return [];
-    return sizePresets.filter(p => p.dressTypeId === selectedDressType.id);
-  }, [sizePresets, selectedDressType]);
-
-  // When dress type changes, initialize measurements from 'M' preset or defaults
+  // When collection or dress type changes, initialize measurements to balanced defaults
   useEffect(() => {
-    if (selectedDressType) {
-      const defaultPreset = currentSizePresets.find(p => p.sizeLabel === 'M') || currentSizePresets[0];
-      if (defaultPreset) {
-        setSizeLabel(defaultPreset.sizeLabel);
-        setMeasurements({ ...defaultPreset.measurements });
-      } else {
-        const initialMap: Record<string, number> = {};
-        currentMeasurementFields.forEach(f => {
-          initialMap[f.fieldName] = f.minValue;
-        });
-        setSizeLabel('Custom');
-        setMeasurements(initialMap);
-      }
+    if (currentMeasurementFields.length > 0) {
+      const initialMap: Record<string, number> = {};
+      currentMeasurementFields.forEach(f => {
+        initialMap[f.fieldName] = Math.round((f.minValue + f.maxValue) / 2);
+      });
+      setSizeLabel('Custom Fit');
+      setMeasurements(initialMap);
     }
-  }, [selectedDressType, currentSizePresets, currentMeasurementFields]);
+  }, [currentMeasurementFields]);
 
   // Step 1 -> Select Collection
   const handleCollectionSelect = (col: Collection) => {
@@ -156,30 +143,34 @@ export default function TailoringStudio() {
     setStep(4);
   };
 
-  // Step 5 -> Add To Bag
+  // Step 5 -> Add To Bag with Transparent Material + Stitching Calculation
   const handleAddToCart = () => {
     if (!selectedDressType || !selectedFabric || !selectedCollection) return;
 
-    const fabricPrice = selectedFabric.pricePerUnit;
+    const fabricPricePerMeter = selectedFabric.pricePerUnit;
+    const requiredMeters = selectedDressType.requiredMeters || 2.5;
+    const fabricTotal = fabricPricePerMeter * requiredMeters;
     const stitchingFee = selectedDressType.stitchingFee;
-    const totalPrice = fabricPrice + stitchingFee;
+    const totalPrice = fabricTotal + stitchingFee;
 
     addItem({
       id: Date.now(),
       name: `Custom ${selectedDressType.name} — ${selectedFabric.name}`,
-      price: `LKR ${totalPrice.toLocaleString()}`,
+      price: `LKR ${Math.round(totalPrice).toLocaleString()}`,
       image: selectedDressType.coverImage,
       quantity: 1,
-      size: sizeLabel === 'Custom' ? 'Custom Fit' : sizeLabel,
+      size: 'Custom Fit',
       tailoring: {
         collectionName: selectedCollection.name,
         collectionSlug: selectedCollection.slug,
         dressTypeName: selectedDressType.name,
         dressTypeSlug: selectedDressType.slug,
         fabricName: selectedFabric.name,
-        fabricPrice,
+        fabricPricePerMeter,
+        requiredMeters,
+        fabricTotal,
         stitchingFee,
-        sizeLabel: sizeLabel === 'Custom' ? 'Custom Fit' : sizeLabel,
+        sizeLabel: 'Custom Fit',
         measurements: { ...measurements },
         leadTime: selectedDressType.leadTime,
       }
@@ -209,7 +200,7 @@ export default function TailoringStudio() {
         <span className="text-[10px] uppercase tracking-[0.3em] text-[#701626] font-bold flex items-center justify-center gap-2">
           <Scissors className="w-3.5 h-3.5" /> BESPOKE TAILORING STUDIO
         </span>
-        <h2 className="font-display text-2xl sm:text-5xl font-bold text-[#110B0E]">
+        <h2 className="font-display text-3xl sm:text-4xl lg:text-5xl font-bold text-[#110B0E]">
           Your measurements. Your fabric. Your masterpiece.
         </h2>
         <p className="text-xs sm:text-sm text-[#6D6268] max-w-xl mx-auto font-light leading-relaxed">
@@ -240,6 +231,7 @@ export default function TailoringStudio() {
                     else if (s.id === 2 && selectedCollection) setStep(2);
                     else if (s.id === 3 && selectedDressType) setStep(3);
                     else if (s.id === 4 && selectedFabric) setStep(4);
+                    else if (s.id === 5 && selectedFabric) setStep(5);
                   }}
                   className={`w-8 h-8 sm:w-12 sm:h-12 rounded-full flex items-center justify-center transition-all cursor-pointer ${
                     isActive
@@ -269,154 +261,144 @@ export default function TailoringStudio() {
         </div>
       </div>
 
-      {/* Steps Content Card */}
-      <div className="max-w-4xl mx-auto bg-white rounded-3xl border border-[#C5A059]/30 shadow-xl overflow-hidden min-h-[520px]">
+      {/* Main Studio Card Container */}
+      <div className="bg-white rounded-3xl border border-[#C5A059]/30 shadow-xl overflow-hidden min-h-[500px] flex flex-col justify-between">
         <AnimatePresence mode="wait">
           
-          {/* STEP 1: SELECT COLLECTION */}
+          {/* STEP 1: CHOOSE GARMENT COLLECTION */}
           {step === 1 && (
-            <motion.div key="step1" variants={variants} initial="initial" animate="animate" exit="exit" className="p-6 sm:p-10 h-full">
+            <motion.div key="step1" variants={variants} initial="initial" animate="animate" exit="exit" className="p-4 sm:p-10 flex flex-col h-full">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
                 <div>
-                  <h3 className="font-display text-2xl font-bold text-[#110B0E]">1. Choose Garment Collection</h3>
-                  <p className="text-xs text-[#6D6268]">Select the garment style category you want tailored</p>
+                  <h3 className="font-display text-2xl sm:text-3xl font-bold text-[#110B0E]">
+                    1. Choose Garment Collection
+                  </h3>
+                  <p className="text-xs sm:text-sm text-[#6D6268]">
+                    Select which attire category you want custom-tailored to your exact fit.
+                  </p>
                 </div>
-                <div className="flex items-center gap-2.5 self-start sm:self-auto">
-                  <span className="text-[11px] font-bold text-[#701626] bg-[#701626]/10 px-3 py-1 rounded-full">
-                    {collections.length} Collections Available
-                  </span>
-                  
-                  {/* Slider Arrow Controls in Header */}
-                  <div className="flex items-center gap-1">
-                    <button
-                      type="button"
-                      onClick={slideLeft}
-                      disabled={!canScrollLeft}
-                      className="w-8 h-8 rounded-full bg-[#F7F4EE] hover:bg-[#701626] text-[#110B0E] hover:text-white disabled:opacity-30 disabled:hover:bg-[#F7F4EE] disabled:hover:text-[#110B0E] flex items-center justify-center transition-all border border-[#C5A059]/30 cursor-pointer disabled:cursor-not-allowed shadow-xs"
-                      title="Previous Collection"
-                      aria-label="Previous Collection"
-                    >
-                      <ChevronLeft className="w-4 h-4" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={slideRight}
-                      disabled={!canScrollRight}
-                      className="w-8 h-8 rounded-full bg-[#F7F4EE] hover:bg-[#701626] text-[#110B0E] hover:text-white disabled:opacity-30 disabled:hover:bg-[#F7F4EE] disabled:hover:text-[#110B0E] flex items-center justify-center transition-all border border-[#C5A059]/30 cursor-pointer disabled:cursor-not-allowed shadow-xs"
-                      title="Next Collection"
-                      aria-label="Next Collection"
-                    >
-                      <ChevronRight className="w-4 h-4" />
-                    </button>
-                  </div>
+                
+                {/* Desktop Carousel Navigation Controls */}
+                <div className="hidden sm:flex items-center gap-2">
+                  <button
+                    onClick={slideLeft}
+                    disabled={!canScrollLeft}
+                    className={`w-9 h-9 rounded-full border border-[#C5A059]/40 flex items-center justify-center transition-all ${
+                      canScrollLeft 
+                        ? 'bg-white text-[#701626] hover:bg-[#701626] hover:text-white cursor-pointer shadow-xs' 
+                        : 'bg-[#F7F4EE] text-gray-300 border-gray-200 cursor-not-allowed'
+                    }`}
+                    title="Slide Left"
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={slideRight}
+                    disabled={!canScrollRight}
+                    className={`w-9 h-9 rounded-full border border-[#C5A059]/40 flex items-center justify-center transition-all ${
+                      canScrollRight 
+                        ? 'bg-white text-[#701626] hover:bg-[#701626] hover:text-white cursor-pointer shadow-xs' 
+                        : 'bg-[#F7F4EE] text-gray-300 border-gray-200 cursor-not-allowed'
+                    }`}
+                    title="Slide Right"
+                  >
+                    <ChevronRight className="w-4 h-4" />
+                  </button>
                 </div>
               </div>
 
-              {/* Slider Track Container */}
-              <div className="relative group/slider">
-                <div
+              {/* Horizontal Scrollable Row of Garment Collections */}
+              <div className="relative">
+                <div 
                   ref={collectionSliderRef}
                   onScroll={checkScroll}
-                  className="flex gap-5 overflow-x-auto scroll-smooth pb-4 pt-1 px-1 snap-x snap-mandatory"
-                  style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+                  className="flex gap-4 sm:gap-6 overflow-x-auto pb-6 pt-2 snap-x snap-mandatory scroll-smooth hide-scrollbar px-1"
                 >
                   {collections.map(col => {
-                    const count = activeDressTypes.filter(d => 
+                    const isSelected = selectedCollection?.id === col.id;
+                    const silhouettesInCol = activeDressTypes.filter(d => 
                       d.collectionSlug === col.slug || 
                       (d.collectionId && d.collectionId === col.id)
-                    ).length;
-                    const isSelected = selectedCollection?.id === col.id || selectedCollection?.slug === col.slug;
+                    );
 
                     return (
-                      <button
-                        key={col.id || col.slug}
-                        onClick={() => handleCollectionSelect(col)}
-                        className={`relative w-[270px] sm:w-[310px] shrink-0 aspect-[3/4] rounded-3xl overflow-hidden group/card text-left transition-all cursor-pointer shadow-md snap-start ${
-                          isSelected ? 'ring-4 ring-[#C5A059]' : 'hover:shadow-xl'
-                        }`}
+                      <div
+                        key={col.id}
+                        className="w-[260px] xs:w-[280px] sm:w-[320px] shrink-0 snap-start flex flex-col"
                       >
-                        <img
-                          src={col.heroImage}
-                          alt={col.name}
-                          className="w-full h-full object-cover transition-transform duration-700 group-hover/card:scale-105"
-                        />
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/35 to-transparent" />
-                        
-                        {/* Top Silhouette Count Badge */}
-                        <div className="absolute top-3.5 right-3.5">
-                          <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-black/60 text-[#DFBF77] border border-[#DFBF77]/40 backdrop-blur-sm shadow-sm">
-                            {count} {count === 1 ? 'Silhouette' : 'Silhouettes'}
-                          </span>
-                        </div>
+                        <button
+                          onClick={() => handleCollectionSelect(col)}
+                          className={`w-full text-left rounded-3xl border-2 transition-all p-3 sm:p-4 bg-[#FCFBF8] flex flex-col h-full group/card cursor-pointer ${
+                            isSelected 
+                              ? 'border-[#701626] shadow-xl shadow-[#701626]/10 ring-2 ring-[#701626]/20 bg-white' 
+                              : 'border-[#C5A059]/30 hover:border-[#C5A059] hover:shadow-lg hover:bg-white'
+                          }`}
+                        >
+                          {/* Image Container with Aspect Ratio */}
+                          <div className="aspect-[4/5] rounded-2xl overflow-hidden relative mb-3 sm:mb-4 bg-gray-100">
+                            <img 
+                              src={col.heroImage} 
+                              alt={col.name} 
+                              className="w-full h-full object-cover group-hover/card:scale-105 transition-transform duration-500" 
+                            />
+                            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
+                            
+                            {/* Badges on image */}
+                            <div className="absolute top-3 left-3 right-3 flex items-center justify-between">
+                              <span className="text-[9px] sm:text-[10px] uppercase tracking-wider font-bold text-white bg-black/40 backdrop-blur-md px-2.5 py-1 rounded-full border border-white/20">
+                                {col.season || 'Signature Edit'}
+                              </span>
+                              <span className="text-[9.5px] font-bold text-[#DFBF77] bg-[#701626]/90 px-2.5 py-0.5 rounded-full shadow-xs">
+                                {silhouettesInCol.length} Silhouettes
+                              </span>
+                            </div>
 
-                        {/* Bottom Collection Information */}
-                        <div className="absolute bottom-0 left-0 right-0 p-5 text-white">
-                          <span className="text-[9.5px] uppercase tracking-[0.2em] text-[#DFBF77] font-bold block mb-1">
-                            {col.season || 'Signature Edit'}
-                          </span>
-                          <h4 className="font-display text-xl font-bold mb-1.5 leading-snug drop-shadow-md">
-                            {col.name}
-                          </h4>
-                          <p className="text-white/80 text-[11px] font-light line-clamp-2 leading-relaxed mb-3">
-                            {col.tagline || col.description}
-                          </p>
-                          <div className="inline-flex items-center gap-1.5 text-xs font-bold text-[#DFBF77] group-hover/card:translate-x-1 transition-transform">
-                            <span>Explore Silhouettes</span>
-                            <ChevronRight className="w-3.5 h-3.5" />
+                            <div className="absolute bottom-3 left-3 right-3 text-white">
+                              <h4 className="font-display text-xl sm:text-2xl font-bold leading-tight drop-shadow-sm">
+                                {col.name}
+                              </h4>
+                            </div>
                           </div>
-                        </div>
-                      </button>
+
+                          {/* Collection Description & CTA */}
+                          <div className="space-y-2 flex-1 flex flex-col justify-between px-1">
+                            <p className="text-xs text-[#6D6268] line-clamp-2 leading-relaxed">
+                              {col.tagline || col.description}
+                            </p>
+
+                            <div className="pt-3 border-t border-black/5 flex items-center justify-between text-xs font-bold text-[#701626]">
+                              <span>Explore Silhouettes</span>
+                              <span className="w-7 h-7 rounded-full bg-[#701626]/10 flex items-center justify-center group-hover/card:bg-[#701626] group-hover/card:text-white transition-colors">
+                                <ChevronRight className="w-3.5 h-3.5" />
+                              </span>
+                            </div>
+                          </div>
+                        </button>
+                      </div>
                     );
                   })}
                 </div>
-
-                {/* Left/Right Floating Side Buttons on Desktop */}
-                {canScrollLeft && (
-                  <button
-                    type="button"
-                    onClick={slideLeft}
-                    className="hidden sm:flex absolute left-2 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white/95 hover:bg-[#701626] text-[#110B0E] hover:text-white backdrop-blur-md shadow-lg border border-[#C5A059]/40 items-center justify-center transition-all cursor-pointer z-20"
-                    title="Slide left"
-                    aria-label="Slide left"
-                  >
-                    <ChevronLeft className="w-5 h-5" />
-                  </button>
-                )}
-                {canScrollRight && (
-                  <button
-                    type="button"
-                    onClick={slideRight}
-                    className="hidden sm:flex absolute right-2 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white/95 hover:bg-[#701626] text-[#110B0E] hover:text-white backdrop-blur-md shadow-lg border border-[#C5A059]/40 items-center justify-center transition-all cursor-pointer z-20"
-                    title="Slide right"
-                    aria-label="Slide right"
-                  >
-                    <ChevronRight className="w-5 h-5" />
-                  </button>
-                )}
               </div>
 
-              {/* Slider Pagination Dots */}
-              {collections.length > 1 && (
-                <div className="flex items-center justify-center gap-2 pt-4">
-                  {collections.map((_, i) => (
-                    <button
-                      key={i}
-                      type="button"
-                      onClick={() => scrollToSlide(i)}
-                      className={`h-1.5 rounded-full transition-all cursor-pointer ${
-                        activeSlideIndex === i ? 'w-6 bg-[#701626]' : 'w-2 bg-[#C5A059]/40 hover:bg-[#C5A059]'
-                      }`}
-                      aria-label={`Slide ${i + 1}`}
-                    />
-                  ))}
-                </div>
-              )}
+              {/* Mobile Swipe / Dots Indicator */}
+              <div className="flex sm:hidden justify-center items-center gap-1.5 pt-2 pb-1">
+                {collections.map((_, i) => (
+                  <button
+                    key={i}
+                    onClick={() => scrollToSlide(i)}
+                    className={`h-1.5 rounded-full transition-all cursor-pointer ${
+                      activeSlideIndex === i ? 'w-5 bg-[#701626]' : 'w-1.5 bg-[#C5A059]/40'
+                    }`}
+                    title={`Slide ${i + 1}`}
+                  />
+                ))}
+              </div>
             </motion.div>
           )}
 
-          {/* STEP 2: SELECT SILHOUETTE FROM CHOSEN COLLECTION */}
+          {/* STEP 2: CHOOSE DESIGN SILHOUETTE */}
           {step === 2 && selectedCollection && (
-            <motion.div key="step2" variants={variants} initial="initial" animate="animate" exit="exit" className="p-6 sm:p-10 h-full">
+            <motion.div key="step2" variants={variants} initial="initial" animate="animate" exit="exit" className="p-4 sm:p-10 flex flex-col h-full">
               <div className="flex items-center gap-4 mb-6">
                 <button
                   onClick={() => setStep(1)}
@@ -426,70 +408,64 @@ export default function TailoringStudio() {
                   <ChevronLeft className="w-5 h-5" />
                 </button>
                 <div>
-                  <h3 className="font-display text-2xl font-bold text-[#110B0E]">2. Select Design Silhouette</h3>
+                  <h3 className="font-display text-2xl font-bold text-[#110B0E]">
+                    2. Select Design Silhouette
+                  </h3>
                   <p className="text-xs text-[#6D6268]">
-                    Signature cuts for <strong className="text-[#701626] font-bold">{selectedCollection.name}</strong>
+                    Designs crafted specifically for <strong className="text-[#701626]">{selectedCollection.name}</strong>
                   </p>
                 </div>
               </div>
-
-              {collectionSilhouettes.length > 0 ? (
-                <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-5">
-                  {collectionSilhouettes.map(dt => {
-                    const isSelected = selectedDressType?.id === dt.id;
-                    return (
-                      <button
-                        key={dt.id}
-                        onClick={() => handleDressSelect(dt)}
-                        className={`relative aspect-[3/4] rounded-2xl sm:rounded-3xl overflow-hidden group text-left transition-all cursor-pointer shadow-md ${
-                          isSelected ? 'ring-3 sm:ring-4 ring-[#C5A059]' : 'hover:shadow-xl'
-                        }`}
-                      >
-                        <img
-                          src={dt.coverImage}
-                          alt={dt.name}
-                          className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
-                        />
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/30 to-transparent" />
-                        
-                        {/* Lead Time Badge */}
-                        <div className="absolute top-2.5 right-2.5 sm:top-3.5 sm:right-3.5">
-                          <span className="text-[9px] sm:text-[10px] font-bold px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-full bg-black/60 text-white/90 border border-white/20 backdrop-blur-sm shadow-sm flex items-center gap-1">
-                            <Clock className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-[#DFBF77]" /> {dt.leadTime}
-                          </span>
+              
+              <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-6">
+                {collectionSilhouettes.map(dt => {
+                  const isSelected = selectedDressType?.id === dt.id;
+                  return (
+                    <button
+                      key={dt.id}
+                      onClick={() => handleDressSelect(dt)}
+                      className={`text-left p-3 sm:p-4 rounded-2xl sm:rounded-3xl border transition-all flex flex-col gap-2 sm:gap-3 cursor-pointer ${
+                        isSelected 
+                          ? 'border-[#701626] bg-[#FCFBF8] shadow-md ring-2 ring-[#701626]/20' 
+                          : 'border-black/5 hover:border-[#C5A059]/50 hover:bg-[#F7F4EE]/60'
+                      }`}
+                    >
+                      <div className="aspect-[3/4] rounded-xl sm:rounded-2xl overflow-hidden relative mb-1 bg-gray-100">
+                        <img src={dt.coverImage} alt={dt.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
+                        <div className="absolute top-2 right-2 bg-black/60 backdrop-blur-md px-2 py-0.5 rounded-full text-[9px] font-semibold text-white flex items-center gap-1">
+                          <Clock className="w-3 h-3 text-[#DFBF77]" />
+                          <span>{dt.leadTime}</span>
                         </div>
-
-                        {/* Bottom Info */}
-                        <div className="absolute bottom-0 left-0 right-0 p-3 sm:p-5 text-white">
-                          <h4 className="font-display text-sm sm:text-xl font-bold mb-0.5 sm:mb-1 leading-snug drop-shadow-md line-clamp-1 sm:line-clamp-none">
-                            {dt.name}
-                          </h4>
-                          {dt.description && (
-                            <p className="hidden sm:block text-white/80 text-[11px] font-light line-clamp-2 leading-relaxed mb-3">
-                              {dt.description}
-                            </p>
-                          )}
-                          <div className="flex items-center justify-between pt-1.5 sm:pt-2 border-t border-white/15">
-                            <span className="text-[10px] sm:text-[11px] text-white/80 font-medium">Stitching:</span>
-                            <span className="font-bold text-[#DFBF77] text-xs sm:text-sm">
-                              {formatLKR(dt.stitchingFee)}
-                            </span>
-                          </div>
+                      </div>
+                      <div>
+                        <h4 className="font-display text-sm sm:text-base font-bold text-[#110B0E] line-clamp-1">{dt.name}</h4>
+                        {dt.description && (
+                          <p className="text-[11px] text-[#6D6268] line-clamp-2 mt-1 hidden sm:block">{dt.description}</p>
+                        )}
+                        <span className="inline-block mt-1 text-[9.5px] font-bold text-[#701626] bg-[#701626]/8 px-2 py-0.5 rounded-full">
+                          📐 {dt.requiredMeters || 2.5}m Fabric Required
+                        </span>
+                      </div>
+                      <div className="mt-auto flex justify-between items-end pt-2 border-t border-black/5">
+                        <div>
+                          <span className="text-[9px] uppercase tracking-wider text-[#6D6268] block">Master Stitching</span>
+                          <span className="text-[#701626] font-bold text-xs sm:text-sm">{formatLKR(dt.stitchingFee)}</span>
                         </div>
-                      </button>
-                    );
-                  })}
-                </div>
-              ) : (
-                <div className="text-center py-16 space-y-3">
-                  <Layers className="w-12 h-12 text-[#C5A059] mx-auto opacity-50" />
-                  <h4 className="font-display text-lg font-bold text-[#110B0E]">No Silhouettes Added Yet</h4>
-                  <p className="text-xs text-[#6D6268] max-w-sm mx-auto">
-                    There are currently no active silhouettes in {selectedCollection.name}. You can add silhouettes from the Admin Tailoring panel.
+                        <span className="text-[10px] sm:text-[11px] font-bold text-[#C5A059] hidden xs:inline">Select &rarr;</span>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {collectionSilhouettes.length === 0 && (
+                <div className="py-16 text-center space-y-3">
+                  <p className="text-sm text-[#6D6268]">
+                    No bespoke silhouettes are currently listed under <strong>{selectedCollection.name}</strong>.
                   </p>
                   <button
                     onClick={() => setStep(1)}
-                    className="px-5 py-2 rounded-xl bg-[#701626] text-white text-xs font-bold uppercase tracking-wider mt-2 cursor-pointer"
+                    className="px-5 py-2 rounded-xl bg-[#701626] text-white text-xs font-bold uppercase tracking-wider cursor-pointer"
                   >
                     Choose Another Collection
                   </button>
@@ -500,7 +476,7 @@ export default function TailoringStudio() {
 
           {/* STEP 3: CHOOSE COMPATIBLE FABRIC */}
           {step === 3 && selectedDressType && (
-            <motion.div key="step3" variants={variants} initial="initial" animate="animate" exit="exit" className="p-6 sm:p-10 flex flex-col h-full">
+            <motion.div key="step3" variants={variants} initial="initial" animate="animate" exit="exit" className="p-4 sm:p-10 flex flex-col h-full">
               <div className="flex items-center gap-4 mb-6">
                 <button
                   onClick={() => setStep(2)}
@@ -512,7 +488,7 @@ export default function TailoringStudio() {
                 <div>
                   <h3 className="font-display text-2xl font-bold text-[#110B0E]">3. Choose Fabric</h3>
                   <p className="text-xs text-[#6D6268]">
-                    Finest artisanal silks and weaves compatible with your <strong className="text-[#701626]">{selectedDressType.name}</strong>
+                    Finest artisanal silks and weaves compatible with your <strong className="text-[#701626]">{selectedDressType.name}</strong> ({selectedDressType.requiredMeters || 2.5}m)
                   </p>
                 </div>
               </div>
@@ -520,6 +496,7 @@ export default function TailoringStudio() {
               <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
                 {compatibleFabrics.map(fb => {
                   const isSelected = selectedFabric?.id === fb.id;
+                  const fabricTotal = fb.pricePerUnit * (selectedDressType.requiredMeters || 2.5);
                   return (
                     <button
                       key={fb.id}
@@ -538,9 +515,14 @@ export default function TailoringStudio() {
                         <p className="text-[9.5px] sm:text-[10px] text-[#6D6268] uppercase tracking-wider mt-0.5 truncate">{fb.weight}</p>
                       </div>
                       <div className="mt-auto flex justify-between items-end pt-2 border-t border-black/5">
-                        <span className="text-[#701626] font-bold text-xs sm:text-sm">
-                          {formatLKR(fb.pricePerUnit)} <span className="text-[9px] sm:text-[10px] font-normal text-[#6D6268]">/ {fb.unit}</span>
-                        </span>
+                        <div>
+                          <div className="text-[#701626] font-bold text-xs sm:text-sm">
+                            {formatLKR(fabricTotal)}
+                          </div>
+                          <div className="text-[9px] text-[#6D6268]">
+                            {formatLKR(fb.pricePerUnit)}/m × {selectedDressType.requiredMeters || 2.5}m
+                          </div>
+                        </div>
                         <span className="text-[10px] sm:text-[11px] font-bold text-[#C5A059] hidden xs:inline">Select & Fit &rarr;</span>
                       </div>
                     </button>
@@ -556,8 +538,8 @@ export default function TailoringStudio() {
           )}
 
           {/* STEP 4: VISUAL FIT & MEASUREMENTS */}
-          {step === 4 && selectedDressType && selectedFabric && (
-            <motion.div key="step4" variants={variants} initial="initial" animate="animate" exit="exit" className="p-6 sm:p-10 flex flex-col h-full space-y-6">
+          {step === 4 && selectedDressType && selectedFabric && selectedCollection && (
+            <motion.div key="step4" variants={variants} initial="initial" animate="animate" exit="exit" className="p-4 sm:p-10 flex flex-col h-full space-y-6">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-4">
                   <button
@@ -568,9 +550,9 @@ export default function TailoringStudio() {
                     <ChevronLeft className="w-5 h-5" />
                   </button>
                   <div>
-                    <h3 className="font-display text-2xl font-bold text-[#110B0E]">4. Visual Fit & Sizing</h3>
+                    <h3 className="font-display text-2xl font-bold text-[#110B0E]">4. Visual Fit & Measurements</h3>
                     <p className="text-xs text-[#6D6268]">
-                      Custom tailoring for your <strong className="text-[#701626]">{selectedDressType.name}</strong>
+                      Custom tailoring for your <strong className="text-[#701626]">{selectedDressType.name}</strong> ({selectedCollection.name})
                     </p>
                   </div>
                 </div>
@@ -602,14 +584,14 @@ export default function TailoringStudio() {
                       const selected = familyProfiles.find((p) => p.id === e.target.value);
                       if (selected) {
                         setMeasurements({ ...selected.measurements });
-                        setSizeLabel('Custom');
+                        setSizeLabel('Custom Fit');
                         if (selected.unit) setUnit(selected.unit);
                       }
                     }}
                     defaultValue=""
                     className="px-4 py-2 rounded-xl bg-white border border-[#C5A059]/40 text-xs font-bold text-[#701626] focus:outline-none focus:ring-1 focus:ring-[#701626] cursor-pointer shadow-xs"
                   >
-                    <option value="" disabled>✨ Load Saved Family Silhouette...</option>
+                    <option value="" disabled>✨ Load Saved Family Profile...</option>
                     {familyProfiles.map((p) => (
                       <option key={p.id} value={p.id}>
                         {p.name} ({p.relationship}){p.isDefault ? ' ⭐ Default' : ''}
@@ -622,7 +604,6 @@ export default function TailoringStudio() {
               {/* Interactive Haute-Couture Fitting Studio */}
               <InteractiveMannequin
                 fields={currentMeasurementFields}
-                presets={currentSizePresets}
                 measurements={measurements}
                 onChangeMeasurements={setMeasurements}
                 sizeLabel={sizeLabel}
@@ -638,7 +619,7 @@ export default function TailoringStudio() {
                 <div className="flex items-center gap-2 text-xs text-[#6D6268]">
                   <Sparkles className="w-4 h-4 text-[#C5A059]" />
                   <span>
-                    Selected: <strong className="text-[#110B0E]">{sizeLabel === 'Custom' ? 'Custom Fit Dimensions' : `Preset Size ${sizeLabel}`}</strong>
+                    Fit Profile: <strong className="text-[#110B0E]">Bespoke Custom Measurements</strong>
                   </span>
                 </div>
 
@@ -655,7 +636,7 @@ export default function TailoringStudio() {
 
           {/* STEP 5: REVIEW & ADD TO BAG */}
           {step === 5 && selectedDressType && selectedFabric && selectedCollection && (
-            <motion.div key="step5" variants={variants} initial="initial" animate="animate" exit="exit" className="p-6 sm:p-10">
+            <motion.div key="step5" variants={variants} initial="initial" animate="animate" exit="exit" className="p-4 sm:p-10">
               <div className="flex items-center gap-4 mb-6">
                 <button
                   onClick={() => setStep(4)}
@@ -705,18 +686,20 @@ export default function TailoringStudio() {
                           {selectedCollection.name} · Bespoke Couture
                         </span>
                         <h4 className="font-display text-2xl sm:text-3xl font-bold text-[#110B0E] mt-1">{selectedDressType.name}</h4>
-                        <p className="text-sm text-[#6D6268] mt-1">Crafted in {selectedFabric.name}</p>
+                        <p className="text-sm text-[#6D6268] mt-1">
+                          Crafted in {selectedFabric.name} · {selectedDressType.requiredMeters || 2.5}m fabric
+                        </p>
                       </div>
 
                       <div className="space-y-4 mb-6">
                         <div className="flex justify-between items-center pb-2 border-b border-black/5">
                           <span className="text-xs font-bold text-[#6D6268] uppercase tracking-wider">Fit Profile</span>
                           <span className="text-xs font-bold text-[#701626] bg-[#701626]/10 px-3 py-1 rounded-full">
-                            {sizeLabel === 'Custom' ? '✨ Custom Fit' : `Preset Size ${sizeLabel}`}
+                            ✨ Custom Fit Dimensions
                           </span>
                         </div>
                         
-                        <div className="bg-white rounded-2xl p-4 border border-[#C5A059]/30 shadow-sm">
+                        <div className="bg-white rounded-2xl p-4 border border-[#C5A059]/30 shadow-xs">
                           <h5 className="text-[10px] uppercase tracking-wider font-bold text-[#6D6268] mb-3 flex items-center gap-1.5">
                             <Ruler className="w-3.5 h-3.5 text-[#701626]" /> Tailor Measurement Matrix
                           </h5>
@@ -733,11 +716,15 @@ export default function TailoringStudio() {
                           </div>
                         </div>
 
-                        {/* Price Breakdown */}
+                        {/* Transparent Price Breakdown */}
                         <div className="space-y-2 pt-2 text-xs text-[#6D6268]">
                           <div className="flex justify-between items-center">
-                            <span>Fabric Cost ({selectedFabric.name}):</span>
-                            <span className="font-bold text-[#110B0E]">{formatLKR(selectedFabric.pricePerUnit)}</span>
+                            <span>
+                              Fabric Cost ({selectedFabric.name} · {selectedDressType.requiredMeters || 2.5}m @ {formatLKR(selectedFabric.pricePerUnit)}/m):
+                            </span>
+                            <span className="font-bold text-[#110B0E]">
+                              {formatLKR(selectedFabric.pricePerUnit * (selectedDressType.requiredMeters || 2.5))}
+                            </span>
                           </div>
                           <div className="flex justify-between items-center">
                             <span>Master Stitching & Tailoring:</span>
@@ -746,7 +733,7 @@ export default function TailoringStudio() {
                           <div className="flex justify-between items-center pt-3 border-t border-[#C5A059]/30 text-base font-bold text-[#110B0E]">
                             <span>Total Investment:</span>
                             <span className="text-[#701626] font-display text-2xl font-bold">
-                              {formatLKR(selectedFabric.pricePerUnit + selectedDressType.stitchingFee)}
+                              {formatLKR((selectedFabric.pricePerUnit * (selectedDressType.requiredMeters || 2.5)) + selectedDressType.stitchingFee)}
                             </span>
                           </div>
                         </div>

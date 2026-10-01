@@ -15,6 +15,7 @@ export interface DressType {
   slug: string;
   coverImage: string;        // WebP URL from Supabase Storage
   stitchingFee: number;      // LKR
+  requiredMeters: number;    // Fabric meterage required for this silhouette
   leadTime: string;          // e.g. "5–7 working days"
   description?: string;      // Styling & cut details
   isActive: boolean;
@@ -26,7 +27,7 @@ export interface TailoringFabric {
   name: string;
   slug: string;
   swatchImage: string;       // WebP URL from Supabase Storage
-  pricePerUnit: number;      // LKR
+  pricePerUnit: number;      // LKR (per meter)
   unit: string;              // "meter", "piece", etc.
   weight: string;            // e.g. "85 GSM · Heavy Fall"
   compatibleDressTypeIds: number[];
@@ -36,19 +37,12 @@ export interface TailoringFabric {
 
 export interface MeasurementField {
   id: number;
-  dressTypeId: number;
+  categorySlug: string;      // Links to Category / Collection slug (e.g. "kurties", "sarees")
   fieldName: string;         // "bust", "waist", etc.
   fieldLabel: string;        // "Bust / Chest"
   minValue: number;          // in inches (canonical unit)
   maxValue: number;          // in inches
   displayOrder: number;
-}
-
-export interface SizePreset {
-  id: number;
-  dressTypeId: number;
-  sizeLabel: string;         // "S", "M", "L", "XL", "XXL"
-  measurements: Record<string, number>; // { bust: 34, waist: 28, ... } in inches
 }
 
 /** Attached to CartItem.tailoring when a tailored item is added to bag */
@@ -58,9 +52,11 @@ export interface TailoringCartData {
   dressTypeName: string;     // Silhouette / design name
   dressTypeSlug: string;
   fabricName: string;
-  fabricPrice: number;       // LKR
+  fabricPricePerMeter: number; // LKR
+  requiredMeters: number;    // Fabric meterage consumed
+  fabricTotal: number;       // LKR (fabricPricePerMeter * requiredMeters)
   stitchingFee: number;      // LKR
-  sizeLabel: string;         // "M" or "Custom"
+  sizeLabel: string;         // Always "Custom Fit"
   measurements: Record<string, number>; // in inches (canonical)
   leadTime: string;
 }
@@ -92,7 +88,7 @@ export function formatMeasurement(valueInInches: number, unit: 'inches' | 'cm'):
 
 /** Format LKR price */
 export function formatLKR(amount: number): string {
-  return `LKR ${amount.toLocaleString('en-LK')}`;
+  return `LKR ${Math.round(amount).toLocaleString('en-LK')}`;
 }
 
 
@@ -109,6 +105,7 @@ export const DEFAULT_DRESS_TYPES: DressType[] = [
     slug: 'anarkali-flared-kurti',
     coverImage: 'https://images.unsplash.com/photo-1610030469983-98e550d6193c?auto=format&fit=crop&w=600&q=85',
     stitchingFee: 3800,
+    requiredMeters: 2.5,
     leadTime: '5–7 working days',
     description: 'Flowing 12-kali flared silhouette with deep pockets and tailored sweetheart neckline.',
     isActive: true,
@@ -121,6 +118,7 @@ export const DEFAULT_DRESS_TYPES: DressType[] = [
     slug: 'straight-cut-slit-kurti',
     coverImage: 'https://images.unsplash.com/photo-1583391733956-3750e0ff4e8b?auto=format&fit=crop&w=600&q=85',
     stitchingFee: 3200,
+    requiredMeters: 2.5,
     leadTime: '5–7 working days',
     description: 'Crisp contemporary straight cut with high side-slits, Mandarin collar, and cigarette pant pairing.',
     isActive: true,
@@ -133,6 +131,7 @@ export const DEFAULT_DRESS_TYPES: DressType[] = [
     slug: 'corset-fitted-peplum-kurti',
     coverImage: 'https://images.unsplash.com/photo-1594938298603-c8148c4dae35?auto=format&fit=crop&w=600&q=85',
     stitchingFee: 4200,
+    requiredMeters: 2.0,
     leadTime: '7–10 working days',
     description: 'Artisanal boned corset bodice tapering into a pleated peplum flare with silk churidar.',
     isActive: true,
@@ -147,6 +146,7 @@ export const DEFAULT_DRESS_TYPES: DressType[] = [
     slug: 'sweetheart-padded-blouse',
     coverImage: 'https://images.unsplash.com/photo-1617627143750-d86bc21e42bb?auto=format&fit=crop&w=600&q=85',
     stitchingFee: 2800,
+    requiredMeters: 1.2,
     leadTime: '3–5 working days',
     description: 'Sculpted sweetheart neckline with lightweight breathable padded cups and gold piping.',
     isActive: true,
@@ -159,6 +159,7 @@ export const DEFAULT_DRESS_TYPES: DressType[] = [
     slug: 'princess-cut-deep-u-blouse',
     coverImage: 'https://images.unsplash.com/photo-1583391733956-3750e0ff4e8b?auto=format&fit=crop&w=600&q=85',
     stitchingFee: 2500,
+    requiredMeters: 1.0,
     leadTime: '3–5 working days',
     description: 'Classic contoured princess darting with an artisanal deep-U back and handmade latkan tassels.',
     isActive: true,
@@ -171,6 +172,7 @@ export const DEFAULT_DRESS_TYPES: DressType[] = [
     slug: 'high-neck-temple-blouse',
     coverImage: 'https://images.unsplash.com/photo-1567401893414-76b7b1e5a7a5?auto=format&fit=crop&w=600&q=85',
     stitchingFee: 3200,
+    requiredMeters: 1.2,
     leadTime: '5–7 working days',
     description: 'Regal Mandarin high collar tailored with elbow-length sleeves and antique border accents.',
     isActive: true,
@@ -185,6 +187,7 @@ export const DEFAULT_DRESS_TYPES: DressType[] = [
     slug: 'structured-corset-bustier',
     coverImage: 'https://images.unsplash.com/photo-1594938298603-c8148c4dae35?auto=format&fit=crop&w=600&q=85',
     stitchingFee: 2600,
+    requiredMeters: 1.5,
     leadTime: '3–5 working days',
     description: 'Architectural boned bustier crafted for luxury evening wear and fusion saree drapes.',
     isActive: true,
@@ -197,6 +200,7 @@ export const DEFAULT_DRESS_TYPES: DressType[] = [
     slug: 'balloon-sleeve-organza-peplum',
     coverImage: 'https://images.unsplash.com/photo-1610030469983-98e550d6193c?auto=format&fit=crop&w=600&q=85',
     stitchingFee: 3100,
+    requiredMeters: 1.8,
     leadTime: '5–7 working days',
     description: 'Dramatic sheer bishop sleeves with button cuffs and a cinched waistline.',
     isActive: true,
@@ -211,6 +215,7 @@ export const DEFAULT_DRESS_TYPES: DressType[] = [
     slug: 'flared-royal-kalidar-lehenga',
     coverImage: 'https://images.unsplash.com/photo-1567401893414-76b7b1e5a7a5?auto=format&fit=crop&w=600&q=85',
     stitchingFee: 5500,
+    requiredMeters: 5.5,
     leadTime: '10–14 working days',
     description: 'Full 16-kali sweeping circle skirt with double cancan under-lining and heavy waistband.',
     isActive: true,
@@ -225,6 +230,7 @@ export const DEFAULT_DRESS_TYPES: DressType[] = [
     slug: 'patiala-royal-salwar-suit',
     coverImage: 'https://images.unsplash.com/photo-1617627143750-d86bc21e42bb?auto=format&fit=crop&w=600&q=85',
     stitchingFee: 4000,
+    requiredMeters: 4.0,
     leadTime: '7–10 working days',
     description: 'Full pleated traditional Patiala bottom paired with a knee-length tailored tunic.',
     isActive: true,
@@ -284,90 +290,41 @@ export const DEFAULT_FABRICS: TailoringFabric[] = [
 ];
 
 export const DEFAULT_MEASUREMENT_FIELDS: MeasurementField[] = [
-  // Kurties Collection (Dress Types 1, 2, 3)
-  ...[1, 2, 3].flatMap((dtId, idx) => [
-    { id: idx * 5 + 1, dressTypeId: dtId, fieldName: 'bust', fieldLabel: 'Bust / Chest', minValue: 28, maxValue: 48, displayOrder: 1 },
-    { id: idx * 5 + 2, dressTypeId: dtId, fieldName: 'waist', fieldLabel: 'Waist', minValue: 24, maxValue: 44, displayOrder: 2 },
-    { id: idx * 5 + 3, dressTypeId: dtId, fieldName: 'hip', fieldLabel: 'Hip', minValue: 30, maxValue: 50, displayOrder: 3 },
-    { id: idx * 5 + 4, dressTypeId: dtId, fieldName: 'length', fieldLabel: 'Kurti Length', minValue: 30, maxValue: 48, displayOrder: 4 },
-    { id: idx * 5 + 5, dressTypeId: dtId, fieldName: 'sleeveLength', fieldLabel: 'Sleeve Length', minValue: 5, maxValue: 26, displayOrder: 5 },
-  ]),
+  // ── Kurties (All Kurti designs share these fields) ──
+  { id: 1, categorySlug: 'kurties', fieldName: 'bust', fieldLabel: 'Bust / Chest', minValue: 28, maxValue: 48, displayOrder: 1 },
+  { id: 2, categorySlug: 'kurties', fieldName: 'waist', fieldLabel: 'Waist', minValue: 24, maxValue: 44, displayOrder: 2 },
+  { id: 3, categorySlug: 'kurties', fieldName: 'hip', fieldLabel: 'Hip', minValue: 30, maxValue: 50, displayOrder: 3 },
+  { id: 4, categorySlug: 'kurties', fieldName: 'length', fieldLabel: 'Kurti Length', minValue: 30, maxValue: 48, displayOrder: 4 },
+  { id: 5, categorySlug: 'kurties', fieldName: 'sleeveLength', fieldLabel: 'Sleeve Length', minValue: 0, maxValue: 26, displayOrder: 5 },
 
-  // Saree Blouses Collection (Dress Types 4, 5, 6)
-  ...[4, 5, 6].flatMap((dtId, idx) => [
-    { id: 20 + idx * 6 + 1, dressTypeId: dtId, fieldName: 'bust', fieldLabel: 'Bust / Chest', minValue: 28, maxValue: 48, displayOrder: 1 },
-    { id: 20 + idx * 6 + 2, dressTypeId: dtId, fieldName: 'underbust', fieldLabel: 'Underbust', minValue: 24, maxValue: 44, displayOrder: 2 },
-    { id: 20 + idx * 6 + 3, dressTypeId: dtId, fieldName: 'shoulderWidth', fieldLabel: 'Shoulder Width', minValue: 12, maxValue: 20, displayOrder: 3 },
-    { id: 20 + idx * 6 + 4, dressTypeId: dtId, fieldName: 'sleeveLength', fieldLabel: 'Sleeve Length', minValue: 4, maxValue: 24, displayOrder: 4 },
-    { id: 20 + idx * 6 + 5, dressTypeId: dtId, fieldName: 'blouseLength', fieldLabel: 'Blouse Length', minValue: 12, maxValue: 22, displayOrder: 5 },
-    { id: 20 + idx * 6 + 6, dressTypeId: dtId, fieldName: 'backNeckDepth', fieldLabel: 'Back Neck Depth', minValue: 4, maxValue: 14, displayOrder: 6 },
-  ]),
+  // ── Sarees & Blouses (All Blouse designs share these fields) ──
+  { id: 6, categorySlug: 'sarees', fieldName: 'bust', fieldLabel: 'Bust / Chest', minValue: 28, maxValue: 48, displayOrder: 1 },
+  { id: 7, categorySlug: 'sarees', fieldName: 'underbust', fieldLabel: 'Underbust', minValue: 24, maxValue: 44, displayOrder: 2 },
+  { id: 8, categorySlug: 'sarees', fieldName: 'shoulderWidth', fieldLabel: 'Shoulder Width', minValue: 12, maxValue: 20, displayOrder: 3 },
+  { id: 9, categorySlug: 'sarees', fieldName: 'sleeveLength', fieldLabel: 'Sleeve Length', minValue: 0, maxValue: 24, displayOrder: 4 },
+  { id: 10, categorySlug: 'sarees', fieldName: 'blouseLength', fieldLabel: 'Blouse Length', minValue: 12, maxValue: 22, displayOrder: 5 },
+  { id: 11, categorySlug: 'sarees', fieldName: 'backNeckDepth', fieldLabel: 'Back Neck Depth', minValue: 4, maxValue: 14, displayOrder: 6 },
 
-  // Tops & Bustiers Collection (Dress Types 7, 8)
-  ...[7, 8].flatMap((dtId, idx) => [
-    { id: 40 + idx * 5 + 1, dressTypeId: dtId, fieldName: 'bust', fieldLabel: 'Bust / Chest', minValue: 28, maxValue: 48, displayOrder: 1 },
-    { id: 40 + idx * 5 + 2, dressTypeId: dtId, fieldName: 'waist', fieldLabel: 'Waist', minValue: 24, maxValue: 44, displayOrder: 2 },
-    { id: 40 + idx * 5 + 3, dressTypeId: dtId, fieldName: 'shoulderWidth', fieldLabel: 'Shoulder Width', minValue: 12, maxValue: 20, displayOrder: 3 },
-    { id: 40 + idx * 5 + 4, dressTypeId: dtId, fieldName: 'topLength', fieldLabel: 'Top Length', minValue: 14, maxValue: 28, displayOrder: 4 },
-    { id: 40 + idx * 5 + 5, dressTypeId: dtId, fieldName: 'sleeveLength', fieldLabel: 'Sleeve Length', minValue: 0, maxValue: 26, displayOrder: 5 },
-  ]),
+  // ── Tops & Bustiers (All Tops share these fields) ──
+  { id: 12, categorySlug: 'tops', fieldName: 'bust', fieldLabel: 'Bust / Chest', minValue: 28, maxValue: 48, displayOrder: 1 },
+  { id: 13, categorySlug: 'tops', fieldName: 'waist', fieldLabel: 'Waist', minValue: 24, maxValue: 44, displayOrder: 2 },
+  { id: 14, categorySlug: 'tops', fieldName: 'shoulderWidth', fieldLabel: 'Shoulder Width', minValue: 12, maxValue: 20, displayOrder: 3 },
+  { id: 15, categorySlug: 'tops', fieldName: 'topLength', fieldLabel: 'Top Length', minValue: 14, maxValue: 28, displayOrder: 4 },
+  { id: 16, categorySlug: 'tops', fieldName: 'sleeveLength', fieldLabel: 'Sleeve Length', minValue: 0, maxValue: 26, displayOrder: 5 },
 
-  // Lehenga Choli (Dress Type 9)
-  { id: 60, dressTypeId: 9, fieldName: 'bust', fieldLabel: 'Bust / Chest', minValue: 28, maxValue: 48, displayOrder: 1 },
-  { id: 61, dressTypeId: 9, fieldName: 'waist', fieldLabel: 'Waist', minValue: 24, maxValue: 44, displayOrder: 2 },
-  { id: 62, dressTypeId: 9, fieldName: 'hip', fieldLabel: 'Hip', minValue: 30, maxValue: 50, displayOrder: 3 },
-  { id: 63, dressTypeId: 9, fieldName: 'lehengaLength', fieldLabel: 'Lehenga Length', minValue: 36, maxValue: 44, displayOrder: 4 },
-  { id: 64, dressTypeId: 9, fieldName: 'choliLength', fieldLabel: 'Choli Length', minValue: 12, maxValue: 22, displayOrder: 5 },
-  { id: 65, dressTypeId: 9, fieldName: 'sleeveLength', fieldLabel: 'Sleeve Length', minValue: 4, maxValue: 24, displayOrder: 6 },
+  // ── Lehengas ──
+  { id: 17, categorySlug: 'lehengas', fieldName: 'bust', fieldLabel: 'Bust / Chest', minValue: 28, maxValue: 48, displayOrder: 1 },
+  { id: 18, categorySlug: 'lehengas', fieldName: 'waist', fieldLabel: 'Waist', minValue: 24, maxValue: 44, displayOrder: 2 },
+  { id: 19, categorySlug: 'lehengas', fieldName: 'hip', fieldLabel: 'Hip', minValue: 30, maxValue: 50, displayOrder: 3 },
+  { id: 20, categorySlug: 'lehengas', fieldName: 'lehengaLength', fieldLabel: 'Lehenga Length', minValue: 36, maxValue: 44, displayOrder: 4 },
+  { id: 21, categorySlug: 'lehengas', fieldName: 'choliLength', fieldLabel: 'Choli Length', minValue: 12, maxValue: 22, displayOrder: 5 },
+  { id: 22, categorySlug: 'lehengas', fieldName: 'sleeveLength', fieldLabel: 'Sleeve Length', minValue: 0, maxValue: 24, displayOrder: 6 },
 
-  // Salwar Suit (Dress Type 10)
-  { id: 70, dressTypeId: 10, fieldName: 'bust', fieldLabel: 'Bust / Chest', minValue: 28, maxValue: 48, displayOrder: 1 },
-  { id: 71, dressTypeId: 10, fieldName: 'waist', fieldLabel: 'Waist', minValue: 24, maxValue: 44, displayOrder: 2 },
-  { id: 72, dressTypeId: 10, fieldName: 'hip', fieldLabel: 'Hip', minValue: 30, maxValue: 50, displayOrder: 3 },
-  { id: 73, dressTypeId: 10, fieldName: 'kameezLength', fieldLabel: 'Kameez Length', minValue: 32, maxValue: 50, displayOrder: 4 },
-  { id: 74, dressTypeId: 10, fieldName: 'sleeveLength', fieldLabel: 'Sleeve Length', minValue: 5, maxValue: 26, displayOrder: 5 },
-  { id: 75, dressTypeId: 10, fieldName: 'salwarLength', fieldLabel: 'Salwar Length', minValue: 34, maxValue: 44, displayOrder: 6 },
-];
-
-export const DEFAULT_SIZE_PRESETS: SizePreset[] = [
-  // Kurties Collection Presets (Dress Types 1, 2, 3)
-  ...[1, 2, 3].flatMap((dtId, idx) => [
-    { id: idx * 5 + 1, dressTypeId: dtId, sizeLabel: 'S', measurements: { bust: 34, waist: 28, hip: 36, length: 38, sleeveLength: 14 } },
-    { id: idx * 5 + 2, dressTypeId: dtId, sizeLabel: 'M', measurements: { bust: 36, waist: 30, hip: 38, length: 39, sleeveLength: 14.5 } },
-    { id: idx * 5 + 3, dressTypeId: dtId, sizeLabel: 'L', measurements: { bust: 38, waist: 32, hip: 40, length: 40, sleeveLength: 15 } },
-    { id: idx * 5 + 4, dressTypeId: dtId, sizeLabel: 'XL', measurements: { bust: 40, waist: 34, hip: 42, length: 41, sleeveLength: 15.5 } },
-    { id: idx * 5 + 5, dressTypeId: dtId, sizeLabel: 'XXL', measurements: { bust: 42, waist: 36, hip: 44, length: 42, sleeveLength: 16 } },
-  ]),
-
-  // Saree Blouses Collection Presets (Dress Types 4, 5, 6)
-  ...[4, 5, 6].flatMap((dtId, idx) => [
-    { id: 20 + idx * 5 + 1, dressTypeId: dtId, sizeLabel: 'S', measurements: { bust: 34, underbust: 30, shoulderWidth: 14, sleeveLength: 6, blouseLength: 15, backNeckDepth: 6 } },
-    { id: 20 + idx * 5 + 2, dressTypeId: dtId, sizeLabel: 'M', measurements: { bust: 36, underbust: 32, shoulderWidth: 14.5, sleeveLength: 7, blouseLength: 15.5, backNeckDepth: 7 } },
-    { id: 20 + idx * 5 + 3, dressTypeId: dtId, sizeLabel: 'L', measurements: { bust: 38, underbust: 34, shoulderWidth: 15, sleeveLength: 8, blouseLength: 16, backNeckDepth: 7.5 } },
-    { id: 20 + idx * 5 + 4, dressTypeId: dtId, sizeLabel: 'XL', measurements: { bust: 40, underbust: 36, shoulderWidth: 15.5, sleeveLength: 9, blouseLength: 16.5, backNeckDepth: 8 } },
-    { id: 20 + idx * 5 + 5, dressTypeId: dtId, sizeLabel: 'XXL', measurements: { bust: 42, underbust: 38, shoulderWidth: 16, sleeveLength: 10, blouseLength: 17, backNeckDepth: 8.5 } },
-  ]),
-
-  // Tops & Bustiers Collection Presets (Dress Types 7, 8)
-  ...[7, 8].flatMap((dtId, idx) => [
-    { id: 40 + idx * 5 + 1, dressTypeId: dtId, sizeLabel: 'S', measurements: { bust: 34, waist: 28, shoulderWidth: 14, topLength: 18, sleeveLength: 6 } },
-    { id: 40 + idx * 5 + 2, dressTypeId: dtId, sizeLabel: 'M', measurements: { bust: 36, waist: 30, shoulderWidth: 14.5, topLength: 19, sleeveLength: 7 } },
-    { id: 40 + idx * 5 + 3, dressTypeId: dtId, sizeLabel: 'L', measurements: { bust: 38, waist: 32, shoulderWidth: 15, topLength: 20, sleeveLength: 8 } },
-    { id: 40 + idx * 5 + 4, dressTypeId: dtId, sizeLabel: 'XL', measurements: { bust: 40, waist: 34, shoulderWidth: 15.5, topLength: 21, sleeveLength: 9 } },
-    { id: 40 + idx * 5 + 5, dressTypeId: dtId, sizeLabel: 'XXL', measurements: { bust: 42, waist: 36, shoulderWidth: 16, topLength: 22, sleeveLength: 10 } },
-  ]),
-
-  // Lehenga Choli Presets (Dress Type 9)
-  { id: 60, dressTypeId: 9, sizeLabel: 'S', measurements: { bust: 34, waist: 28, hip: 36, lehengaLength: 40, choliLength: 15, sleeveLength: 6 } },
-  { id: 61, dressTypeId: 9, sizeLabel: 'M', measurements: { bust: 36, waist: 30, hip: 38, lehengaLength: 40, choliLength: 15.5, sleeveLength: 7 } },
-  { id: 62, dressTypeId: 9, sizeLabel: 'L', measurements: { bust: 38, waist: 32, hip: 40, lehengaLength: 41, choliLength: 16, sleeveLength: 8 } },
-  { id: 63, dressTypeId: 9, sizeLabel: 'XL', measurements: { bust: 40, waist: 34, hip: 42, lehengaLength: 41, choliLength: 16.5, sleeveLength: 9 } },
-  { id: 64, dressTypeId: 9, sizeLabel: 'XXL', measurements: { bust: 42, waist: 36, hip: 44, lehengaLength: 42, choliLength: 17, sleeveLength: 10 } },
-
-  // Salwar Suit Presets (Dress Type 10)
-  { id: 70, dressTypeId: 10, sizeLabel: 'S', measurements: { bust: 34, waist: 28, hip: 36, kameezLength: 38, sleeveLength: 22, salwarLength: 38 } },
-  { id: 71, dressTypeId: 10, sizeLabel: 'M', measurements: { bust: 36, waist: 30, hip: 38, kameezLength: 39, sleeveLength: 23, salwarLength: 39 } },
-  { id: 72, dressTypeId: 10, sizeLabel: 'L', measurements: { bust: 38, waist: 32, hip: 40, kameezLength: 40, sleeveLength: 23.5, salwarLength: 40 } },
-  { id: 73, dressTypeId: 10, sizeLabel: 'XL', measurements: { bust: 40, waist: 34, hip: 42, kameezLength: 41, sleeveLength: 24, salwarLength: 41 } },
-  { id: 74, dressTypeId: 10, sizeLabel: 'XXL', measurements: { bust: 42, waist: 36, hip: 44, kameezLength: 42, sleeveLength: 24.5, salwarLength: 42 } },
+  // ── Salwar Suits ──
+  { id: 23, categorySlug: 'salwar-suits', fieldName: 'bust', fieldLabel: 'Bust / Chest', minValue: 28, maxValue: 48, displayOrder: 1 },
+  { id: 24, categorySlug: 'salwar-suits', fieldName: 'waist', fieldLabel: 'Waist', minValue: 24, maxValue: 44, displayOrder: 2 },
+  { id: 25, categorySlug: 'salwar-suits', fieldName: 'hip', fieldLabel: 'Hip', minValue: 30, maxValue: 50, displayOrder: 3 },
+  { id: 26, categorySlug: 'salwar-suits', fieldName: 'kameezLength', fieldLabel: 'Kameez Length', minValue: 32, maxValue: 50, displayOrder: 4 },
+  { id: 27, categorySlug: 'salwar-suits', fieldName: 'sleeveLength', fieldLabel: 'Sleeve Length', minValue: 0, maxValue: 26, displayOrder: 5 },
+  { id: 28, categorySlug: 'salwar-suits', fieldName: 'salwarLength', fieldLabel: 'Salwar Length', minValue: 34, maxValue: 44, displayOrder: 6 },
 ];

@@ -1,11 +1,11 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Sparkles, Upload, Loader2, RefreshCw, Link as LinkIcon, Check, Ruler, Palette } from 'lucide-react';
+import { X, Upload, Loader2, Link as LinkIcon, Ruler } from 'lucide-react';
 import { useAdminStore } from '@/store/admin';
 import { COLLECTIONS } from '@/lib/data';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import { compressToWebP } from '@/lib/image-compressor';
-import type { DressType, TailoringFabric, MeasurementField, SizePreset } from '@/lib/tailoring';
+import type { DressType, TailoringFabric, MeasurementField } from '@/lib/tailoring';
 
 /* ── 1. Dress Type Modal ── */
 interface DressTypeModalProps {
@@ -23,6 +23,7 @@ export function DressTypeModal({ isOpen, onClose, onSave, initial }: DressTypeMo
   const [slug, setSlug] = useState('');
   const [description, setDescription] = useState('');
   const [stitchingFee, setStitchingFee] = useState<number>(0);
+  const [requiredMeters, setRequiredMeters] = useState<number>(2.5);
   const [leadTime, setLeadTime] = useState('');
   const [coverImage, setCoverImage] = useState('');
   const [isActive, setIsActive] = useState(true);
@@ -40,6 +41,7 @@ export function DressTypeModal({ isOpen, onClose, onSave, initial }: DressTypeMo
       setSlug(initial.slug || '');
       setDescription(initial.description || '');
       setStitchingFee(Number(initial.stitchingFee) || 0);
+      setRequiredMeters(Number(initial.requiredMeters) || 2.5);
       setLeadTime(initial.leadTime || '5–7 working days');
       setCoverImage(initial.coverImage || '');
       setIsActive(initial.isActive !== false);
@@ -51,6 +53,7 @@ export function DressTypeModal({ isOpen, onClose, onSave, initial }: DressTypeMo
       setSlug('');
       setDescription('');
       setStitchingFee(0);
+      setRequiredMeters(2.5);
       setLeadTime('5–7 working days');
       setCoverImage('');
       setIsActive(true);
@@ -101,6 +104,7 @@ export function DressTypeModal({ isOpen, onClose, onSave, initial }: DressTypeMo
       };
       reader.readAsDataURL(compressedWebpFile);
     } catch (err) {
+      console.error('[Dress Type Upload Error]:', err);
       setIsUploading(false);
     }
   };
@@ -116,21 +120,23 @@ export function DressTypeModal({ isOpen, onClose, onSave, initial }: DressTypeMo
     e.preventDefault();
     e.stopPropagation();
     setDragActive(false);
-    const file = e.dataTransfer.files?.[0];
-    if (file) uploadFile(file);
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      uploadFile(e.dataTransfer.files[0]);
+    }
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim() || !coverImage.trim()) return;
-    const matchedCat = categories.find(c => c.slug === collectionSlug);
+    const cat = categories.find(c => c.slug === collectionSlug);
     onSave({
-      collectionId: matchedCat ? Number(matchedCat.id) : undefined,
+      collectionId: cat?.id,
       collectionSlug,
       name: name.trim(),
       slug: slug.trim() || name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, ''),
       coverImage: coverImage.trim(),
       stitchingFee: Number(stitchingFee) || 0,
+      requiredMeters: Number(requiredMeters) || 2.5,
       leadTime: leadTime.trim() || '5–7 working days',
       description: description.trim(),
       isActive,
@@ -183,10 +189,14 @@ export function DressTypeModal({ isOpen, onClose, onSave, initial }: DressTypeMo
                 className="w-full px-3.5 py-2 rounded-xl bg-[#F7F4EE]/70 border border-[#C5A059]/30 text-xs focus:border-[#701626] focus:bg-white focus:outline-none"
               />
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div className="space-y-1">
                 <label className="block text-xs font-bold text-[#110B0E] uppercase tracking-wider">Stitching Fee (LKR) *</label>
                 <input type="number" min="0" step="100" value={stitchingFee} onChange={(e) => setStitchingFee(Number(e.target.value))} required className="w-full px-3.5 py-2.5 rounded-xl bg-[#F7F4EE]/70 border border-[#C5A059]/30 text-xs focus:border-[#701626] focus:bg-white focus:outline-none" />
+              </div>
+              <div className="space-y-1">
+                <label className="block text-xs font-bold text-[#110B0E] uppercase tracking-wider">Fabric Req. (m) *</label>
+                <input type="number" min="0.5" max="15" step="0.1" value={requiredMeters} onChange={(e) => setRequiredMeters(Number(e.target.value))} required className="w-full px-3.5 py-2.5 rounded-xl bg-[#F7F4EE]/70 border border-[#C5A059]/30 text-xs font-bold text-[#701626] focus:border-[#701626] focus:bg-white focus:outline-none" />
               </div>
               <div className="space-y-1">
                 <label className="block text-xs font-bold text-[#110B0E] uppercase tracking-wider">Lead Time</label>
@@ -253,13 +263,13 @@ interface FabricModalProps {
 export function FabricModal({ isOpen, onClose, onSave, initial, dressTypes }: FabricModalProps) {
   const [name, setName] = useState('');
   const [slug, setSlug] = useState('');
+  const [swatchImage, setSwatchImage] = useState('');
   const [pricePerUnit, setPricePerUnit] = useState<number>(0);
   const [unit, setUnit] = useState('meter');
   const [weight, setWeight] = useState('');
-  const [swatchImage, setSwatchImage] = useState('');
+  const [compatibleDressTypeIds, setCompatibleDressTypeIds] = useState<number[]>([]);
   const [inStock, setInStock] = useState(true);
   const [displayOrder, setDisplayOrder] = useState(1);
-  const [compatibleIds, setCompatibleIds] = useState<number[]>([]);
   const [isUploading, setIsUploading] = useState(false);
   const [showUrlFallback, setShowUrlFallback] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -268,32 +278,40 @@ export function FabricModal({ isOpen, onClose, onSave, initial, dressTypes }: Fa
     if (initial) {
       setName(initial.name);
       setSlug(initial.slug);
-      setPricePerUnit(initial.pricePerUnit);
-      setUnit(initial.unit);
-      setWeight(initial.weight);
       setSwatchImage(initial.swatchImage);
+      setPricePerUnit(initial.pricePerUnit);
+      setUnit(initial.unit || 'meter');
+      setWeight(initial.weight || '');
+      setCompatibleDressTypeIds(initial.compatibleDressTypeIds || []);
       setInStock(initial.inStock);
       setDisplayOrder(initial.displayOrder);
-      setCompatibleIds(initial.compatibleDressTypeIds);
       setShowUrlFallback(false);
     } else {
       setName('');
       setSlug('');
+      setSwatchImage('');
       setPricePerUnit(0);
       setUnit('meter');
       setWeight('');
-      setSwatchImage('');
+      setCompatibleDressTypeIds(dressTypes.map(d => d.id));
       setInStock(true);
       setDisplayOrder(1);
-      setCompatibleIds([]);
       setShowUrlFallback(false);
     }
-  }, [initial, isOpen]);
+  }, [initial, isOpen, dressTypes]);
 
   if (!isOpen) return null;
 
-  const toggleCompatible = (id: number) => {
-    setCompatibleIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+  const handleNameChange = (val: string) => {
+    setName(val);
+    if (!initial) {
+      setSlug(
+        val
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, '-')
+          .replace(/(^-|-$)+/g, '')
+      );
+    }
   };
 
   const uploadFile = async (rawFile: File) => {
@@ -304,7 +322,10 @@ export function FabricModal({ isOpen, onClose, onSave, initial, dressTypes }: Fa
       if (isSupabaseConfigured()) {
         const fileName = `fabric-${Date.now()}-${Math.random().toString(36).substring(2, 6)}.webp`;
         const filePath = `tailoring/${fileName}`;
-        const { error: uploadErr } = await supabase.storage.from('product-images').upload(filePath, compressedWebpFile, { contentType: 'image/webp', upsert: true });
+        const { error: uploadErr } = await supabase.storage
+          .from('product-images')
+          .upload(filePath, compressedWebpFile, { contentType: 'image/webp', upsert: true });
+
         if (!uploadErr) {
           const { data } = supabase.storage.from('product-images').getPublicUrl(filePath);
           if (data?.publicUrl) {
@@ -321,8 +342,15 @@ export function FabricModal({ isOpen, onClose, onSave, initial, dressTypes }: Fa
       };
       reader.readAsDataURL(compressedWebpFile);
     } catch (err) {
+      console.error('[Fabric Upload Error]:', err);
       setIsUploading(false);
     }
+  };
+
+  const toggleCompatible = (id: number) => {
+    setCompatibleDressTypeIds(prev =>
+      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+    );
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -332,12 +360,12 @@ export function FabricModal({ isOpen, onClose, onSave, initial, dressTypes }: Fa
       name: name.trim(),
       slug: slug.trim() || name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, ''),
       swatchImage: swatchImage.trim(),
-      pricePerUnit,
-      unit: unit.trim(),
+      pricePerUnit: Number(pricePerUnit) || 0,
+      unit: unit.trim() || 'meter',
       weight: weight.trim(),
-      compatibleDressTypeIds: compatibleIds,
+      compatibleDressTypeIds,
       inStock,
-      displayOrder,
+      displayOrder: Number(displayOrder) || 1,
     });
     onClose();
   };
@@ -347,80 +375,80 @@ export function FabricModal({ isOpen, onClose, onSave, initial, dressTypes }: Fa
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
         <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className="bg-white rounded-3xl p-6 sm:p-8 max-w-lg w-full max-h-[90vh] overflow-y-auto border border-[#C5A059]/40 shadow-2xl space-y-6">
           <div className="flex items-center justify-between border-b border-[#C5A059]/20 pb-4">
-            <div className="flex items-center gap-2">
-              <Palette className="w-5 h-5 text-[#C5A059]" />
-              <h3 className="font-display text-xl font-bold text-[#110B0E]">{initial ? 'Edit Fabric' : 'Add Fabric'}</h3>
-            </div>
-            <button onClick={onClose} className="w-8 h-8 rounded-full bg-[#F7F4EE] hover:bg-gray-200 flex items-center justify-center text-[#110B0E] transition-colors"><X className="w-4 h-4" /></button>
+            <h3 className="font-display text-xl font-bold text-[#110B0E]">{initial ? 'Edit Fabric' : 'Add Fabric'}</h3>
+            <button onClick={onClose} className="p-1 rounded-full hover:bg-gray-100"><X className="w-5 h-5" /></button>
           </div>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1">
                 <label className="block text-xs font-bold text-[#110B0E] uppercase tracking-wider">Fabric Name *</label>
-                <input type="text" value={name} onChange={(e) => { setName(e.target.value); if (!initial) setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '')); }} required className="w-full px-3.5 py-2.5 rounded-xl bg-[#F7F4EE]/70 border border-[#C5A059]/30 text-xs font-medium focus:border-[#701626] focus:bg-white focus:outline-none" />
+                <input type="text" value={name} onChange={(e) => handleNameChange(e.target.value)} placeholder="e.g. Kanjivaram Mulberry Silk" required className="w-full px-3.5 py-2.5 rounded-xl bg-[#F7F4EE]/70 border border-[#C5A059]/30 text-xs focus:border-[#701626] focus:bg-white focus:outline-none" />
               </div>
               <div className="space-y-1">
                 <label className="block text-xs font-bold text-[#110B0E] uppercase tracking-wider">URL Slug</label>
                 <input type="text" value={slug} onChange={(e) => setSlug(e.target.value)} required className="w-full px-3.5 py-2.5 rounded-xl bg-[#F7F4EE]/70 border border-[#C5A059]/30 text-xs font-mono text-[#701626] focus:border-[#701626] focus:bg-white focus:outline-none" />
               </div>
             </div>
-            <div className="grid grid-cols-3 gap-3">
-              <div className="col-span-1 space-y-1">
-                <label className="block text-xs font-bold text-[#110B0E] uppercase tracking-wider">Price/Unit *</label>
-                <input type="number" min="0" step="100" value={pricePerUnit} onChange={(e) => setPricePerUnit(Number(e.target.value))} required className="w-full px-3.5 py-2.5 rounded-xl bg-[#F7F4EE]/70 border border-[#C5A059]/30 text-xs focus:border-[#701626] focus:bg-white focus:outline-none" />
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="space-y-1">
+                <label className="block text-xs font-bold text-[#110B0E] uppercase tracking-wider">Price per Unit (LKR) *</label>
+                <input type="number" min="0" step="50" value={pricePerUnit} onChange={(e) => setPricePerUnit(Number(e.target.value))} required className="w-full px-3.5 py-2.5 rounded-xl bg-[#F7F4EE]/70 border border-[#C5A059]/30 text-xs focus:border-[#701626] focus:bg-white focus:outline-none" />
               </div>
-              <div className="col-span-1 space-y-1">
+              <div className="space-y-1">
                 <label className="block text-xs font-bold text-[#110B0E] uppercase tracking-wider">Unit</label>
                 <input type="text" value={unit} onChange={(e) => setUnit(e.target.value)} placeholder="meter" required className="w-full px-3.5 py-2.5 rounded-xl bg-[#F7F4EE]/70 border border-[#C5A059]/30 text-xs focus:border-[#701626] focus:bg-white focus:outline-none" />
               </div>
-              <div className="col-span-1 space-y-1">
-                <label className="block text-xs font-bold text-[#110B0E] uppercase tracking-wider">Weight</label>
-                <input type="text" value={weight} onChange={(e) => setWeight(e.target.value)} placeholder="85 GSM" className="w-full px-3.5 py-2.5 rounded-xl bg-[#F7F4EE]/70 border border-[#C5A059]/30 text-xs focus:border-[#701626] focus:bg-white focus:outline-none" />
+              <div className="space-y-1">
+                <label className="block text-xs font-bold text-[#110B0E] uppercase tracking-wider">Weight / Spec</label>
+                <input type="text" value={weight} onChange={(e) => setWeight(e.target.value)} placeholder="e.g. 85 GSM · Heavy Fall" className="w-full px-3.5 py-2.5 rounded-xl bg-[#F7F4EE]/70 border border-[#C5A059]/30 text-xs focus:border-[#701626] focus:bg-white focus:outline-none" />
               </div>
             </div>
             <div className="space-y-2">
-              <label className="block text-xs font-bold text-[#110B0E] uppercase tracking-wider">Swatch Image *</label>
-              <div className="flex gap-4 items-center">
-                <div className="w-20 h-20 rounded-xl overflow-hidden border border-[#C5A059]/40 bg-gray-100 flex-shrink-0">
-                  {swatchImage ? <img src={swatchImage} alt="Swatch" className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-gray-400 text-xs">No image</div>}
-                </div>
-                <div className="flex-1 space-y-2">
-                  <div className="flex items-center gap-2">
-                    <button type="button" onClick={() => setShowUrlFallback(!showUrlFallback)} className="text-[11px] text-[#701626] hover:underline font-bold">Toggle URL / Upload</button>
-                  </div>
-                  {showUrlFallback ? (
-                    <input type="url" value={swatchImage} onChange={(e) => setSwatchImage(e.target.value)} placeholder="https://..." className="w-full px-3.5 py-2 rounded-xl bg-[#F7F4EE]/70 border border-[#C5A059]/30 text-xs" />
+              <div className="flex items-center justify-between">
+                <label className="block text-xs font-bold text-[#110B0E] uppercase tracking-wider">Swatch Image *</label>
+                <button type="button" onClick={() => setShowUrlFallback(!showUrlFallback)} className="text-[11px] text-[#701626] hover:underline font-bold flex items-center gap-1"><LinkIcon className="w-3 h-3" /><span>{showUrlFallback ? 'Upload File' : 'Paste URL'}</span></button>
+              </div>
+              {showUrlFallback ? (
+                <input type="url" value={swatchImage} onChange={(e) => setSwatchImage(e.target.value)} placeholder="https://..." className="w-full px-3.5 py-2.5 rounded-xl bg-[#F7F4EE]/70 border border-[#C5A059]/30 text-xs focus:border-[#701626] focus:bg-white focus:outline-none" />
+              ) : (
+                <div>
+                  <input ref={fileInputRef} type="file" accept="image/*" onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadFile(f); }} className="hidden" />
+                  {swatchImage ? (
+                    <div className="relative rounded-2xl overflow-hidden border border-[#C5A059]/40 group aspect-video bg-[#110B0E] max-w-xs mx-auto">
+                      <img src={swatchImage} alt="Swatch" className="w-full h-full object-cover" />
+                      <div className="absolute inset-0 flex items-center justify-center gap-2 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button type="button" onClick={() => fileInputRef.current?.click()} className="px-3 py-1 bg-white text-[#110B0E] rounded-lg text-xs font-bold">Change</button>
+                        <button type="button" onClick={() => setSwatchImage('')} className="px-3 py-1 bg-rose-600 text-white rounded-lg text-xs font-bold">Remove</button>
+                      </div>
+                    </div>
                   ) : (
-                    <div>
-                      <input ref={fileInputRef} type="file" accept="image/*" onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadFile(f); }} className="hidden" />
-                      <button type="button" onClick={() => fileInputRef.current?.click()} className="px-3 py-1.5 bg-[#F7F4EE] border border-[#C5A059]/30 rounded-xl text-xs font-bold">{isUploading ? 'Uploading...' : 'Upload Image'}</button>
+                    <div onClick={() => fileInputRef.current?.click()} className="border-2 border-dashed border-[#C5A059]/40 hover:border-[#701626] rounded-2xl p-6 text-center cursor-pointer bg-[#FCFBF8]">
+                      {isUploading ? <Loader2 className="w-6 h-6 text-[#701626] animate-spin mx-auto" /> : <Upload className="w-6 h-6 text-[#701626] mx-auto" />}
                     </div>
                   )}
                 </div>
-              </div>
+              )}
             </div>
-            <div className="space-y-2">
-              <label className="block text-xs font-bold text-[#110B0E] uppercase tracking-wider">Compatible Dress Types</label>
-              <div className="flex flex-wrap gap-2 p-3 rounded-xl border border-[#C5A059]/30 bg-[#F7F4EE]/40">
+            <div className="space-y-1.5">
+              <label className="block text-xs font-bold text-[#110B0E] uppercase tracking-wider">Compatible Silhouettes</label>
+              <div className="grid grid-cols-2 gap-2 max-h-40 overflow-y-auto p-2 bg-[#F7F4EE]/50 rounded-2xl border border-[#C5A059]/20">
                 {dressTypes.map(dt => (
-                  <label key={dt.id} className="flex items-center gap-1.5 bg-white px-2.5 py-1.5 rounded-lg border border-[#C5A059]/20 cursor-pointer hover:border-[#701626]">
-                    <input type="checkbox" checked={compatibleIds.includes(dt.id)} onChange={() => toggleCompatible(dt.id)} className="accent-[#701626]" />
-                    <span className="text-[11px] font-medium text-[#110B0E]">{dt.name}</span>
+                  <label key={dt.id} className="flex items-center gap-2 text-xs text-[#110B0E] cursor-pointer">
+                    <input type="checkbox" checked={compatibleDressTypeIds.includes(dt.id)} onChange={() => toggleCompatible(dt.id)} className="rounded text-[#701626] focus:ring-[#701626]" />
+                    <span className="truncate">{dt.name}</span>
                   </label>
                 ))}
               </div>
             </div>
-            <div className="p-4 rounded-2xl bg-[#F7F4EE]/80 border border-[#C5A059]/30 flex items-center justify-between gap-4">
+            <div className="p-4 rounded-2xl bg-[#F7F4EE]/80 border border-[#C5A059]/30 flex items-center justify-between">
               <span className="text-xs font-bold text-[#110B0E] uppercase tracking-wider">In Stock</span>
-              <button type="button" role="switch" onClick={() => setInStock(!inStock)} className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${inStock ? 'bg-emerald-600' : 'bg-gray-300'}`}>
+              <button type="button" role="switch" onClick={() => setInStock(!inStock)} className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out ${inStock ? 'bg-[#701626]' : 'bg-gray-300'}`}>
                 <span className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out ${inStock ? 'translate-x-5' : 'translate-x-0'}`} />
               </button>
             </div>
             <div className="flex items-center justify-end gap-3 pt-3 border-t border-[#C5A059]/20">
               <button type="button" onClick={onClose} className="px-4 py-2 text-xs font-bold uppercase tracking-wider text-[#6D6268]">Cancel</button>
-              <button type="submit" disabled={isUploading || !swatchImage} className="px-6 py-2.5 bg-[#701626] hover:bg-[#8E1E34] text-white text-xs font-bold uppercase tracking-wider rounded-2xl shadow-sm transition-all">
-                {initial ? 'Save' : 'Create'}
-              </button>
+              <button type="submit" disabled={isUploading || !swatchImage} className="px-6 py-2.5 bg-[#701626] hover:bg-[#8E1E34] text-white text-xs font-bold uppercase tracking-wider rounded-2xl shadow-sm">Save</button>
             </div>
           </form>
         </motion.div>
@@ -429,20 +457,22 @@ export function FabricModal({ isOpen, onClose, onSave, initial, dressTypes }: Fa
   );
 }
 
-/* ── 3. Measurement Field Modal ── */
+/* ── 3. Measurement Field Modal (Category-level) ── */
 interface MeasurementFieldModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (data: Omit<MeasurementField, 'id' | 'dressTypeId'>) => void;
+  onSave: (data: Omit<MeasurementField, 'id'>) => void;
   initial?: MeasurementField | null;
+  categorySlug: string;
 }
 
-export function MeasurementFieldModal({ isOpen, onClose, onSave, initial }: MeasurementFieldModalProps) {
+export function MeasurementFieldModal({ isOpen, onClose, onSave, initial, categorySlug }: MeasurementFieldModalProps) {
   const [fieldName, setFieldName] = useState('');
   const [fieldLabel, setFieldLabel] = useState('');
   const [minValue, setMinValue] = useState<number>(0);
   const [maxValue, setMaxValue] = useState<number>(0);
   const [displayOrder, setDisplayOrder] = useState<number>(1);
+  const [errorMsg, setErrorMsg] = useState('');
 
   useEffect(() => {
     if (initial) {
@@ -451,12 +481,14 @@ export function MeasurementFieldModal({ isOpen, onClose, onSave, initial }: Meas
       setMinValue(initial.minValue);
       setMaxValue(initial.maxValue);
       setDisplayOrder(initial.displayOrder);
+      setErrorMsg('');
     } else {
       setFieldName('');
       setFieldLabel('');
       setMinValue(10);
       setMaxValue(60);
       setDisplayOrder(1);
+      setErrorMsg('');
     }
   }, [initial, isOpen]);
 
@@ -465,7 +497,13 @@ export function MeasurementFieldModal({ isOpen, onClose, onSave, initial }: Meas
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!fieldName.trim() || !fieldLabel.trim()) return;
+    if (minValue >= maxValue) {
+      setErrorMsg('Min value must be strictly less than Max value');
+      return;
+    }
+    setErrorMsg('');
     onSave({
+      categorySlug: initial?.categorySlug || categorySlug,
       fieldName: fieldName.trim(),
       fieldLabel: fieldLabel.trim(),
       minValue,
@@ -480,10 +518,15 @@ export function MeasurementFieldModal({ isOpen, onClose, onSave, initial }: Meas
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
         <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className="bg-white rounded-3xl p-6 max-w-sm w-full border border-[#C5A059]/40 shadow-2xl space-y-4">
           <div className="flex items-center justify-between border-b border-[#C5A059]/20 pb-3">
-            <h3 className="font-display text-lg font-bold text-[#110B0E]">{initial ? 'Edit Field' : 'Add Field'}</h3>
+            <h3 className="font-display text-lg font-bold text-[#110B0E]">{initial ? 'Edit Field' : 'Add Measurement Field'}</h3>
             <button onClick={onClose} className="p-1.5 rounded-full hover:bg-gray-100"><X className="w-4 h-4" /></button>
           </div>
           <form onSubmit={handleSubmit} className="space-y-3">
+            {errorMsg && (
+              <div className="p-2 bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-xl font-medium">
+                {errorMsg}
+              </div>
+            )}
             <div className="space-y-1">
               <label className="block text-[11px] font-bold text-[#110B0E] uppercase tracking-wider">Field ID (e.g. bust, waist)</label>
               <input type="text" value={fieldName} onChange={(e) => setFieldName(e.target.value.toLowerCase().replace(/[^a-z0-9]/g, ''))} required className="w-full px-3 py-2 rounded-xl bg-[#F7F4EE]/70 border border-[#C5A059]/30 text-xs font-mono" />
@@ -507,82 +550,6 @@ export function MeasurementFieldModal({ isOpen, onClose, onSave, initial }: Meas
               <input type="number" min="1" value={displayOrder} onChange={(e) => setDisplayOrder(Number(e.target.value))} required className="w-full px-3 py-2 rounded-xl bg-[#F7F4EE]/70 border border-[#C5A059]/30 text-xs" />
             </div>
             <div className="flex justify-end gap-2 pt-2">
-              <button type="button" onClick={onClose} className="px-3 py-2 text-[11px] font-bold uppercase tracking-wider text-[#6D6268]">Cancel</button>
-              <button type="submit" className="px-4 py-2 bg-[#701626] text-white text-[11px] font-bold uppercase tracking-wider rounded-xl">Save</button>
-            </div>
-          </form>
-        </motion.div>
-      </div>
-    </AnimatePresence>
-  );
-}
-
-/* ── 4. Size Preset Modal ── */
-interface SizePresetModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  onSave: (data: Omit<SizePreset, 'id' | 'dressTypeId'>) => void;
-  initial?: SizePreset | null;
-  measurementFields: MeasurementField[];
-}
-
-export function SizePresetModal({ isOpen, onClose, onSave, initial, measurementFields }: SizePresetModalProps) {
-  const [sizeLabel, setSizeLabel] = useState('');
-  const [measurements, setMeasurements] = useState<Record<string, number>>({});
-
-  useEffect(() => {
-    if (initial) {
-      setSizeLabel(initial.sizeLabel);
-      setMeasurements(initial.measurements);
-    } else {
-      setSizeLabel('');
-      const defaultMeas: Record<string, number> = {};
-      measurementFields.forEach(f => {
-        defaultMeas[f.fieldName] = (f.minValue + f.maxValue) / 2;
-      });
-      setMeasurements(defaultMeas);
-    }
-  }, [initial, isOpen, measurementFields]);
-
-  if (!isOpen) return null;
-
-  const handleMeasurementChange = (fieldName: string, val: number) => {
-    setMeasurements(prev => ({ ...prev, [fieldName]: val }));
-  };
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!sizeLabel.trim()) return;
-    onSave({
-      sizeLabel: sizeLabel.trim(),
-      measurements,
-    });
-    onClose();
-  };
-
-  return (
-    <AnimatePresence>
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-        <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className="bg-white rounded-3xl p-6 max-w-sm w-full border border-[#C5A059]/40 shadow-2xl space-y-4">
-          <div className="flex items-center justify-between border-b border-[#C5A059]/20 pb-3">
-            <h3 className="font-display text-lg font-bold text-[#110B0E]">{initial ? 'Edit Preset' : 'Add Preset'}</h3>
-            <button onClick={onClose} className="p-1.5 rounded-full hover:bg-gray-100"><X className="w-4 h-4" /></button>
-          </div>
-          <form onSubmit={handleSubmit} className="space-y-3">
-            <div className="space-y-1">
-              <label className="block text-[11px] font-bold text-[#110B0E] uppercase tracking-wider">Size Label (e.g. S, M, XL)</label>
-              <input type="text" value={sizeLabel} onChange={(e) => setSizeLabel(e.target.value.toUpperCase())} required className="w-full px-3 py-2 rounded-xl bg-[#F7F4EE]/70 border border-[#C5A059]/30 text-xs font-bold" />
-            </div>
-            <div className="max-h-60 overflow-y-auto space-y-2 pr-2">
-              <label className="block text-[11px] font-bold text-[#110B0E] uppercase tracking-wider pt-2">Measurements (inches)</label>
-              {measurementFields.map(field => (
-                <div key={field.id} className="flex items-center justify-between gap-3 bg-[#F7F4EE]/50 p-2 rounded-xl">
-                  <span className="text-[11px] font-medium text-[#110B0E]">{field.fieldLabel}</span>
-                  <input type="number" step="0.5" min={field.minValue} max={field.maxValue} value={measurements[field.fieldName] || 0} onChange={(e) => handleMeasurementChange(field.fieldName, Number(e.target.value))} required className="w-20 px-2 py-1 rounded-lg bg-white border border-[#C5A059]/30 text-xs text-right focus:border-[#701626]" />
-                </div>
-              ))}
-            </div>
-            <div className="flex justify-end gap-2 pt-2 border-t border-[#C5A059]/20">
               <button type="button" onClick={onClose} className="px-3 py-2 text-[11px] font-bold uppercase tracking-wider text-[#6D6268]">Cancel</button>
               <button type="submit" className="px-4 py-2 bg-[#701626] text-white text-[11px] font-bold uppercase tracking-wider rounded-xl">Save</button>
             </div>

@@ -220,7 +220,7 @@ export const useAuthStore = create<AuthState>()(
                       image: item.image_url || '',
                       quantity: item.quantity,
                       size: item.size,
-                      tailoring: item.tailoring_details || undefined,
+                      tailoring: item.custom_measurements || item.tailoring_details || item.tailoring || undefined,
                     })),
                     subtotal: Number(o.subtotal),
                     discount: Number(o.discount || 0),

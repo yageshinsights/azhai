@@ -1,8 +1,6 @@
-import { useState, useMemo } from 'react';
+import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Ruler, Sparkles, Check, Info } from 'lucide-react';
-import { useAdminStore } from '@/store/admin';
-import { inchesToCm } from '@/lib/tailoring';
+import { X, Ruler, Info } from 'lucide-react';
 
 interface SizeGuideModalProps {
   isOpen: boolean;
@@ -15,33 +13,6 @@ export default function SizeGuideModal({ isOpen, onClose, category = 'Kurties' }
   const [activeTab, setActiveTab] = useState<'kurties' | 'tops' | 'sarees'>(
     category.toLowerCase().includes('top') ? 'tops' : category.toLowerCase().includes('saree') ? 'sarees' : 'kurties'
   );
-
-  const storeDressTypes = useAdminStore((s) => s.dressTypes) || [];
-  const storeFields = useAdminStore((s) => s.measurementFields) || [];
-  const storePresets = useAdminStore((s) => s.sizePresets) || [];
-
-  // Determine current active dress type from store
-  const activeDressType = useMemo(() => {
-    if (activeTab === 'kurties') {
-      return storeDressTypes.find((d) => d.slug?.includes('kurti') || d.name?.toLowerCase().includes('kurti'));
-    }
-    if (activeTab === 'tops') {
-      return storeDressTypes.find((d) => d.slug?.includes('top') || d.name?.toLowerCase().includes('top') || d.slug?.includes('bustier'));
-    }
-    return null;
-  }, [activeTab, storeDressTypes]);
-
-  const activeFields = useMemo(() => {
-    if (!activeDressType) return [];
-    return storeFields
-      .filter((f) => f.dressTypeId === activeDressType.id)
-      .sort((a, b) => a.displayOrder - b.displayOrder);
-  }, [activeDressType, storeFields]);
-
-  const activePresets = useMemo(() => {
-    if (!activeDressType) return [];
-    return storePresets.filter((p) => p.dressTypeId === activeDressType.id);
-  }, [activeDressType, storePresets]);
 
   const kurtiSizes = [
     { size: 'XS', bustIn: '34', bustCm: '86', waistIn: '30', waistCm: '76', hipIn: '38', hipCm: '96', lengthIn: '44', lengthCm: '112' },
@@ -145,41 +116,7 @@ export default function SizeGuideModal({ isOpen, onClose, category = 'Kurties' }
             {/* Table based on active tab */}
             {(activeTab === 'kurties' || activeTab === 'tops') && (
               <div className="overflow-x-auto rounded-2xl border border-[#C5A059]/30">
-                {activeFields.length > 0 && activePresets.length > 0 ? (
-                  <table className="w-full text-xs text-left">
-                    <thead className="bg-[#701626] text-[#F3E8CE] uppercase tracking-wider text-[10px]">
-                      <tr>
-                        <th className="p-3">Size</th>
-                        {activeFields.map((f) => (
-                          <th key={f.id} className="p-3 whitespace-nowrap">
-                            {f.fieldLabel} ({unit === 'inches' ? 'in' : 'cm'})
-                          </th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-[#C5A059]/15">
-                      {activePresets.map((preset, idx) => (
-                        <tr key={preset.id || preset.sizeLabel} className={idx % 2 === 0 ? 'bg-white' : 'bg-[#FCFBF8]'}>
-                          <td className="p-3 font-bold text-[#701626]">{preset.sizeLabel}</td>
-                          {activeFields.map((f) => {
-                            const val = preset.measurements?.[f.fieldName];
-                            const displayVal =
-                              val != null
-                                ? unit === 'inches'
-                                  ? `${val}"`
-                                  : `${inchesToCm(val)} cm`
-                                : '—';
-                            return (
-                              <td key={f.id} className="p-3 text-[#110B0E] whitespace-nowrap">
-                                {displayVal}
-                              </td>
-                            );
-                          })}
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                ) : activeTab === 'kurties' ? (
+                {activeTab === 'kurties' ? (
                   <table className="w-full text-xs text-left">
                     <thead className="bg-[#701626] text-[#F3E8CE] uppercase tracking-wider text-[10px]">
                       <tr>

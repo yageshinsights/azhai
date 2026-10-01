@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom';
 import { RotateCcw, CheckCircle2, AlertCircle, ArrowLeft, MessageCircle, Truck } from 'lucide-react';
 import SEOHead from '@/components/SEOHead';
 import { useAdminStore, cleanWhatsAppDigits } from '@/store/admin';
-import { STORE_PHONE } from '@/lib/constants';
+import { STORE_PHONE, formatPhoneNumber } from '@/lib/constants';
 
 export default function ReturnsExchanges() {
   const settings = useAdminStore((s) => s.settings);
@@ -165,8 +165,8 @@ export default function ReturnsExchanges() {
             </p>
             <div className="p-4 rounded-2xl bg-[#F7F4EE] border border-[#C5A059]/30 space-y-1 font-mono text-[11px] text-[#110B0E]">
               <p>Email: {settings?.studio?.supportEmail || 'orders@azhaiclothing.lk'}</p>
-              <p>Hotline: {settings?.phoneNumber || STORE_PHONE}</p>
-              <p>WhatsApp Concierge: {activeWhatsApp}</p>
+              <p>Hotline: {formatPhoneNumber(settings?.phoneNumber || STORE_PHONE)}</p>
+              <p>WhatsApp Concierge: {formatPhoneNumber(activeWhatsApp)}</p>
               <p>Atelier Showroom: {settings?.atelierAddress || 'Colombo, Sri Lanka'}</p>
             </div>
           </div>

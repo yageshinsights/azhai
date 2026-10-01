@@ -10,7 +10,7 @@ import { useCartStore } from '@/store/cart';
 import { useAuthStore } from '@/store/auth';
 import { useAdminStore, cleanWhatsAppDigits } from '@/store/admin';
 import SEOHead from '@/components/SEOHead';
-import { STORE_PHONE, STORE_EMAIL } from '@/lib/constants';
+import { STORE_PHONE, STORE_EMAIL, formatPhoneNumber } from '@/lib/constants';
 import BankBadge from '@/components/BankBadge';
 import { compressToWebP } from '@/lib/image-compressor';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
@@ -82,7 +82,7 @@ export default function OrderSuccess() {
                 image: it.image_url || it.image,
                 quantity: it.quantity,
                 size: it.size,
-                tailoring: it.tailoring,
+                tailoring: it.custom_measurements || it.tailoring || undefined,
               })),
               subtotal: Number(ord.subtotal) || 0,
               discount: Number(ord.discount) || 0,
@@ -438,7 +438,7 @@ export default function OrderSuccess() {
               rel="noreferrer"
               className="px-6 py-3 bg-white hover:bg-gray-50 border border-[#C5A059]/40 text-[#110B0E] text-xs font-bold uppercase tracking-wider rounded-2xl flex items-center gap-1.5"
             >
-              <span>Ask Concierge ({activeWhatsApp})</span>
+              <span>Ask Concierge ({formatPhoneNumber(activeWhatsApp)})</span>
             </a>
           </div>
         </div>
@@ -979,7 +979,7 @@ export default function OrderSuccess() {
                       className="w-full py-3 px-4 rounded-2xl bg-[#25D366] hover:bg-[#20bd5a] text-white text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2 shadow-sm transition-all"
                     >
                       <MessageCircle className="w-4 h-4" />
-                      <span>Send Deposit Slip via WhatsApp ({activeWhatsApp})</span>
+                      <span>Send Deposit Slip via WhatsApp ({formatPhoneNumber(activeWhatsApp)})</span>
                     </a>
                   </div>
                 </div>
@@ -1015,17 +1015,48 @@ export default function OrderSuccess() {
             {order.items.length > 0 && (
               <div className="divide-y divide-[#C5A059]/20">
                 {order.items.map((item: any, idx: number) => (
-                  <div key={`${item.id}-${item.size}-${idx}`} className="py-3 flex items-center justify-between gap-4">
-                    <div className="flex items-center gap-3">
-                      <div className="w-12 h-14 rounded-lg bg-[#F7F4EE] overflow-hidden shrink-0 border border-[#C5A059]/30">
-                        <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
+                  <div key={`${item.id}-${item.size}-${idx}`} className="py-3.5 space-y-2">
+                    <div className="flex items-center justify-between gap-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-12 h-14 rounded-lg bg-[#F7F4EE] overflow-hidden shrink-0 border border-[#C5A059]/30">
+                          <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
+                        </div>
+                        <div>
+                          {item.tailoring && (
+                            <span className="inline-block text-[8.5px] font-bold uppercase tracking-wider text-[#701626] bg-[#701626]/10 px-2 py-0.5 rounded-full mb-0.5">
+                              ✂️ Custom Tailored
+                            </span>
+                          )}
+                          <h4 className="font-display text-sm font-bold text-[#110B0E]">{item.name}</h4>
+                          <p className="text-[10px] text-[#6D6268]">
+                            {item.tailoring
+                              ? `Fabric: ${item.tailoring.fabricName} (${item.tailoring.requiredMeters || 2.5}m) · Size: ${item.tailoring.sizeLabel || item.size} · Qty: ${item.quantity}`
+                              : `Size: ${item.size} · Qty: ${item.quantity}`}
+                          </p>
+                          {item.tailoring?.leadTime && (
+                            <p className="text-[9.5px] text-[#C5A059] font-medium">⏱ Crafting Lead Time: {item.tailoring.leadTime}</p>
+                          )}
+                        </div>
                       </div>
-                      <div>
-                        <h4 className="font-display text-sm font-bold text-[#110B0E]">{item.name}</h4>
-                        <p className="text-[10px] text-[#6D6268]">Size: {item.size} · Qty: {item.quantity}</p>
-                      </div>
+                      <span className="font-display text-sm font-bold text-[#701626]">{item.price}</span>
                     </div>
-                    <span className="font-display text-sm font-bold text-[#701626]">{item.price}</span>
+
+                    {/* Tailor Cutting Specifications Matrix */}
+                    {item.tailoring && item.tailoring.measurements && (
+                      <div className="ml-15 p-2.5 bg-[#FCFBF8] rounded-xl border border-[#C5A059]/30 text-[10px]">
+                        <span className="font-bold text-[#701626] uppercase tracking-wider text-[8.5px] block mb-1">
+                          📐 Tailor Cutting Measurements:
+                        </span>
+                        <div className="grid grid-cols-3 sm:grid-cols-6 gap-1.5 font-mono text-[9.5px]">
+                          {Object.entries(item.tailoring.measurements).map(([k, v]) => (
+                            <div key={k} className="bg-white px-1.5 py-1 rounded border border-[#C5A059]/20 text-center">
+                              <span className="text-gray-500 uppercase block text-[8px] truncate">{k}</span>
+                              <span className="font-bold text-[#701626]">{v as any}"</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>

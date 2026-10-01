@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Mail, MessageCircle, MapPin, Phone, Sparkles, Check, ArrowRight, Heart } from 'lucide-react';
 import { useAdminStore, cleanWhatsAppDigits } from '@/store/admin';
-import { STORE_INSTAGRAM_URL, STORE_EMAIL, STORE_ADDRESS_FULL, STORE_PHONE } from '@/lib/constants';
+import { STORE_INSTAGRAM_URL, STORE_EMAIL, STORE_ADDRESS_FULL, STORE_PHONE, formatPhoneNumber } from '@/lib/constants';
 import { sendBrevoEmail, buildNewsletterWelcomeHtml, createOrUpdateBrevoContact, BREVO_LISTS } from '@/lib/brevo';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 
@@ -127,8 +127,8 @@ export default function Footer() {
                 </div>
                 <div className="flex items-center gap-2">
                   <Phone className="w-4 h-4 text-[#701626] shrink-0" />
-                  <a href={`tel:${phoneNumber.replace(/[^0-9+]/g, '')}`} className="hover:text-[#701626] font-medium">
-                    Studio Phone: {phoneNumber}
+                  <a href={`tel:${phoneNumber.replace(/[^0-9+]/g, '')}`} className="hover:text-[#701626] transition-colors">
+                    Studio Hotline: <span className="font-medium text-[#110B0E]">{formatPhoneNumber(phoneNumber)}</span>
                   </a>
                 </div>
                 <div className="flex items-center gap-2">
@@ -137,9 +137,9 @@ export default function Footer() {
                     href={`https://wa.me/${whatsappDigits}?text=${encodeURIComponent('Hi Preethi, I would like to inquire about Azhai Clothing.')}`}
                     target="_blank"
                     rel="noreferrer"
-                    className="hover:text-[#701626] font-medium text-[#110B0E]"
+                    className="hover:text-[#701626] transition-colors"
                   >
-                    WhatsApp Stylist: <strong className="text-[#25D366] font-semibold">{settings?.whatsappNumber || phoneNumber}</strong>
+                    WhatsApp Concierge: <span className="font-medium text-[#110B0E]">{formatPhoneNumber(settings?.whatsappNumber || phoneNumber)}</span>
                   </a>
                 </div>
               </div>

@@ -1,8 +1,14 @@
 import { Link } from 'react-router-dom';
 import { ShieldCheck, Lock, ArrowLeft } from 'lucide-react';
 import SEOHead from '@/components/SEOHead';
+import { useAdminStore } from '@/store/admin';
+import { STORE_EMAIL, STORE_PHONE, STORE_ADDRESS_FULL, formatPhoneNumber } from '@/lib/constants';
 
 export default function PrivacyPolicy() {
+  const settings = useAdminStore((s) => s.settings);
+  const activePhone = settings?.phoneNumber || STORE_PHONE;
+  const activeEmail = settings?.studio?.supportEmail || STORE_EMAIL;
+  const activeAddress = settings?.atelierAddress || STORE_ADDRESS_FULL;
   return (
     <div className="min-h-screen bg-[#FCFBF8] pt-32 sm:pt-36 pb-20 text-[#110B0E]">
       <SEOHead
@@ -99,9 +105,9 @@ export default function PrivacyPolicy() {
               If you have any questions, requests to access or delete your stored data, please contact our Colombo atelier:
             </p>
             <div className="p-4 rounded-2xl bg-[#F7F4EE] border border-[#C5A059]/30 space-y-1 font-mono text-[11px] text-[#110B0E]">
-              <p>Email: orders@azhaiclothing.lk | support@azhaiclothing.lk</p>
-              <p>Hotline: +94 77 123 4567</p>
-              <p>Atelier Showroom: 42/A Temple Road, Kollupitiya, Colombo 03, Sri Lanka</p>
+              <p>Email: {activeEmail}</p>
+              <p>Hotline: {formatPhoneNumber(activePhone)}</p>
+              <p>Atelier Showroom: {activeAddress}</p>
             </div>
           </div>
         </div>

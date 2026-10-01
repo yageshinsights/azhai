@@ -7,11 +7,9 @@ import {
   type DressType,
   type TailoringFabric,
   type MeasurementField,
-  type SizePreset,
   DEFAULT_DRESS_TYPES,
   DEFAULT_FABRICS,
   DEFAULT_MEASUREMENT_FIELDS,
-  DEFAULT_SIZE_PRESETS,
 } from '@/lib/tailoring';
 
 export type AdminRole = 'owner' | 'manager' | 'dispatch';
@@ -173,7 +171,6 @@ interface AdminState {
   dressTypes: DressType[];
   tailoringFabrics: TailoringFabric[];
   measurementFields: MeasurementField[];
-  sizePresets: SizePreset[];
   // Data loading flags
   isSupabaseDataLoaded: boolean;
 
@@ -236,9 +233,6 @@ interface AdminState {
   addMeasurementField: (f: Omit<MeasurementField, 'id'>) => void;
   updateMeasurementField: (id: number, updates: Partial<MeasurementField>) => void;
   deleteMeasurementField: (id: number) => void;
-  addSizePreset: (p: Omit<SizePreset, 'id'>) => void;
-  updateSizePreset: (id: number, updates: Partial<SizePreset>) => void;
-  deleteSizePreset: (id: number) => void;
 }
 
 const INITIAL_TAGS: string[] = [
@@ -372,6 +366,27 @@ const INITIAL_CUSTOMERS: CustomerRecord[] = [];
 
 const INITIAL_ORDERS: AdminOrder[] = [];
 
+function saveTailoringToLocalStorage(dressTypes: DressType[]) {
+  if (typeof window !== 'undefined') {
+    try {
+      localStorage.setItem('azhai_tailoring_dresstypes', JSON.stringify(dressTypes));
+    } catch {}
+  }
+}
+
+function loadTailoringFromLocalStorage(): DressType[] | null {
+  if (typeof window !== 'undefined') {
+    try {
+      const data = localStorage.getItem('azhai_tailoring_dresstypes');
+      if (data) {
+        const parsed = JSON.parse(data);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch {}
+  }
+  return null;
+}
+
 export const useAdminStore = create<AdminState>()(
   persist(
     (set, get) => ({
@@ -386,11 +401,10 @@ export const useAdminStore = create<AdminState>()(
       inquiries: [],
       settings: getInitialSettings(),
 
-      // Tailoring initial state
-      dressTypes: DEFAULT_DRESS_TYPES,
+      // Tailoring initial state (preserves saved edits across reloads)
+      dressTypes: loadTailoringFromLocalStorage() || DEFAULT_DRESS_TYPES,
       tailoringFabrics: DEFAULT_FABRICS,
       measurementFields: DEFAULT_MEASUREMENT_FIELDS,
-      sizePresets: DEFAULT_SIZE_PRESETS,
       isSupabaseDataLoaded: !isSupabaseConfigured(),
 
       fetchSupabaseData: async () => {
@@ -742,31 +756,43 @@ export const useAdminStore = create<AdminState>()(
 
           // 7. Fetch Tailoring Tables (Safe with fallback)
           try {
-            const { data: dbDressTypes } = await supabase.from('tailoring_dress_types').select('*').order('display_order', { ascending: true });
-            if (dbDressTypes && dbDressTypes.length > 0) {
-              const currentDressTypes = get().dressTypes || DEFAULT_DRESS_TYPES;
-              set({
-                dressTypes: dbDressTypes.map((dt: any) => {
-                  const existing = currentDressTypes.find((item) => item.id === dt.id || item.slug === dt.slug);
-                  return {
-                    id: dt.id,
-                    collectionId: dt.collection_id ?? existing?.collectionId,
-                    collectionSlug: dt.collection_slug || existing?.collectionSlug || 'kurties',
-                    name: dt.name,
-                    slug: dt.slug,
-                    coverImage: dt.cover_image || dt.icon || existing?.coverImage || '',
-                    stitchingFee: Number(dt.stitching_fee ?? existing?.stitchingFee ?? 0),
-                    leadTime: dt.lead_time || existing?.leadTime || '5–7 working days',
-                    description: dt.description || existing?.description || '',
-                    isActive: dt.is_active !== false,
-                    displayOrder: Number(dt.display_order ?? existing?.displayOrder ?? 0),
-                  };
-                }),
+            const localSavedDressTypes = loadTailoringFromLocalStorage();
+            const { data: dbDressTypes, error: dtErr } = await supabase
+              .from('tailoring_dress_types')
+              .select('*')
+              .order('display_order', { ascending: true });
+
+            if (!dtErr && dbDressTypes && dbDressTypes.length > 0) {
+              const currentDressTypes = localSavedDressTypes || get().dressTypes || DEFAULT_DRESS_TYPES;
+              const mergedDressTypes = dbDressTypes.map((dt: any) => {
+                const existing = currentDressTypes.find((item) => item.id === dt.id || item.slug === dt.slug);
+                return {
+                  id: dt.id,
+                  collectionId: dt.collection_id ?? existing?.collectionId,
+                  collectionSlug: dt.collection_slug || existing?.collectionSlug || 'kurties',
+                  name: dt.name || existing?.name || '',
+                  slug: dt.slug || existing?.slug || '',
+                  coverImage: dt.cover_image || dt.icon || existing?.coverImage || '',
+                  stitchingFee: dt.stitching_fee != null && Number(dt.stitching_fee) > 0 ? Number(dt.stitching_fee) : (existing?.stitchingFee ?? 0),
+                  requiredMeters: dt.required_meters != null && Number(dt.required_meters) > 0 ? Number(dt.required_meters) : (existing?.requiredMeters ?? 2.5),
+                  leadTime: dt.lead_time || existing?.leadTime || '5–7 working days',
+                  description: dt.description || existing?.description || '',
+                  isActive: dt.is_active !== false,
+                  displayOrder: Number(dt.display_order ?? existing?.displayOrder ?? 0),
+                };
               });
+              set({ dressTypes: mergedDressTypes });
+              saveTailoringToLocalStorage(mergedDressTypes);
+            } else if (localSavedDressTypes && localSavedDressTypes.length > 0) {
+              set({ dressTypes: localSavedDressTypes });
             }
 
-            const { data: dbFabrics } = await supabase.from('tailoring_fabrics').select('*').order('display_order', { ascending: true });
-            if (dbFabrics && dbFabrics.length > 0) {
+            const { data: dbFabrics, error: fabErr } = await supabase
+              .from('tailoring_fabrics')
+              .select('*')
+              .order('display_order', { ascending: true });
+
+            if (!fabErr && dbFabrics && dbFabrics.length > 0) {
               set({
                 tailoringFabrics: dbFabrics.map((f: any) => ({
                   id: f.id,
@@ -776,38 +802,30 @@ export const useAdminStore = create<AdminState>()(
                   pricePerUnit: Number(f.price_per_unit || 0),
                   unit: f.unit || 'meter',
                   weight: f.weight || '',
-                  compatibleDressTypeIds: Array.isArray(f.compatible_dress_type_ids) ? f.compatible_dress_type_ids : [1, 2, 3, 4, 5],
+                  compatibleDressTypeIds: Array.isArray(f.compatible_dress_type_ids) ? f.compatible_dress_type_ids : [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
                   inStock: f.in_stock !== false,
                   displayOrder: Number(f.display_order || 0),
                 })),
               });
             }
 
-            const { data: dbFields } = await supabase.from('tailoring_measurement_fields').select('*').order('display_order', { ascending: true });
-            if (dbFields && dbFields.length > 0) {
-              set({
-                measurementFields: dbFields.map((mf: any) => ({
-                  id: mf.id,
-                  dressTypeId: Number(mf.dress_type_id),
-                  fieldName: mf.field_name,
-                  fieldLabel: mf.field_label,
-                  minValue: Number(mf.min_value || 0),
-                  maxValue: Number(mf.max_value || 100),
-                  displayOrder: Number(mf.display_order || 0),
-                })),
-              });
-            }
-
-            const { data: dbPresets } = await supabase.from('tailoring_size_presets').select('*');
-            if (dbPresets && dbPresets.length > 0) {
-              set({
-                sizePresets: dbPresets.map((sp: any) => ({
-                  id: sp.id,
-                  dressTypeId: Number(sp.dress_type_id),
-                  sizeLabel: sp.size_label,
-                  measurements: sp.measurements || {},
-                })),
-              });
+            try {
+              const { data: dbFields, error: mfErr } = await supabase.from('tailoring_measurement_fields').select('*');
+              if (!mfErr && dbFields && dbFields.length > 0) {
+                set({
+                  measurementFields: dbFields.map((mf: any) => ({
+                    id: mf.id,
+                    categorySlug: mf.category_slug || 'kurties',
+                    fieldName: mf.field_name,
+                    fieldLabel: mf.field_label,
+                    minValue: Number(mf.min_value || 0),
+                    maxValue: Number(mf.max_value || 100),
+                    displayOrder: Number(mf.display_order || 0),
+                  })),
+                });
+              }
+            } catch (mfErr) {
+              console.warn('[Tailoring Measurement Fields Supabase Fetch]: Using local defaults', mfErr);
             }
           } catch (tailoringErr) {
             console.warn('[Tailoring Supabase Fetch]: Using local defaults', tailoringErr);
@@ -1724,42 +1742,54 @@ export const useAdminStore = create<AdminState>()(
       addDressType: async (dt) => {
         const newId = Date.now();
         const newDt: DressType = { ...dt, id: newId };
-        set((state) => ({
-          dressTypes: [...(state.dressTypes || []), newDt],
-        }));
+        const nextList = [...(get().dressTypes || []), newDt];
+        set({ dressTypes: nextList });
+        saveTailoringToLocalStorage(nextList);
 
         if (isSupabaseConfigured()) {
           try {
+            // Tier 1: Try full payload
             let res = await supabase.from('tailoring_dress_types').insert({
               collection_id: dt.collectionId || null,
               collection_slug: dt.collectionSlug || '',
               name: dt.name,
               slug: dt.slug,
               cover_image: dt.coverImage,
-              stitching_fee: dt.stitchingFee,
+              stitching_fee: Number(dt.stitchingFee),
+              required_meters: Number(dt.requiredMeters || 2.5),
               lead_time: dt.leadTime,
               description: dt.description || '',
               is_active: dt.isActive,
-              display_order: dt.displayOrder,
+              display_order: Number(dt.displayOrder || 1),
             }).select().single();
 
-            if (res.error && (res.error.code === 'PGRST204' || res.error.message?.includes('column'))) {
-              console.warn('[Supabase Dress Type Column Fallback]: Inserting base columns without optional metadata');
-              res = await supabase.from('tailoring_dress_types').insert({
+            // Tier 2: Strip migration columns if column does not exist
+            if (res.error) {
+              console.warn('[Supabase Dress Type Insert Tier 1 Failed]:', res.error.message);
+              const tier2Payload: any = {
                 name: dt.name,
                 slug: dt.slug,
                 cover_image: dt.coverImage,
-                stitching_fee: dt.stitchingFee,
+                stitching_fee: Number(dt.stitchingFee),
                 lead_time: dt.leadTime,
                 is_active: dt.isActive,
-                display_order: dt.displayOrder,
-              }).select().single();
+                display_order: Number(dt.displayOrder || 1),
+              };
+              let fallbackRes = await supabase.from('tailoring_dress_types').insert(tier2Payload).select().single();
+
+              // Tier 3: If cover_image failed, try icon
+              if (fallbackRes.error && fallbackRes.error.message?.includes('cover_image')) {
+                delete tier2Payload.cover_image;
+                tier2Payload.icon = dt.coverImage;
+                fallbackRes = await supabase.from('tailoring_dress_types').insert(tier2Payload).select().single();
+              }
+              res = fallbackRes;
             }
 
             if (res.data?.id) {
-              set((state) => ({
-                dressTypes: (state.dressTypes || []).map((item) => (item.id === newId ? { ...item, id: res.data.id } : item)),
-              }));
+              const updatedList = (get().dressTypes || []).map((item) => (item.id === newId ? { ...item, id: res.data.id } : item));
+              set({ dressTypes: updatedList });
+              saveTailoringToLocalStorage(updatedList);
             }
           } catch (err) {
             console.error('[Supabase Dress Type Insert Error]:', err);
@@ -1768,43 +1798,89 @@ export const useAdminStore = create<AdminState>()(
       },
 
       updateDressType: async (id, updates) => {
-        set((state) => ({
-          dressTypes: (state.dressTypes || []).map((dt) => (dt.id === id ? { ...dt, ...updates } : dt)),
-        }));
+        const nextList = (get().dressTypes || []).map((dt) => (dt.id === id ? { ...dt, ...updates } : dt));
+        set({ dressTypes: nextList });
+        saveTailoringToLocalStorage(nextList);
 
         if (isSupabaseConfigured()) {
           try {
-            const dbPayload: any = {};
-            if (updates.collectionId !== undefined) dbPayload.collection_id = updates.collectionId;
-            if (updates.collectionSlug !== undefined) dbPayload.collection_slug = updates.collectionSlug;
-            if (updates.name !== undefined) dbPayload.name = updates.name;
-            if (updates.slug !== undefined) dbPayload.slug = updates.slug;
-            if (updates.coverImage !== undefined) dbPayload.cover_image = updates.coverImage;
-            if (updates.stitchingFee !== undefined) dbPayload.stitching_fee = updates.stitchingFee;
-            if (updates.leadTime !== undefined) dbPayload.lead_time = updates.leadTime;
-            if (updates.description !== undefined) dbPayload.description = updates.description;
-            if (updates.isActive !== undefined) dbPayload.is_active = updates.isActive;
-            if (updates.displayOrder !== undefined) dbPayload.display_order = updates.displayOrder;
+            // Tier 1: Try full payload with all columns
+            const fullPayload: any = {};
+            if (updates.collectionId !== undefined) fullPayload.collection_id = updates.collectionId;
+            if (updates.collectionSlug !== undefined) fullPayload.collection_slug = updates.collectionSlug;
+            if (updates.name !== undefined) fullPayload.name = updates.name;
+            if (updates.slug !== undefined) fullPayload.slug = updates.slug;
+            if (updates.coverImage !== undefined) fullPayload.cover_image = updates.coverImage;
+            if (updates.stitchingFee !== undefined) fullPayload.stitching_fee = Number(updates.stitchingFee);
+            if (updates.requiredMeters !== undefined) fullPayload.required_meters = Number(updates.requiredMeters);
+            if (updates.leadTime !== undefined) fullPayload.lead_time = updates.leadTime;
+            if (updates.description !== undefined) fullPayload.description = updates.description;
+            if (updates.isActive !== undefined) fullPayload.is_active = updates.isActive;
+            if (updates.displayOrder !== undefined) fullPayload.display_order = Number(updates.displayOrder);
 
-            let res = await supabase.from('tailoring_dress_types').update(dbPayload).eq('id', id);
+            const res1 = await supabase.from('tailoring_dress_types').update(fullPayload).eq('id', id);
 
-            if (res.error && (res.error.code === 'PGRST204' || res.error.message?.includes('column'))) {
-              console.warn('[Supabase Dress Type Column Fallback]: Updating base columns without optional metadata');
-              delete dbPayload.collection_id;
-              delete dbPayload.collection_slug;
-              delete dbPayload.description;
-              await supabase.from('tailoring_dress_types').update(dbPayload).eq('id', id);
+            if (!res1.error) {
+              console.log('[Supabase Dress Type Update]: Saved full payload for ID:', id);
+              return;
+            }
+
+            console.warn('[Supabase Dress Type Tier 1 Failed]:', res1.error.message || res1.error);
+
+            // Tier 2: Strip unmigrated columns (collection_id, collection_slug, description, required_meters)
+            const tier2Payload: any = {};
+            if (updates.name !== undefined) tier2Payload.name = updates.name;
+            if (updates.slug !== undefined) tier2Payload.slug = updates.slug;
+            if (updates.coverImage !== undefined) tier2Payload.cover_image = updates.coverImage;
+            if (updates.stitchingFee !== undefined) tier2Payload.stitching_fee = Number(updates.stitchingFee);
+            if (updates.leadTime !== undefined) tier2Payload.lead_time = updates.leadTime;
+            if (updates.isActive !== undefined) tier2Payload.is_active = updates.isActive;
+            if (updates.displayOrder !== undefined) tier2Payload.display_order = Number(updates.displayOrder);
+
+            let res2 = await supabase.from('tailoring_dress_types').update(tier2Payload).eq('id', id);
+
+            if (!res2.error) {
+              console.log('[Supabase Dress Type Tier 2]: Saved core columns for ID:', id);
+              return;
+            }
+
+            console.warn('[Supabase Dress Type Tier 2 Failed]:', res2.error.message || res2.error);
+
+            // Tier 3: If cover_image failed, try icon
+            if (tier2Payload.cover_image !== undefined) {
+              delete tier2Payload.cover_image;
+              tier2Payload.icon = updates.coverImage;
+              let res3 = await supabase.from('tailoring_dress_types').update(tier2Payload).eq('id', id);
+              if (!res3.error) {
+                console.log('[Supabase Dress Type Tier 3]: Saved with icon column for ID:', id);
+                return;
+              }
+              console.warn('[Supabase Dress Type Tier 3 Failed]:', res3.error.message || res3.error);
+            }
+
+            // Tier 4: GUARANTEED STITCHING FEE UPDATE — update stitching_fee alone
+            if (updates.stitchingFee !== undefined) {
+              const feeRes = await supabase
+                .from('tailoring_dress_types')
+                .update({ stitching_fee: Number(updates.stitchingFee) })
+                .eq('id', id);
+
+              if (!feeRes.error) {
+                console.log('[Supabase Dress Type Stitching Fee]: Successfully saved stitching_fee individually to Supabase for ID:', id);
+              } else {
+                console.error('[Supabase Dress Type Critical]: Failed to save stitching_fee:', feeRes.error.message);
+              }
             }
           } catch (err) {
-            console.error('[Supabase Dress Type Update Error]:', err);
+            console.error('[Supabase Dress Type Update Exception]:', err);
           }
         }
       },
 
       deleteDressType: async (id) => {
-        set((state) => ({
-          dressTypes: (state.dressTypes || []).filter((dt) => dt.id !== id),
-        }));
+        const nextList = (get().dressTypes || []).filter((dt) => dt.id !== id);
+        set({ dressTypes: nextList });
+        saveTailoringToLocalStorage(nextList);
 
         if (isSupabaseConfigured()) {
           try {
@@ -1820,10 +1896,9 @@ export const useAdminStore = create<AdminState>()(
         const target = list.find((dt) => dt.id === id);
         if (!target) return;
         const newStatus = !target.isActive;
-
-        set((state) => ({
-          dressTypes: (state.dressTypes || []).map((dt) => (dt.id === id ? { ...dt, isActive: newStatus } : dt)),
-        }));
+        const nextList = (get().dressTypes || []).map((dt) => (dt.id === id ? { ...dt, isActive: newStatus } : dt));
+        set({ dressTypes: nextList });
+        saveTailoringToLocalStorage(nextList);
 
         if (isSupabaseConfigured()) {
           try {
@@ -1934,7 +2009,7 @@ export const useAdminStore = create<AdminState>()(
         if (isSupabaseConfigured()) {
           try {
             const { data } = await supabase.from('tailoring_measurement_fields').insert({
-              dress_type_id: field.dressTypeId,
+              category_slug: field.categorySlug,
               field_name: field.fieldName,
               field_label: field.fieldLabel,
               min_value: field.minValue,
@@ -1961,6 +2036,7 @@ export const useAdminStore = create<AdminState>()(
         if (isSupabaseConfigured()) {
           try {
             const dbPayload: any = {};
+            if (updates.categorySlug !== undefined) dbPayload.category_slug = updates.categorySlug;
             if (updates.fieldName !== undefined) dbPayload.field_name = updates.fieldName;
             if (updates.fieldLabel !== undefined) dbPayload.field_label = updates.fieldLabel;
             if (updates.minValue !== undefined) dbPayload.min_value = updates.minValue;
@@ -1984,64 +2060,6 @@ export const useAdminStore = create<AdminState>()(
             await supabase.from('tailoring_measurement_fields').delete().eq('id', id);
           } catch (err) {
             console.error('[Supabase Field Delete Error]:', err);
-          }
-        }
-      },
-
-      addSizePreset: async (preset) => {
-        const newId = Date.now();
-        const newPreset: SizePreset = { ...preset, id: newId };
-        set((state) => ({
-          sizePresets: [...(state.sizePresets || []), newPreset],
-        }));
-
-        if (isSupabaseConfigured()) {
-          try {
-            const { data } = await supabase.from('tailoring_size_presets').insert({
-              dress_type_id: preset.dressTypeId,
-              size_label: preset.sizeLabel,
-              measurements: preset.measurements,
-            }).select().single();
-
-            if (data?.id) {
-              set((state) => ({
-                sizePresets: (state.sizePresets || []).map((item) => (item.id === newId ? { ...item, id: data.id } : item)),
-              }));
-            }
-          } catch (err) {
-            console.error('[Supabase Size Preset Insert Error]:', err);
-          }
-        }
-      },
-
-      updateSizePreset: async (id, updates) => {
-        set((state) => ({
-          sizePresets: (state.sizePresets || []).map((p) => (p.id === id ? { ...p, ...updates } : p)),
-        }));
-
-        if (isSupabaseConfigured()) {
-          try {
-            const dbPayload: any = {};
-            if (updates.sizeLabel !== undefined) dbPayload.size_label = updates.sizeLabel;
-            if (updates.measurements !== undefined) dbPayload.measurements = updates.measurements;
-
-            await supabase.from('tailoring_size_presets').update(dbPayload).eq('id', id);
-          } catch (err) {
-            console.error('[Supabase Size Preset Update Error]:', err);
-          }
-        }
-      },
-
-      deleteSizePreset: async (id) => {
-        set((state) => ({
-          sizePresets: (state.sizePresets || []).filter((p) => p.id !== id),
-        }));
-
-        if (isSupabaseConfigured()) {
-          try {
-            await supabase.from('tailoring_size_presets').delete().eq('id', id);
-          } catch (err) {
-            console.error('[Supabase Size Preset Delete Error]:', err);
           }
         }
       },

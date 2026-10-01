@@ -28,6 +28,7 @@ import AdminLayout from '@/components/admin/AdminLayout';
 import { useAdminStore, cleanWhatsAppDigits, type BankAccount } from '@/store/admin';
 import BankBadge from '@/components/BankBadge';
 import BankAccountModal from '@/components/admin/BankAccountModal';
+import { formatPhoneNumber } from '@/lib/constants';
 import { STORE_ADDRESS_FULL, STORE_PHONE, STORE_SUPPORT_EMAIL, STORE_EMAIL, STORE_INSTAGRAM_URL, STORE_FACEBOOK_URL, STORE_TIKTOK_URL } from '@/lib/constants';
 
 export default function AdminSettings() {
@@ -648,9 +649,10 @@ export default function AdminSettings() {
                   placeholder="+94 77 123 4567"
                   className="w-full px-4 py-2.5 rounded-xl bg-white border border-[#C5A059]/30 text-xs font-medium text-[#110B0E] focus:border-[#701626] focus:outline-none"
                 />
-                <p className="text-[10.5px] text-[#6D6268]">
-                  Powers the floating styling concierge button, customer order inquiries, and footer quick chat.
-                </p>
+                <div className="flex items-center justify-between text-[10.5px] text-[#6D6268]">
+                  <span>Powers floating styling concierge button & quick chat.</span>
+                  <span className="text-[#701626] font-medium">Customer sees: {formatPhoneNumber(whatsappNumber)}</span>
+                </div>
               </div>
 
               {/* Studio Voice Phone Number */}
@@ -664,7 +666,7 @@ export default function AdminSettings() {
                     href={`tel:${phoneNumber.replace(/[^0-9+]/g, '')}`}
                     className="text-[10px] font-bold text-[#701626] hover:underline flex items-center gap-1"
                   >
-                    <span>Call: {phoneNumber}</span>
+                    <span>Call: {formatPhoneNumber(phoneNumber)}</span>
                   </a>
                 </div>
                 <input
@@ -674,9 +676,10 @@ export default function AdminSettings() {
                   placeholder="+94 11 234 5678 or +94 77 123 4567"
                   className="w-full px-4 py-2.5 rounded-xl bg-white border border-[#C5A059]/30 text-xs font-medium text-[#110B0E] focus:border-[#701626] focus:outline-none"
                 />
-                <p className="text-[10.5px] text-[#6D6268]">
-                  Displayed on the Contact page, printable packing slips, and order receipts for direct phone calls.
-                </p>
+                <div className="flex items-center justify-between text-[10.5px] text-[#6D6268]">
+                  <span>Displayed on Contact page, packing slips, and receipts.</span>
+                  <span className="text-[#701626] font-medium">Customer sees: {formatPhoneNumber(phoneNumber)}</span>
+                </div>
               </div>
             </div>
 

@@ -136,20 +136,12 @@ export const useCartStore = create<CartStore>()(
         const cleanItem = { ...item, quantity: qtyToAdd };
 
         const existing = get().items.find((i) => {
-          // For tailored items, match by dress type + fabric + size label + measurements
+          // For tailored items, match by dress type + fabric + custom measurements
           if (cleanItem.tailoring && i.tailoring) {
-            if (cleanItem.tailoring.sizeLabel !== 'Custom') {
-              return (
-                i.tailoring.dressTypeSlug === cleanItem.tailoring.dressTypeSlug &&
-                i.tailoring.fabricName === cleanItem.tailoring.fabricName &&
-                i.tailoring.sizeLabel === cleanItem.tailoring.sizeLabel
-              );
-            }
             return (
               i.tailoring.dressTypeSlug === cleanItem.tailoring.dressTypeSlug &&
               i.tailoring.fabricName === cleanItem.tailoring.fabricName &&
-              i.tailoring.sizeLabel === cleanItem.tailoring.sizeLabel &&
-              JSON.stringify(i.tailoring.measurements) === JSON.stringify(cleanItem.tailoring.measurements)
+              JSON.stringify(i.tailoring.measurements || {}) === JSON.stringify(cleanItem.tailoring.measurements || {})
             );
           }
           // For regular items, match by id + size
@@ -161,14 +153,9 @@ export const useCartStore = create<CartStore>()(
             items: state.items.map((i) => {
               if (cleanItem.tailoring && i.tailoring) {
                 const isMatch =
-                  cleanItem.tailoring.sizeLabel !== 'Custom'
-                    ? i.tailoring.dressTypeSlug === cleanItem.tailoring.dressTypeSlug &&
-                      i.tailoring.fabricName === cleanItem.tailoring.fabricName &&
-                      i.tailoring.sizeLabel === cleanItem.tailoring.sizeLabel
-                    : i.tailoring.dressTypeSlug === cleanItem.tailoring.dressTypeSlug &&
-                      i.tailoring.fabricName === cleanItem.tailoring.fabricName &&
-                      i.tailoring.sizeLabel === cleanItem.tailoring.sizeLabel &&
-                      JSON.stringify(i.tailoring.measurements) === JSON.stringify(cleanItem.tailoring.measurements);
+                  i.tailoring.dressTypeSlug === cleanItem.tailoring.dressTypeSlug &&
+                  i.tailoring.fabricName === cleanItem.tailoring.fabricName &&
+                  JSON.stringify(i.tailoring.measurements || {}) === JSON.stringify(cleanItem.tailoring.measurements || {});
                 return isMatch ? { ...i, quantity: i.quantity + qtyToAdd } : i;
               }
               return i.id === cleanItem.id && i.size === cleanItem.size && !i.tailoring
@@ -221,10 +208,12 @@ export const useCartStore = create<CartStore>()(
       totalItems: () => get().items.reduce((sum, i) => sum + (Number(i.quantity) || 0), 0),
       totalPrice: () =>
         get().items.reduce((sum, i) => {
-          // For tailored items, use fabricPrice + stitchingFee
+          // For tailored items, use fabricTotal (or fabricPricePerMeter * requiredMeters) + stitchingFee
           if (i.tailoring) {
-            const tailoringPrice =
-              (Number(i.tailoring.fabricPrice) || 0) + (Number(i.tailoring.stitchingFee) || 0);
+            const fabricAmount =
+              Number(i.tailoring.fabricTotal) ||
+              (Number(i.tailoring.fabricPricePerMeter || (i.tailoring as any).fabricPrice || 0) * (Number(i.tailoring.requiredMeters) || 1));
+            const tailoringPrice = fabricAmount + (Number(i.tailoring.stitchingFee) || 0);
             return sum + tailoringPrice * (Number(i.quantity) || 1);
           }
           // For regular items, parse from price string safely without inflating decimals

@@ -211,6 +211,7 @@ export default function Checkout() {
         name: item.name,
         quantity: item.quantity,
         weightGrams: matched?.weightGrams,
+        category: item.tailoring?.collectionSlug || (matched?.categories?.[0]?.slug),
       };
     })
   );
@@ -292,6 +293,7 @@ export default function Checkout() {
               price: i.price,
               image: i.image,
               quantity: i.quantity,
+              tailoring: i.tailoring,
             })),
             total_value: finalTotal,
             email_sent: false,
@@ -810,7 +812,7 @@ export default function Checkout() {
                         <h4 className="font-display text-sm font-bold text-[#110B0E] leading-tight line-clamp-1">{item.name}</h4>
                         {item.tailoring ? (
                           <p className="text-[9.5px] text-[#6D6268]">
-                            Fabric: {item.tailoring.fabricName} · Size: {item.tailoring.sizeLabel}
+                            Fabric: {item.tailoring.fabricName} · Size: {item.tailoring.sizeLabel} · Qty: {item.quantity}
                           </p>
                         ) : (
                           <p className="text-[9.5px] text-[#6D6268] uppercase tracking-wider">
@@ -1542,7 +1544,7 @@ export default function Checkout() {
                       <h4 className="font-display text-base font-bold text-[#110B0E] leading-tight line-clamp-1">{item.name}</h4>
                       {item.tailoring ? (
                         <p className="text-[10px] text-[#6D6268]">
-                          Fabric: {item.tailoring.fabricName} · Size: {item.tailoring.sizeLabel}
+                          Fabric: {item.tailoring.fabricName} · Size: {item.tailoring.sizeLabel} · Qty: {item.quantity}
                         </p>
                       ) : (
                         <p className="text-[10px] text-[#6D6268] uppercase tracking-wider">

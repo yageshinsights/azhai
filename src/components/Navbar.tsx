@@ -22,7 +22,7 @@ import { useAdminStore, cleanWhatsAppDigits } from '@/store/admin';
 import { PRODUCTS } from '@/lib/data';
 import SearchModal from '@/components/SearchModal';
 import AccountDropdown from '@/components/AccountDropdown';
-import { STORE_PHONE, STORE_ADDRESS_FULL, getWhatsAppUrl } from '@/lib/constants';
+import { STORE_PHONE, STORE_ADDRESS_FULL, getWhatsAppUrl, formatPhoneNumber } from '@/lib/constants';
 
 export default function Navbar() {
   const [scrolled, setScrolled] = useState(false);
@@ -43,6 +43,10 @@ export default function Navbar() {
   const activeWhatsAppDigits = cleanWhatsAppDigits(activeWhatsApp);
   const activeAddress = settings?.atelierAddress || STORE_ADDRESS_FULL;
   const ticker = settings?.announcementTicker;
+
+  const formattedPhone = formatPhoneNumber(activePhone);
+  const formattedWhatsApp = formatPhoneNumber(activeWhatsApp);
+  const isSameContact = cleanWhatsAppDigits(activePhone) === activeWhatsAppDigits;
 
   const allProducts = Array.isArray(adminProducts) ? adminProducts : PRODUCTS;
   const validWishlistCount = wishlist.filter((slug) => allProducts.some((p) => p.slug === slug)).length;
@@ -89,20 +93,49 @@ export default function Navbar() {
                 {ticker?.enabled && ticker?.text ? ticker.text : '✨ Bespoke Handloom Silks & Bridal Tailoring Colombo · Express Island-wide Courier'}
               </span>
             </div>
-            <div className="hidden md:flex items-center gap-4 shrink-0 text-[10.5px]">
-              <a href={`tel:${activePhone.replace(/[^0-9+]/g, '')}`} className="hover:text-white transition-colors flex items-center gap-1 font-medium">
-                <span>Hotline:</span> <strong className="text-white">{activePhone}</strong>
-              </a>
-              <span className="text-[#C5A059]/50">|</span>
-              <a
-                href={`https://wa.me/${activeWhatsAppDigits}?text=${encodeURIComponent('Hi Preethi, I would like styling advice on Azhai Clothing.')}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="hover:text-white transition-colors flex items-center gap-1 font-medium"
-              >
-                <MessageCircle className="w-3.5 h-3.5 text-[#25D366]" />
-                <span>WhatsApp:</span> <strong className="text-[#25D366]">{activeWhatsApp}</strong>
-              </a>
+            <div className="hidden md:flex items-center gap-4 shrink-0 text-[11px]">
+              {isSameContact ? (
+                <div className="flex items-center gap-2">
+                  <span className="text-[#F3E8CE]/85 font-light">Hotline & WhatsApp:</span>
+                  <a
+                    href={`tel:${activePhone.replace(/[^0-9+]/g, '')}`}
+                    className="text-white hover:text-[#DFBF77] font-medium tracking-wider transition-colors"
+                  >
+                    {formattedPhone}
+                  </a>
+                  <a
+                    href={`https://wa.me/${activeWhatsAppDigits}?text=${encodeURIComponent('Hi Preethi, I would like styling advice on Azhai Clothing.')}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-white/10 hover:bg-[#25D366]/25 text-[#F3E8CE] hover:text-white border border-[#C5A059]/40 transition-all text-[10px] font-medium"
+                    title="Chat on WhatsApp"
+                  >
+                    <MessageCircle className="w-2.5 h-2.5 text-[#25D366]" />
+                    <span>Chat</span>
+                  </a>
+                </div>
+              ) : (
+                <div className="flex items-center gap-3">
+                  <a
+                    href={`tel:${activePhone.replace(/[^0-9+]/g, '')}`}
+                    className="text-[#F3E8CE]/90 hover:text-white transition-colors flex items-center gap-1.5 font-light"
+                  >
+                    <span>Hotline:</span>
+                    <span className="text-white font-medium tracking-wider">{formattedPhone}</span>
+                  </a>
+                  <span className="text-[#C5A059]/40">•</span>
+                  <a
+                    href={`https://wa.me/${activeWhatsAppDigits}?text=${encodeURIComponent('Hi Preethi, I would like styling advice on Azhai Clothing.')}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-[#F3E8CE]/90 hover:text-white transition-colors flex items-center gap-1.5 font-light"
+                  >
+                    <MessageCircle className="w-3 h-3 text-[#25D366]" />
+                    <span>WhatsApp:</span>
+                    <span className="text-white font-medium tracking-wider">{formattedWhatsApp}</span>
+                  </a>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -299,7 +332,7 @@ export default function Navbar() {
               target="_blank"
               rel="noopener noreferrer"
               className="hidden xl:inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.18em] text-[#701626] bg-[#701626]/8 border border-[#C5A059]/30 px-3.5 py-1.5 rounded-full hover:bg-[#701626]/12 transition-colors shadow-sm"
-              title={`Speak with Preethi (${activeWhatsApp})`}
+              title={`Speak with Preethi (${formattedWhatsApp})`}
               aria-label="Speak with Preethi on WhatsApp"
             >
               <MessageCircle className="w-3.5 h-3.5 text-[#701626]" />
@@ -579,13 +612,13 @@ export default function Navbar() {
                   className="w-full py-3 bg-[#25D366] hover:bg-[#20bd5a] text-white text-xs uppercase tracking-[0.2em] font-bold rounded-xl flex items-center justify-center gap-2 shadow-md transition-colors"
                 >
                   <MessageCircle className="w-4 h-4" />
-                  <span>WhatsApp: {activeWhatsApp}</span>
+                  <span>WhatsApp: {formattedWhatsApp}</span>
                 </a>
                 <a
                   href={`tel:${activePhone.replace(/[^0-9+]/g, '')}`}
                   className="w-full py-2.5 bg-white border border-[#C5A059]/40 text-[#110B0E] text-xs font-bold rounded-xl flex items-center justify-center gap-2 hover:bg-gray-50 transition-colors"
                 >
-                  <span>Studio Call: {activePhone}</span>
+                  <span>Studio Call: {formattedPhone}</span>
                 </a>
                 <p className="text-[10px] text-center text-[#6D6268]">Atelier: {activeAddress}</p>
               </div>

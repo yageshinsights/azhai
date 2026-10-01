@@ -1042,18 +1042,32 @@ export default function OrderDetailDrawer({ order: propOrder, isOpen, onClose }:
 
                         {/* Tailoring Specs Matrix */}
                         {item.tailoring && (
-                          <div className="p-3 bg-[#FCFBF8] rounded-xl border border-[#DFBF77] text-[11px] space-y-1">
-                            <span className="font-bold text-[#701626] uppercase tracking-wider text-[9px]">
-                              ✂️ Tailor Cutting Specifications:
-                            </span>
-                            <div className="grid grid-cols-3 gap-2 pt-1 font-mono text-[10px]">
+                          <div className="p-3 bg-[#FCFBF8] rounded-xl border border-[#DFBF77] text-[11px] space-y-2">
+                            <div className="flex items-center justify-between pb-1.5 border-b border-[#C5A059]/20 text-[10px]">
+                              <span className="font-bold text-[#701626] uppercase tracking-wider text-[9px] flex items-center gap-1">
+                                ✂️ Tailor Cutting Specifications:
+                              </span>
+                              <span className="text-[#6D6268]">
+                                Fabric: <strong className="text-[#110B0E]">{item.tailoring.fabricName}</strong>
+                                {item.tailoring.requiredMeters ? ` (${item.tailoring.requiredMeters}m)` : ''}
+                              </span>
+                            </div>
+                            <div className="grid grid-cols-3 sm:grid-cols-6 gap-1.5 font-mono text-[10px]">
                               {Object.entries(item.tailoring.measurements || {}).map(([k, v]) => (
                                 <div key={k} className="bg-white p-1.5 rounded border border-[#C5A059]/30 text-center">
-                                  <span className="text-gray-500 uppercase block">{k}</span>
-                                  <span className="font-bold text-[#701626]">{v}"</span>
+                                  <span className="text-gray-500 uppercase block text-[8px] truncate">{k}</span>
+                                  <span className="font-bold text-[#701626]">{v as any}"</span>
                                 </div>
                               ))}
                             </div>
+                            {item.tailoring.stitchingFee && (
+                              <div className="flex justify-between text-[10px] text-[#6D6268] pt-1">
+                                <span>Master Stitching: <strong>LKR {Number(item.tailoring.stitchingFee).toLocaleString()}</strong></span>
+                                {item.tailoring.fabricTotal && (
+                                  <span>Fabric Total: <strong>LKR {Number(item.tailoring.fabricTotal).toLocaleString()}</strong></span>
+                                )}
+                              </div>
+                            )}
                           </div>
                         )}
                       </div>

@@ -235,7 +235,7 @@ export default function CartDrawer() {
                               </p>
                               <p className="text-[10px] text-[#6D6268]">
                                 Size: <strong className="text-[#110B0E]">{item.tailoring.sizeLabel}</strong>
-                                {item.tailoring.sizeLabel === 'Custom' && item.tailoring.measurements && (
+                                {item.tailoring.measurements && (
                                   <span className="text-[9px] text-[#701626] ml-1 font-mono">
                                     ({Object.entries(item.tailoring.measurements).slice(0, 3).map(([k, v]) => `${k}:${v}"`).join(', ')})
                                   </span>

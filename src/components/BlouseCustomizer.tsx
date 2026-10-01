@@ -319,9 +319,11 @@ export default function BlouseCustomizer() {
         dressTypeName: blouseDressType?.name || 'Bespoke Saree Blouse',
         dressTypeSlug: blouseDressType?.slug || 'saree-blouse',
         fabricName: `${selectedFabric.name} with ${selectedSleeve.name}`,
-        fabricPrice: fabricPrice,
+        fabricPricePerMeter: fabricPrice,
+        requiredMeters: 1.0,
+        fabricTotal: fabricPrice,
         stitchingFee: basePrice + latkanPrice + pearlPrice,
-        sizeLabel: selectedSize,
+        sizeLabel: selectedSize === 'Custom' ? 'Custom Fit' : selectedSize,
         measurements: {
           bust: customMeasurements.bust,
           waist: customMeasurements.waist,

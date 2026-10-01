@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom';
 import { ShieldCheck, FileText, ArrowLeft, Scale, CheckCircle2 } from 'lucide-react';
 import SEOHead from '@/components/SEOHead';
 import { useAdminStore } from '@/store/admin';
-import { STORE_EMAIL, STORE_PHONE, STORE_ADDRESS_FULL } from '@/lib/constants';
+import { STORE_EMAIL, STORE_PHONE, STORE_ADDRESS_FULL, formatPhoneNumber } from '@/lib/constants';
 
 export default function TermsConditions() {
   const settings = useAdminStore((s) => s.settings);
@@ -127,8 +127,8 @@ export default function TermsConditions() {
             </p>
             <div className="p-4 rounded-2xl bg-[#F7F4EE] border border-[#C5A059]/30 space-y-1 font-mono text-[11px] text-[#110B0E]">
               <p>Email: {activeEmail}</p>
-              <p>Hotline: {activePhone}</p>
-              <p>WhatsApp Concierge: {activeWhatsApp}</p>
+              <p>Hotline: {formatPhoneNumber(activePhone)}</p>
+              <p>WhatsApp Concierge: {formatPhoneNumber(activeWhatsApp)}</p>
               <p>Showroom Address: {activeAddress}</p>
             </div>
           </div>

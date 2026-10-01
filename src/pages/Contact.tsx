@@ -4,7 +4,7 @@ import { motion } from 'framer-motion';
 import { Mail, MessageCircle, MapPin, Clock, Send, Sparkles, CheckCircle2, Phone, ExternalLink, PhoneCall } from 'lucide-react';
 import SEOHead from '@/components/SEOHead';
 import { useAdminStore, cleanWhatsAppDigits } from '@/store/admin';
-import { STORE_ADDRESS_FULL, STORE_PHONE, STORE_SUPPORT_EMAIL } from '@/lib/constants';
+import { STORE_ADDRESS_FULL, STORE_PHONE, STORE_SUPPORT_EMAIL, formatPhoneNumber } from '@/lib/constants';
 import { sendBrevoEmail, buildCustomerInquiryConfirmationHtml } from '@/lib/brevo';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 
@@ -233,8 +233,8 @@ export default function Contact() {
               <div className="text-xs space-y-2 text-[#6D6268]">
                 <div className="flex items-center justify-between">
                   <span>Studio Phone:</span>
-                  <a href={`tel:${activePhone}`} className="font-semibold text-[#110B0E] hover:text-[#701626] transition-colors">
-                    {activePhone}
+                  <a href={`tel:${activePhone.replace(/[^0-9+]/g, '')}`} className="font-semibold text-[#110B0E] hover:text-[#701626] transition-colors">
+                    {formatPhoneNumber(activePhone)}
                   </a>
                 </div>
                 <div className="flex items-center justify-between">
@@ -269,7 +269,7 @@ export default function Contact() {
                 <h3 className="font-display text-xl font-bold">Instant WhatsApp Stylist</h3>
               </div>
               <p className="text-xs text-white/80 font-light leading-relaxed">
-                Need urgent sizing advice, custom bridal consultation, or same-day dispatch assistance in Colombo? Message Preethi directly on WhatsApp ({activeWhatsApp}).
+                Need urgent sizing advice, custom bridal consultation, or same-day dispatch assistance in Colombo? Message Preethi directly on WhatsApp ({formatPhoneNumber(activeWhatsApp)}).
               </p>
               <a
                 href={`https://wa.me/${activeWhatsAppDigits}?text=${encodeURIComponent('Hello Preethi! I would like to inquire about an Azhai piece.')}`}

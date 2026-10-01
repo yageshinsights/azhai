@@ -384,8 +384,16 @@ export function buildOrderConfirmationHtml(order: {
           <span style="font-size: 11px; color: #6D6268;">Size: <strong style="color: #701626;">${item.size || 'M'}</strong> | Qty: ${item.quantity}</span>
           ${
             item.tailoring
-              ? `<div style="margin-top: 6px; font-size: 10px; color: #701626; font-weight: bold; background: #F7F4EE; padding: 4px 8px; border-radius: 6px; border: 1px solid #DFBF77; display: inline-block;">
-                  ✂️ Bespoke Custom Fitting (${item.tailoring.leadTime || '4-7 days'})
+              ? `<div style="margin-top: 6px; font-size: 10px; color: #701626; background: #FCFBF8; padding: 6px 10px; border-radius: 8px; border: 1px solid #DFBF77;">
+                  <strong style="color: #701626; display: block; margin-bottom: 2px;">✂️ Bespoke Tailoring (${item.tailoring.leadTime || '4–7 days'})</strong>
+                  <span style="color: #6D6268; display: block;">Fabric: <strong style="color: #110B0E;">${item.tailoring.fabricName || 'Selected Fabric'}</strong>${item.tailoring.requiredMeters ? ` (${item.tailoring.requiredMeters}m)` : ''}</span>
+                  ${
+                    item.tailoring.measurements && Object.keys(item.tailoring.measurements).length > 0
+                      ? `<div style="margin-top: 4px; font-size: 9.5px; color: #110B0E; font-family: monospace;">
+                          ${Object.entries(item.tailoring.measurements).map(([k, v]) => `<span style="display: inline-block; background: #F7F4EE; padding: 1px 4px; border-radius: 3px; margin: 1px 2px; border: 1px solid #DFBF77;">${k}: ${v}"</span>`).join('')}
+                         </div>`
+                      : ''
+                  }
                  </div>`
               : ''
           }
@@ -524,8 +532,16 @@ export function buildOrderApprovedHtml(order: {
           <span style="font-size: 11px; color: #6D6268;">Size: <strong style="color: #701626;">${item.size || 'M'}</strong> | Qty: ${item.quantity}</span>
           ${
             item.tailoring
-              ? `<div style="margin-top: 6px; font-size: 10px; color: #701626; font-weight: bold; background: #F7F4EE; padding: 4px 8px; border-radius: 6px; border: 1px solid #DFBF77; display: inline-block;">
-                  ✂️ Bespoke Custom Fitting (${item.tailoring.leadTime || '4-7 days'})
+              ? `<div style="margin-top: 6px; font-size: 10px; color: #701626; background: #FCFBF8; padding: 6px 10px; border-radius: 8px; border: 1px solid #DFBF77;">
+                  <strong style="color: #701626; display: block; margin-bottom: 2px;">✂️ Bespoke Tailoring (${item.tailoring.leadTime || '4–7 days'})</strong>
+                  <span style="color: #6D6268; display: block;">Fabric: <strong style="color: #110B0E;">${item.tailoring.fabricName || 'Selected Fabric'}</strong>${item.tailoring.requiredMeters ? ` (${item.tailoring.requiredMeters}m)` : ''}</span>
+                  ${
+                    item.tailoring.measurements && Object.keys(item.tailoring.measurements).length > 0
+                      ? `<div style="margin-top: 4px; font-size: 9.5px; color: #110B0E; font-family: monospace;">
+                          ${Object.entries(item.tailoring.measurements).map(([k, v]) => `<span style="display: inline-block; background: #F7F4EE; padding: 1px 4px; border-radius: 3px; margin: 1px 2px; border: 1px solid #DFBF77;">${k}: ${v}"</span>`).join('')}
+                         </div>`
+                      : ''
+                  }
                  </div>`
               : ''
           }

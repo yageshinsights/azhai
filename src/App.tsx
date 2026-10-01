@@ -76,6 +76,7 @@ function AnimatedRoutes() {
             <Route path="/collections/:slug" element={<CollectionDetail />} />
             <Route path="/products/:slug" element={<ProductDetail />} />
             <Route path="/story" element={<Story />} />
+            <Route path="/about" element={<Navigate to="/story" replace />} />
             <Route path="/tailoring" element={<Tailoring />} />
             <Route path="/checkout" element={<Checkout />} />
             <Route path="/order-success/:orderId" element={<OrderSuccess />} />
