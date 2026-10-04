@@ -108,9 +108,14 @@ export default function ReviewSection({ productName, onReviewsLoaded }: ReviewSe
     if (isSupabaseConfigured() && id.length > 30) {
       (async () => {
         try {
-          const currentReview = reviews.find((x) => x.id === id);
-          const nextLikes = (currentReview?.likes || 0) + 1;
-          await supabase.from('product_reviews').update({ likes: nextLikes }).eq('id', id);
+          // 1. Try secure RPC function (safe under strict RLS)
+          const { error: rpcErr } = await supabase.rpc('increment_review_likes', { review_id: id });
+          if (rpcErr) {
+            // 2. Fallback to direct update
+            const currentReview = reviews.find((x) => x.id === id);
+            const nextLikes = (currentReview?.likes || 0) + 1;
+            await supabase.from('product_reviews').update({ likes: nextLikes }).eq('id', id);
+          }
         } catch (err) {
           console.warn('[Supabase Like Review Exception]:', err);
         }

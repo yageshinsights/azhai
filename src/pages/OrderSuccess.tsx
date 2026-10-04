@@ -63,20 +63,35 @@ export default function OrderSuccess() {
       setIsFetchingDb(true);
       (async () => {
         try {
-          const { data: ord, error: ordErr } = await supabase
-            .from('orders')
-            .select(`
-              *,
-              order_items (*)
-            `)
-            .eq('order_code', orderId)
-            .maybeSingle();
+          let ord: any = null;
 
-          if (ord && !ordErr) {
+          // 1. Try secure RPC function (guarantees guest access under strict RLS)
+          const { data: rpcOrders, error: rpcErr } = await supabase
+            .rpc('get_order_by_code', { p_order_code: orderId });
+
+          if (!rpcErr && Array.isArray(rpcOrders) && rpcOrders.length > 0) {
+            ord = rpcOrders[0];
+          } else {
+            // 2. Fallback to direct select
+            const { data: directOrd, error: directErr } = await supabase
+              .from('orders')
+              .select(`
+                *,
+                order_items (*)
+              `)
+              .eq('order_code', orderId)
+              .maybeSingle();
+
+            if (!directErr && directOrd) {
+              ord = directOrd;
+            }
+          }
+
+          if (ord) {
             setDbOrder({
               orderId: ord.order_code,
               items: (ord.order_items || []).map((it: any, idx: number) => ({
-                id: it.id || idx,
+                id: it.id || it.product_id || idx,
                 name: it.product_name || it.name,
                 price: it.price,
                 image: it.image_url || it.image,

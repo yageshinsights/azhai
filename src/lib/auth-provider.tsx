@@ -48,8 +48,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (session?.user) {
         syncProfileToStore(session.user);
       } else if (event === 'SIGNED_OUT') {
-        // Only reset auth store on an explicit sign out event
+        // Reset customer & admin stores on an explicit sign out event
         useAuthStore.getState().logout();
+        useAdminStore.getState().adminLogout();
       }
       setLoading(false);
     });
@@ -99,6 +100,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             ? { familyProfiles: profile.family_profiles }
             : {}),
         });
+
+        // If user has administrative role, automatically sync with useAdminStore as well
+        const profileRole = (profile.role || 'customer').toLowerCase();
+        if (['owner', 'manager', 'dispatch', 'admin'].includes(profileRole)) {
+          const mappedRole =
+            profileRole === 'dispatch' ? 'dispatch' :
+            profileRole === 'manager' ? 'manager' : 'owner';
+          useAdminStore.setState({
+            adminUser: {
+              id: profile.id,
+              name: profile.full_name || (mappedRole === 'owner' ? 'Preethi' : 'Atelier Manager'),
+              email: profile.email,
+              role: mappedRole,
+              avatar: profile.avatar_url || undefined,
+            },
+            isAdminAuthenticated: true,
+          });
+        }
       }
 
       // 2. Fetch User Addresses

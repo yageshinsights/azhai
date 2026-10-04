@@ -920,6 +920,9 @@ export const useAdminStore = create<AdminState>()(
       },
 
       adminLogout: () => {
+        if (isSupabaseConfigured()) {
+          supabase.auth.signOut().catch(() => {});
+        }
         set({ adminUser: null, isAdminAuthenticated: false });
       },
 
@@ -2117,28 +2120,38 @@ export const useAdminStore = create<AdminState>()(
         if (isSupabaseConfigured()) {
           (async () => {
             try {
-              const { data: existingOrder } = await supabase
-                .from('orders')
-                .select('customer_details')
-                .eq('order_code', orderId)
-                .maybeSingle();
+              // 1. Try secure RPC function (safe under strict RLS)
+              const { error: rpcErr } = await supabase.rpc('submit_bank_transfer_slip', {
+                p_order_code: orderId,
+                p_slip_url: slipUrl,
+                p_reference_number: reference || null,
+              });
 
-              const currentCustomer = (existingOrder?.customer_details as Record<string, any>) || {};
-              const existingDetails = (currentCustomer?.bank_transfer_details as Record<string, any>) || {};
-              await supabase
-                .from('orders')
-                .update({
-                  customer_details: {
-                    ...currentCustomer,
-                    bank_transfer_details: {
-                      ...existingDetails,
-                      slipUrl,
-                      referenceNumber: reference || existingDetails.referenceNumber,
-                      submittedAt,
+              if (rpcErr) {
+                // 2. Fallback to direct table update
+                const { data: existingOrder } = await supabase
+                  .from('orders')
+                  .select('customer_details')
+                  .eq('order_code', orderId)
+                  .maybeSingle();
+
+                const currentCustomer = (existingOrder?.customer_details as Record<string, any>) || {};
+                const existingDetails = (currentCustomer?.bank_transfer_details as Record<string, any>) || {};
+                await supabase
+                  .from('orders')
+                  .update({
+                    customer_details: {
+                      ...currentCustomer,
+                      bank_transfer_details: {
+                        ...existingDetails,
+                        slipUrl,
+                        referenceNumber: reference || existingDetails.referenceNumber,
+                        submittedAt,
+                      },
                     },
-                  },
-                })
-                .eq('order_code', orderId);
+                  })
+                  .eq('order_code', orderId);
+              }
             } catch (err) {
               console.error('[Supabase uploadOrderBankSlip Error]:', err);
             }
