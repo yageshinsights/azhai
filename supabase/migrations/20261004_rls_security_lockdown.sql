@@ -34,9 +34,12 @@ UPDATE public.profiles
 SET role = 'owner' 
 WHERE LOWER(email) = LOWER('admin@azhai.lk') AND role = 'customer';
 
--- ────────────────────────────────────────────────────────────────────
--- 2. ENABLE RLS ON ALL TABLES (ENSURING NO TABLE IS MISSED)
--- ────────────────────────────────────────────────────────────────────
+-- Ensure potentially unmigrated columns exist
+ALTER TABLE IF EXISTS public.orders ADD COLUMN IF NOT EXISTS bank_transfer_details JSONB;
+ALTER TABLE IF EXISTS public.orders ADD COLUMN IF NOT EXISTS admin_notes TEXT;
+ALTER TABLE IF EXISTS public.orders ADD COLUMN IF NOT EXISTS courier_partner TEXT;
+ALTER TABLE IF EXISTS public.orders ADD COLUMN IF NOT EXISTS tracking_number TEXT;
+
 ALTER TABLE IF EXISTS public.profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE IF EXISTS public.addresses ENABLE ROW LEVEL SECURITY;
 ALTER TABLE IF EXISTS public.categories ENABLE ROW LEVEL SECURITY;
@@ -503,13 +506,15 @@ BEGIN
   );
 
   UPDATE public.orders
-  SET customer_details = jsonb_set(
-    COALESCE(v_customer, '{}'::jsonb),
-    '{bank_transfer_details}',
-    v_bank
-  ),
-  bank_transfer_details = v_bank,
-  updated_at = NOW()
+  SET 
+    customer_details = jsonb_set(
+      COALESCE(v_customer, '{}'::jsonb),
+      ARRAY['bank_transfer_details'],
+      v_bank,
+      true
+    ),
+    bank_transfer_details = v_bank,
+    updated_at = NOW()
   WHERE order_code = p_order_code;
 
   RETURN TRUE;
