@@ -938,6 +938,10 @@ export const useAdminStore = create<AdminState>()(
       },
 
       updateOrderStatus: async (orderId, status, courierPartner, trackingNumber, notes) => {
+        const targetOrder = get().orders.find((o) => o.orderId === orderId);
+        const wasCancelled = targetOrder?.status === 'cancelled';
+        const isCancellingNow = status === 'cancelled' && !wasCancelled;
+
         set((state) => ({
           orders: state.orders.map((ord) => {
             if (ord.orderId !== orderId) return ord;
@@ -950,6 +954,23 @@ export const useAdminStore = create<AdminState>()(
               paymentStatus: status === 'delivered' && ord.paymentStatus === 'pending_cod' ? 'paid' : ord.paymentStatus,
             };
           }),
+          ...(isCancellingNow && targetOrder
+            ? {
+                products: state.products.map((prod) => {
+                  const restoredItem = (targetOrder.items || []).find((it) => it.id === prod.id && !it.tailoring);
+                  if (restoredItem) {
+                    const restoredQty = Number(restoredItem.quantity) || 1;
+                    const currentStock = prod.stockQuantity !== undefined ? prod.stockQuantity : (prod.quantity ?? 15);
+                    return {
+                      ...prod,
+                      stockQuantity: currentStock + restoredQty,
+                      quantity: currentStock + restoredQty,
+                    };
+                  }
+                  return prod;
+                }),
+              }
+            : {}),
         }));
 
         // Synchronize updated order status, tracking, and notes to localStorage auth store
@@ -1222,9 +1243,26 @@ export const useAdminStore = create<AdminState>()(
             });
           }
 
+          // Deduct purchased quantities from in-memory product stock for real-time storefront & admin updates
+          const updatedProducts = state.products.map((prod) => {
+            const purchasedItems = (placedOrder.items || []).filter((it) => it.id === prod.id && !it.tailoring);
+            if (purchasedItems.length > 0) {
+              const totalDeducted = purchasedItems.reduce((acc, it) => acc + (Number(it.quantity) || 1), 0);
+              const currentStock = prod.stockQuantity !== undefined ? prod.stockQuantity : (prod.quantity ?? 15);
+              const newStock = Math.max(0, currentStock - totalDeducted);
+              return {
+                ...prod,
+                stockQuantity: newStock,
+                quantity: newStock,
+              };
+            }
+            return prod;
+          });
+
           return {
             orders: [newAdminOrder, ...state.orders],
             customers: updatedCustomers,
+            products: updatedProducts,
           };
         });
       },

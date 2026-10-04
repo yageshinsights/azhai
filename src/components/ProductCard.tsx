@@ -15,10 +15,13 @@ export default function ProductCard({ product, index = 0 }: { product: Product; 
   const navigate = useNavigate();
 
   const isWishlisted = isInWishlist(product.slug);
+  const availableStock = product.stockQuantity !== undefined ? product.stockQuantity : (product.quantity ?? 15);
+  const isOutOfStock = availableStock === 0;
 
   const handleAddToCart = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
+    if (isOutOfStock) return;
     addItem({
       id: product.id,
       name: product.name,
@@ -73,12 +76,20 @@ export default function ProductCard({ product, index = 0 }: { product: Product; 
 
             {/* Top Luxury Badges */}
             <div className="absolute top-2 sm:top-3.5 left-2 sm:left-3.5 right-2 sm:right-3.5 flex items-start justify-between gap-1.5 z-20 pointer-events-none">
-              {product.tag ? (
+              {isOutOfStock ? (
+                <div className="bg-[#110B0E]/90 backdrop-blur-md text-[#E8DCC4] text-[7.5px] sm:text-[9px] uppercase tracking-[0.16em] font-bold px-2 sm:px-3 py-0.5 sm:py-1 rounded-full shadow-sm border border-[#C5A059]/40">
+                  Sold Out
+                </div>
+              ) : product.tag ? (
                 <div 
                   className="bg-[#701626]/95 backdrop-blur-md text-[#F3E8CE] text-[7.5px] sm:text-[9px] uppercase tracking-[0.1em] sm:tracking-[0.16em] font-semibold px-2 sm:px-3 py-0.5 sm:py-1 rounded-full shadow-sm border border-[#C5A059]/35 max-w-[calc(100%-2.5rem)] truncate leading-tight"
                   title={product.tag}
                 >
                   {product.tag}
+                </div>
+              ) : availableStock <= 3 && availableStock > 0 ? (
+                <div className="bg-amber-950/80 backdrop-blur-md text-amber-200 text-[7.5px] sm:text-[9px] uppercase tracking-[0.12em] font-bold px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-full shadow-sm border border-amber-500/40">
+                  Only {availableStock} Left
                 </div>
               ) : <div />}
 
@@ -137,13 +148,18 @@ export default function ProductCard({ product, index = 0 }: { product: Product; 
               <div className="flex items-center gap-1.5 w-full">
                 <button
                   onClick={handleAddToCart}
+                  disabled={isOutOfStock}
                   className={`flex-1 py-2.5 px-3 text-[10.5px] uppercase tracking-[0.14em] font-bold rounded-xl flex items-center justify-center gap-1.5 transition-all shadow-sm ${
-                    justAdded 
+                    isOutOfStock
+                      ? 'bg-[#110B0E]/30 text-white/40 border border-white/10 cursor-not-allowed'
+                      : justAdded 
                       ? 'bg-emerald-700 text-white' 
                       : 'bg-[#701626] hover:bg-[#8E1E34] text-white'
                   }`}
                 >
-                  {justAdded ? (
+                  {isOutOfStock ? (
+                    'Sold Out'
+                  ) : justAdded ? (
                     <>
                       <Check className="w-3.5 h-3.5" /> Added!
                     </>
