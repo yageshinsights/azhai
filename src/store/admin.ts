@@ -876,7 +876,13 @@ export const useAdminStore = create<AdminState>()(
               password,
             });
 
-            if (!authError && authData.user) {
+            if (authError) {
+              console.warn('[Admin Supabase Auth Error]:', authError.message);
+              // If Supabase user exists but password was wrong, return specific message
+              if (!authError.message.toLowerCase().includes('invalid login credentials')) {
+                return { success: false, error: authError.message };
+              }
+            } else if (authData.user) {
               const { data: profile } = await supabase
                 .from('profiles')
                 .select('*')
@@ -898,6 +904,11 @@ export const useAdminStore = create<AdminState>()(
                 };
                 set({ adminUser, isAdminAuthenticated: true });
                 return { success: true };
+              } else {
+                return { 
+                  success: false, 
+                  error: 'Access denied: This account exists but does not have administrator privileges. Please assign role = owner in Supabase profiles.' 
+                };
               }
             }
           } catch (err) {
