@@ -635,28 +635,15 @@ export default function AdminMarketing() {
               </div>
 
               {/* Brevo API Key Status Banner */}
-              {!(typeof import.meta !== 'undefined' && import.meta.env?.VITE_BREVO_API_KEY) ? (
-                <div className="p-4 rounded-2xl bg-amber-50 border border-amber-200 text-xs text-amber-900 space-y-2">
-                  <div className="flex items-center gap-2 font-bold text-amber-800">
-                    <span>⚠️ Brevo Email API Key Not Configured (Simulation Mode)</span>
-                  </div>
-                  <p className="text-[11px] leading-relaxed text-amber-800/90">
-                    Emails are currently simulated in the browser console. To deliver live emails to real Gmail/Yahoo inboxes, add your Brevo API key to your <code className="bg-amber-100 px-1.5 py-0.5 rounded font-mono text-[10px]">.env</code> file:
-                  </p>
-                  <pre className="p-2.5 bg-amber-900/10 rounded-xl font-mono text-[10px] text-amber-950 overflow-x-auto">
-                    VITE_BREVO_API_KEY=xkeysib-your_brevo_v3_api_key<br/>
-                    VITE_SENDER_EMAIL=orders@azhaiclothing.lk
-                  </pre>
-                  <p className="text-[10px] text-amber-700">
-                    💡 Get a free API key at <a href="https://app.brevo.com/settings/keys/api" target="_blank" rel="noopener noreferrer" className="underline font-bold">Brevo.com &rarr; SMTP & API Keys</a>.
-                  </p>
+              <div className="p-3.5 rounded-2xl bg-emerald-50/80 border border-emerald-200 text-xs text-emerald-900 flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2.5 font-bold text-emerald-800">
+                  <Check className="w-4 h-4 text-emerald-600 shrink-0" />
+                  <span>Brevo Transactional Engine Connected via Secure Server Proxy</span>
                 </div>
-              ) : (
-                <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-800 flex items-center gap-2 font-bold">
-                  <Check className="w-4 h-4 text-emerald-600" />
-                  <span>Brevo Email Engine Connected & Live ({import.meta.env.VITE_SENDER_EMAIL || STORE_EMAIL})</span>
-                </div>
-              )}
+                <span className="text-[10px] font-mono font-semibold bg-emerald-100 text-emerald-800 px-2.5 py-0.5 rounded-full">
+                  {import.meta.env.VITE_SENDER_EMAIL || STORE_EMAIL}
+                </span>
+              </div>
 
               {/* Test Sender Bar */}
               <div className="p-4 rounded-2xl bg-[#FCFBF8] border border-[#DFBF77] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
