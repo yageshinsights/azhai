@@ -542,55 +542,11 @@ export default defineConfig(({ mode }) => {
             else next();
           });
 
-          // 4. Confirm Card Order Proxy
-          server.middlewares.use('/api/confirm-card-order', (req, res, next) => {
-            if (req.method === 'POST') {
-              let body = '';
-              req.on('data', (c) => { body += c; });
-              req.on('end', async () => {
-                try {
-                  const { orderId, paymentId } = JSON.parse(body);
-                  if (!orderId) {
-                    res.statusCode = 400;
-                    res.setHeader('Content-Type', 'application/json');
-                    res.end(JSON.stringify({ error: 'Order ID is required' }));
-                    return;
-                  }
-                  const sUrl = env.VITE_SUPABASE_URL || 'https://hrmcxxcrnxqhesiywqsc.supabase.co';
-                  const sKey = env.SUPABASE_SERVICE_ROLE_KEY || env.VITE_SUPABASE_ANON_KEY || 'sb_publishable_-ZSOc4XGHM2OysLhqKZ5yQ_4OPgdcAm';
-
-                  const patchPayload: Record<string, any> = {
-                    payment_status: 'paid',
-                    status: 'pending',
-                    updated_at: new Date().toISOString(),
-                  };
-                  if (paymentId) {
-                    patchPayload.admin_notes = `Paid via PayHere (Payment ID: ${paymentId})`;
-                  }
-
-                  const patchRes = await fetch(`${sUrl}/rest/v1/orders?order_code=eq.${encodeURIComponent(orderId)}`, {
-                    method: 'PATCH',
-                    headers: {
-                      'apikey': sKey,
-                      'Authorization': `Bearer ${sKey}`,
-                      'Content-Type': 'application/json',
-                      'Prefer': 'return=representation',
-                    },
-                    body: JSON.stringify(patchPayload),
-                  });
-                  const updated = await patchRes.json();
-                  res.statusCode = 200;
-                  res.setHeader('Content-Type', 'application/json');
-                  res.end(JSON.stringify({ success: true, updated }));
-                } catch (err: any) {
-                  res.statusCode = 500;
-                  res.setHeader('Content-Type', 'application/json');
-                  res.end(JSON.stringify({ error: err.message }));
-                }
-              });
-            } else {
-              next();
-            }
+          // 4. Confirm Card Order Proxy (Decommissioned for Security)
+          server.middlewares.use('/api/confirm-card-order', (_req, res) => {
+            res.statusCode = 410;
+            res.setHeader('Content-Type', 'application/json');
+            res.end(JSON.stringify({ error: 'Endpoint decommissioned for security: Orders are verified exclusively via PayHere IPN.' }));
           });
 
           // 5. PayHere IPN Webhook Dev Proxy
@@ -612,15 +568,25 @@ export default defineConfig(({ mode }) => {
 
                 const { merchant_id, order_id, payment_id, payhere_amount, payhere_currency, status_code, md5sig, method } = params;
 
-                if (payhereSecret && md5sig) {
-                  const hashedSecret = md5(payhereSecret).toUpperCase();
-                  const rawString = `${merchant_id}${order_id}${payhere_amount}${payhere_currency}${status_code}${hashedSecret}`;
-                  const localSig = md5(rawString).toUpperCase();
-                  if (localSig !== md5sig.toUpperCase()) {
-                    res.statusCode = 400;
-                    res.end('Invalid Signature');
-                    return;
-                  }
+                // Mandatory Signature Verification: Reject any notification without signature or secret
+                if (!payhereSecret) {
+                  res.statusCode = 500;
+                  res.end('PayHere merchant secret not configured in local environment');
+                  return;
+                }
+                if (!md5sig) {
+                  res.statusCode = 400;
+                  res.end('Missing Signature');
+                  return;
+                }
+
+                const hashedSecret = md5(payhereSecret).toUpperCase();
+                const rawString = `${merchant_id}${order_id}${payhere_amount}${payhere_currency}${status_code}${hashedSecret}`;
+                const localSig = md5(rawString).toUpperCase();
+                if (localSig !== md5sig.toUpperCase()) {
+                  res.statusCode = 401;
+                  res.end('Invalid Signature');
+                  return;
                 }
 
                 const statusCode = parseInt(status_code, 10);

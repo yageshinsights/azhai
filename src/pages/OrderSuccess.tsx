@@ -181,14 +181,7 @@ export default function OrderSuccess() {
           });
       }
 
-      // Server endpoint fallback to guarantee database update
-      fetch('/api/confirm-card-order', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ orderId, paymentId: returnedPaymentId }),
-      }).catch((err) => console.warn('[Confirm Card Order API Notice]:', err));
-
-      // 3. Update payment status in local Admin store if present
+      // 3. Update payment status in local Admin store for UI display
       useAdminStore.getState().updateOrderPaymentStatus(orderId, 'paid', returnedPaymentId);
     }
   }, [location.search, orderId]);

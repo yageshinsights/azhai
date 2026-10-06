@@ -865,10 +865,8 @@ export const useAdminStore = create<AdminState>()(
 
       adminLogin: async (email, password, role = 'owner') => {
         const cleanEmail = email.trim().toLowerCase();
-        const expectedEmail = (import.meta.env.VITE_ADMIN_EMAIL || 'admin@azhai.lk').trim().toLowerCase();
-        const expectedPassword = import.meta.env.VITE_ADMIN_PASSWORD || 'AzhaiAdmin@2026';
 
-        // 1. First check Supabase Auth + profiles.role
+        // 1. Authenticate securely via Supabase Auth + profiles.role
         if (isSupabaseConfigured()) {
           try {
             const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
@@ -878,10 +876,7 @@ export const useAdminStore = create<AdminState>()(
 
             if (authError) {
               console.warn('[Admin Supabase Auth Error]:', authError.message);
-              // If Supabase user exists but password was wrong, return specific message
-              if (!authError.message.toLowerCase().includes('invalid login credentials')) {
-                return { success: false, error: authError.message };
-              }
+              return { success: false, error: authError.message };
             } else if (authData.user) {
               const { data: profile } = await supabase
                 .from('profiles')
@@ -911,23 +906,13 @@ export const useAdminStore = create<AdminState>()(
                 };
               }
             }
-          } catch (err) {
-            console.warn('[Admin Supabase Auth Login Exception]:', err);
+          } catch (err: any) {
+            console.error('[Admin Supabase Auth Login Exception]:', err);
+            return { success: false, error: err?.message || 'Authentication service error' };
           }
         }
 
-        // 2. Fallback to Master Admin Credentials from .env
-        if (cleanEmail === expectedEmail && password === expectedPassword) {
-          const user: AdminUser = {
-            id: 'adm_01',
-            name: role === 'owner' ? 'Preethi' : 'Atelier Manager',
-            email: cleanEmail,
-            role,
-          };
-          set({ adminUser: user, isAdminAuthenticated: true });
-          return { success: true };
-        }
-        return { success: false, error: 'Invalid admin credentials. Please verify your email and password.' };
+        return { success: false, error: 'Database authentication service is required for admin portal access.' };
       },
 
       adminLogout: () => {

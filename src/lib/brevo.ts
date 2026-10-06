@@ -8,10 +8,22 @@
 import { STORE_EMAIL, STORE_PHONE, STORE_WHATSAPP_NUMBER, STORE_SUPPORT_EMAIL } from '@/lib/constants';
 import { useAdminStore, cleanWhatsAppDigits } from '@/store/admin';
 
-const BREVO_API_KEY = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_BREVO_API_KEY) || '';
 const SENDER_EMAIL = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_SENDER_EMAIL) || 'orders@azhaiclothing.lk';
 const SENDER_NAME = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_SENDER_NAME) || 'Azhai Clothing by Preethi';
 const STORE_URL = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_STORE_URL) || 'https://azhaiclothing.lk';
+
+/**
+ * Defensive HTML entity encoding to prevent HTML/XSS injection in email clients
+ */
+export function escapeHtml(str: unknown): string {
+  if (str === null || str === undefined) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
 
 export function getEmailContactDetails() {
   let settings: any = null;
@@ -64,57 +76,25 @@ export async function sendBrevoEmail(payload: SendEmailPayload): Promise<{ succe
     replyTo: payload.replyTo || { name: SENDER_NAME, email: SENDER_EMAIL },
   };
 
-  // 1. Try server-side proxy endpoint (/api/send-email) which bypasses browser CORS.
-  // In production (Cloudflare Worker), the worker securely holds the Brevo API key as a secret.
+  // Dispatch via server-side proxy endpoint (/api/send-email) which securely holds the Brevo API key
   try {
     const proxyRes = await fetch('/api/send-email', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        apiKey: BREVO_API_KEY || undefined,
-        payload: emailBody,
-      }),
+      body: JSON.stringify({ payload: emailBody }),
     });
 
     if (proxyRes.ok) {
-      console.log(`[Brevo Email Sent via Server Proxy]: Dispatched to ${payload.to.map(t => t.email).join(', ')}`);
+      console.log(`[Brevo Email Sent via Server Proxy]: Dispatched to ${payload.to.map((t) => t.email).join(', ')}`);
       return { success: true };
     }
 
     const errData = await proxyRes.json().catch(() => ({}));
     console.warn('[Brevo Proxy Non-200]:', errData);
-  } catch (proxyErr) {
-    console.warn('[Brevo Proxy Unreachable, trying direct fetch]:', proxyErr);
-  }
-
-  // 2. Direct fallback to Brevo REST API (only if client has direct API key)
-  if (!BREVO_API_KEY) {
-    console.warn(`[Brevo Email]: Proxy failed or unreachable, and no client VITE_BREVO_API_KEY for direct fallback.`);
-    return { success: false, error: 'Email service unreachable' };
-  }
-
-  // 2. Direct fallback to Brevo REST API
-  try {
-    const response = await fetch('https://api.brevo.com/v3/smtp/email', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'api-key': BREVO_API_KEY,
-      },
-      body: JSON.stringify(emailBody),
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json();
-      console.error('[Brevo Email Direct Error]:', errorData);
-      return { success: false, error: errorData.message || 'Failed to send email' };
-    }
-
-    console.log(`[Brevo Email Sent Direct]: Dispatched to ${payload.to.map(t => t.email).join(', ')}`);
-    return { success: true };
-  } catch (err: any) {
-    console.error('[Brevo Fetch Exception]:', err);
-    return { success: false, error: err?.message || 'Network/CORS error communicating with Brevo' };
+    return { success: false, error: errData.error || errData.message || 'Email delivery failed' };
+  } catch (proxyErr: any) {
+    console.error('[Brevo Proxy Unreachable]:', proxyErr);
+    return { success: false, error: proxyErr?.message || 'Email service unreachable' };
   }
 }
 
@@ -132,7 +112,7 @@ export interface BrevoContactPayload {
 }
 
 /**
- * Creates or updates a subscriber in Brevo's master Contact list & CRM
+ * Creates or updates a subscriber in Brevo's master Contact list & CRM via Server Proxy
  */
 export async function createOrUpdateBrevoContact(
   payload: BrevoContactPayload
@@ -156,15 +136,12 @@ export async function createOrUpdateBrevoContact(
     contactBody.attributes = attributes;
   }
 
-  // 1. Try server-side proxy endpoint (/api/create-brevo-contact)
+  // Dispatch via secure server-side proxy endpoint (/api/create-brevo-contact)
   try {
     const proxyRes = await fetch('/api/create-brevo-contact', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        apiKey: BREVO_API_KEY || undefined,
-        payload: contactBody,
-      }),
+      body: JSON.stringify({ payload: contactBody }),
     });
 
     if (proxyRes.ok || proxyRes.status === 204) {
@@ -174,36 +151,10 @@ export async function createOrUpdateBrevoContact(
 
     const errData = await proxyRes.json().catch(() => ({}));
     console.warn('[Brevo Contact Proxy Non-200]:', errData);
-  } catch (proxyErr) {
-    console.warn('[Brevo Contact Proxy Unreachable, attempting direct fetch]:', proxyErr);
-  }
-
-  // 2. Direct fallback (if client has direct API key)
-  if (!BREVO_API_KEY) {
-    return { success: false, error: 'Brevo API key not configured' };
-  }
-
-  try {
-    const response = await fetch('https://api.brevo.com/v3/contacts', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'api-key': BREVO_API_KEY,
-      },
-      body: JSON.stringify(contactBody),
-    });
-
-    if (response.ok || response.status === 204) {
-      console.log(`[Brevo Contact Synced Direct]: ${cleanEmail}`);
-      return { success: true };
-    }
-
-    const errData = await response.json().catch(() => ({}));
-    console.error('[Brevo Contact Direct Error]:', errData);
-    return { success: false, error: errData.message || 'Failed to sync contact with Brevo' };
-  } catch (err: any) {
-    console.error('[Brevo Contact Fetch Exception]:', err);
-    return { success: false, error: err?.message || 'Network error syncing contact' };
+    return { success: false, error: errData.error || errData.message || 'Contact sync failed' };
+  } catch (proxyErr: any) {
+    console.error('[Brevo Contact Proxy Unreachable]:', proxyErr);
+    return { success: false, error: proxyErr?.message || 'Network error syncing contact' };
   }
 }
 
@@ -362,7 +313,8 @@ export function buildOrderConfirmationHtml(order: {
     customInstructions?: string;
   };
 }): string {
-  const firstName = order.customerName ? order.customerName.split(' ')[0] : 'Valued Patron';
+  const firstName = escapeHtml(order.customerName ? order.customerName.split(' ')[0] : 'Valued Patron');
+  const safeOrderId = escapeHtml(order.orderId);
   const { whatsappNumber } = getEmailContactDetails();
   const isBankTransfer = 
     Boolean(order.bankTransferDetails) || 
@@ -375,22 +327,22 @@ export function buildOrderConfirmationHtml(order: {
         <td style="padding: 14px 0; border-bottom: 1px solid #E5E0D8; vertical-align: top; width: 75px;">
           <img 
             src="${item.image || 'https://images.unsplash.com/photo-1610030469983-98e550d6193c?auto=format&fit=crop&w=300&q=80'}" 
-            alt="${item.name}" 
+            alt="${escapeHtml(item.name)}" 
             style="width: 68px; height: 86px; object-fit: cover; border-radius: 12px; border: 1px solid #DFBF77; display: block;" 
           />
         </td>
         <td style="padding: 14px 12px; border-bottom: 1px solid #E5E0D8; vertical-align: top;">
-          <strong style="color: #110B0E; font-size: 13.5px; font-family: Georgia, serif;">${item.name}</strong><br>
-          <span style="font-size: 11px; color: #6D6268;">Size: <strong style="color: #701626;">${item.size || 'M'}</strong> | Qty: ${item.quantity}</span>
+          <strong style="color: #110B0E; font-size: 13.5px; font-family: Georgia, serif;">${escapeHtml(item.name)}</strong><br>
+          <span style="font-size: 11px; color: #6D6268;">Size: <strong style="color: #701626;">${escapeHtml(item.size || 'M')}</strong> | Qty: ${Number(item.quantity) || 1}</span>
           ${
             item.tailoring
               ? `<div style="margin-top: 6px; font-size: 10px; color: #701626; background: #FCFBF8; padding: 6px 10px; border-radius: 8px; border: 1px solid #DFBF77;">
-                  <strong style="color: #701626; display: block; margin-bottom: 2px;">✂️ Bespoke Tailoring (${item.tailoring.leadTime || '4–7 days'})</strong>
-                  <span style="color: #6D6268; display: block;">Fabric: <strong style="color: #110B0E;">${item.tailoring.fabricName || 'Selected Fabric'}</strong>${item.tailoring.requiredMeters ? ` (${item.tailoring.requiredMeters}m)` : ''}</span>
+                  <strong style="color: #701626; display: block; margin-bottom: 2px;">✂️ Bespoke Tailoring (${escapeHtml(item.tailoring.leadTime || '4–7 days')})</strong>
+                  <span style="color: #6D6268; display: block;">Fabric: <strong style="color: #110B0E;">${escapeHtml(item.tailoring.fabricName || 'Selected Fabric')}</strong>${item.tailoring.requiredMeters ? ` (${item.tailoring.requiredMeters}m)` : ''}</span>
                   ${
                     item.tailoring.measurements && Object.keys(item.tailoring.measurements).length > 0
                       ? `<div style="margin-top: 4px; font-size: 9.5px; color: #110B0E; font-family: monospace;">
-                          ${Object.entries(item.tailoring.measurements).map(([k, v]) => `<span style="display: inline-block; background: #F7F4EE; padding: 1px 4px; border-radius: 3px; margin: 1px 2px; border: 1px solid #DFBF77;">${k}: ${v}"</span>`).join('')}
+                          ${Object.entries(item.tailoring.measurements).map(([k, v]) => `<span style="display: inline-block; background: #F7F4EE; padding: 1px 4px; border-radius: 3px; margin: 1px 2px; border: 1px solid #DFBF77;">${escapeHtml(k)}: ${escapeHtml(v)}"</span>`).join('')}
                          </div>`
                       : ''
                   }
@@ -399,7 +351,7 @@ export function buildOrderConfirmationHtml(order: {
           }
         </td>
         <td style="padding: 14px 0; border-bottom: 1px solid #E5E0D8; vertical-align: top; text-align: right; color: #701626; font-weight: bold; font-size: 13.5px; white-space: nowrap;">
-          ${item.price}
+          ${escapeHtml(item.price)}
         </td>
       </tr>
     `
@@ -629,11 +581,11 @@ export function buildAdminOrderAlertHtml(order: {
           <img src="${item.image || 'https://images.unsplash.com/photo-1610030469983-98e550d6193c?auto=format&fit=crop&w=200&q=80'}" style="width: 50px; height: 60px; object-fit: cover; border-radius: 8px;" />
         </td>
         <td style="padding: 10px 10px; border-bottom: 1px solid #ddd;">
-          <strong>${item.name}</strong> (${item.size || 'M'} x ${item.quantity})
+          <strong>${escapeHtml(item.name)}</strong> (${escapeHtml(item.size || 'M')} x ${Number(item.quantity) || 1})
           ${tailoringInfo}
         </td>
         <td style="padding: 10px 0; border-bottom: 1px solid #ddd; text-align: right; font-weight: bold; color: #701626;">
-          ${item.price}
+          ${escapeHtml(item.price)}
         </td>
       </tr>
     `;
@@ -642,14 +594,14 @@ export function buildAdminOrderAlertHtml(order: {
     .join('');
 
   const body = `
-    <h2 style="font-family: Georgia, serif; color: #701626; margin-top: 0;">🛍️ New Order Received: #${order.orderId}</h2>
+    <h2 style="font-family: Georgia, serif; color: #701626; margin-top: 0;">🛍️ New Order Received: #${escapeHtml(order.orderId)}</h2>
     <div style="background-color: #F7F4EE; padding: 18px; border-radius: 14px; margin-bottom: 18px; font-size: 13px; line-height: 1.6;">
-      <p style="margin: 0;"><strong>Patron:</strong> ${order.customerName}</p>
-      <p style="margin: 0;"><strong>Phone:</strong> <a href="tel:${order.customerPhone}" style="color: #701626; font-weight: bold;">${order.customerPhone}</a></p>
-      <p style="margin: 0;"><strong>Email:</strong> ${order.customerEmail}</p>
-      <p style="margin: 0;"><strong>Destination:</strong> ${order.customerAddress}, ${order.city}, ${order.district}</p>
-      <p style="margin: 0;"><strong>Payment:</strong> ${order.paymentMethod}</p>
-      <p style="margin: 0;"><strong>Delivery:</strong> ${order.deliveryMethod}</p>
+      <p style="margin: 0;"><strong>Patron:</strong> ${escapeHtml(order.customerName)}</p>
+      <p style="margin: 0;"><strong>Phone:</strong> <a href="tel:${escapeHtml(order.customerPhone)}" style="color: #701626; font-weight: bold;">${escapeHtml(order.customerPhone)}</a></p>
+      <p style="margin: 0;"><strong>Email:</strong> ${escapeHtml(order.customerEmail)}</p>
+      <p style="margin: 0;"><strong>Destination:</strong> ${escapeHtml(order.customerAddress)}, ${escapeHtml(order.city)}, ${escapeHtml(order.district)}</p>
+      <p style="margin: 0;"><strong>Payment:</strong> ${escapeHtml(order.paymentMethod)}</p>
+      <p style="margin: 0;"><strong>Delivery:</strong> ${escapeHtml(order.deliveryMethod)}</p>
     </div>
 
     <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="font-size: 12px;">

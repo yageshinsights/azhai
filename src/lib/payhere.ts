@@ -4,6 +4,8 @@
  * Supports: Visa, MasterCard, AMEX, LankaQR, eZ Cash, mCash, Genie, FriMi
  */
 
+import { supabase, isSupabaseConfigured } from '@/lib/supabase';
+
 export function getPayHereSandboxMode(): boolean {
   return import.meta.env.VITE_PAYHERE_SANDBOX !== 'false';
 }
@@ -315,9 +317,24 @@ export async function requestPayHereRefund(params: {
   adminNotes?: string;
 }): Promise<{ success: boolean; data?: any; error?: string }> {
   try {
+    let authHeader = '';
+    if (isSupabaseConfigured()) {
+      try {
+        const { data: sessionData } = await supabase.auth.getSession();
+        if (sessionData.session?.access_token) {
+          authHeader = `Bearer ${sessionData.session.access_token}`;
+        }
+      } catch {}
+    }
+
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (authHeader) {
+      headers['Authorization'] = authHeader;
+    }
+
     const res = await fetch('/api/payhere-refund', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify(params),
     });
 

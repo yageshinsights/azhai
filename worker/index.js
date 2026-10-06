@@ -160,10 +160,29 @@ export default {
   async fetch(request, env) {
     const url = new URL(request.url);
 
+    const origin = request.headers.get('Origin') || '';
+    const allowedOrigins = [
+      'https://azhaiclothing.lk',
+      'https://www.azhaiclothing.lk',
+      'http://localhost:5173',
+      'http://localhost:4173',
+      'http://127.0.0.1:5173',
+    ];
+    const isAllowedOrigin = allowedOrigins.includes(origin) || origin.endsWith('.pages.dev') || origin.endsWith('.workers.dev');
+    const allowOrigin = isAllowedOrigin ? origin : 'https://azhaiclothing.lk';
+
+    const securityHeaders = {
+      'X-Frame-Options': 'SAMEORIGIN',
+      'X-Content-Type-Options': 'nosniff',
+      'Referrer-Policy': 'strict-origin-when-cross-origin',
+      'Permissions-Policy': 'camera=(), microphone=(), geolocation=()',
+    };
+
     const corsHeaders = {
-      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Origin': allowOrigin,
       'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type, api-key, Authorization',
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+      ...securityHeaders,
     };
 
     if (request.method === 'OPTIONS') {
@@ -177,14 +196,30 @@ export default {
     if (url.pathname === '/api/send-email') {
       if (request.method === 'POST') {
         try {
-          const body = await request.json();
-          const apiKey = env.BREVO_API_KEY || env.VITE_BREVO_API_KEY || body.apiKey;
-
-          if (!apiKey) {
-            return new Response(JSON.stringify({ error: 'Brevo API key is not configured.' }), {
-              status: 400,
+          // Reject cross-origin requests from untrusted external websites
+          if (origin && !isAllowedOrigin) {
+            return new Response(JSON.stringify({ error: 'Origin not allowed' }), {
+              status: 403,
               headers: { 'Content-Type': 'application/json', ...corsHeaders },
             });
+          }
+
+          const body = await request.json();
+          // Never trust client-supplied apiKey; use server-side environment secret only
+          const apiKey = env.BREVO_API_KEY || env.VITE_BREVO_API_KEY;
+
+          if (!apiKey) {
+            return new Response(JSON.stringify({ error: 'Brevo API key is not configured on server.' }), {
+              status: 500,
+              headers: { 'Content-Type': 'application/json', ...corsHeaders },
+            });
+          }
+
+          const payload = body.payload || {};
+          // Enforce sender domain restrictions to prevent arbitrary email spoofing
+          const allowedSenderEmails = ['orders@azhaiclothing.lk', 'hello@azhaiclothing.lk', 'support@azhaiclothing.lk'];
+          if (payload.sender && payload.sender.email && !allowedSenderEmails.includes(payload.sender.email.toLowerCase())) {
+            payload.sender.email = 'orders@azhaiclothing.lk';
           }
 
           const brevoRes = await fetch('https://api.brevo.com/v3/smtp/email', {
@@ -193,7 +228,7 @@ export default {
               'Content-Type': 'application/json',
               'api-key': apiKey,
             },
-            body: JSON.stringify(body.payload),
+            body: JSON.stringify(payload),
           });
 
           const data = await brevoRes.json();
@@ -214,12 +249,19 @@ export default {
     if (url.pathname === '/api/create-brevo-contact') {
       if (request.method === 'POST') {
         try {
+          if (origin && !isAllowedOrigin) {
+            return new Response(JSON.stringify({ error: 'Origin not allowed' }), {
+              status: 403,
+              headers: { 'Content-Type': 'application/json', ...corsHeaders },
+            });
+          }
+
           const body = await request.json();
-          const apiKey = env.BREVO_API_KEY || env.VITE_BREVO_API_KEY || body.apiKey;
+          const apiKey = env.BREVO_API_KEY || env.VITE_BREVO_API_KEY;
 
           if (!apiKey) {
-            return new Response(JSON.stringify({ error: 'Brevo API key is not configured.' }), {
-              status: 400,
+            return new Response(JSON.stringify({ error: 'Brevo API key is not configured on server.' }), {
+              status: 500,
               headers: { 'Content-Type': 'application/json', ...corsHeaders },
             });
           }
@@ -514,56 +556,15 @@ export default {
       }
     }
 
-    // ── 4b. Confirm Card Order (Server-Side Fallback) ──────────
+    // ── 4b. Confirm Card Order Endpoint (Decommissioned for Security) ────
     if (url.pathname === '/api/confirm-card-order') {
-      if (request.method === 'POST') {
-        try {
-          const { orderId, paymentId } = await request.json();
-          if (!orderId) {
-            return new Response(JSON.stringify({ error: 'Order ID is required' }), {
-              status: 400,
-              headers: { 'Content-Type': 'application/json', ...corsHeaders },
-            });
-          }
-
-          const supabaseUrl = env.VITE_SUPABASE_URL || 'https://hrmcxxcrnxqhesiywqsc.supabase.co';
-          const supabaseKey = env.SUPABASE_SERVICE_ROLE_KEY || env.VITE_SUPABASE_ANON_KEY || 'sb_publishable_-ZSOc4XGHM2OysLhqKZ5yQ_4OPgdcAm';
-
-          const patchPayload = {
-            payment_status: 'paid',
-            status: 'pending',
-            updated_at: new Date().toISOString(),
-          };
-          if (paymentId) {
-            patchPayload.admin_notes = `Paid via PayHere (Payment ID: ${paymentId})`;
-          }
-
-          const patchRes = await fetch(`${supabaseUrl}/rest/v1/orders?order_code=eq.${encodeURIComponent(orderId)}`, {
-            method: 'PATCH',
-            headers: {
-              'apikey': supabaseKey,
-              'Authorization': `Bearer ${supabaseKey}`,
-              'Content-Type': 'application/json',
-              'Prefer': 'return=representation',
-            },
-            body: JSON.stringify(patchPayload),
-          });
-
-          const updated = await patchRes.json();
-          return new Response(JSON.stringify({ success: true, updated }), {
-            status: 200,
-            headers: { 'Content-Type': 'application/json', ...corsHeaders },
-          });
-        } catch (err) {
-          return new Response(JSON.stringify({ error: err.message }), {
-            status: 500,
-            headers: { 'Content-Type': 'application/json', ...corsHeaders },
-          });
-        }
-      }
+      return new Response(
+        JSON.stringify({ error: 'Endpoint decommissioned for security: Orders are verified exclusively via PayHere IPN.' }),
+        { status: 410, headers: { 'Content-Type': 'application/json', ...corsHeaders } }
+      );
     }
 
-    // ── 5. PayHere IPN Webhook Receiver ────────────────────────
+    // ── 5. PayHere IPN Webhook Receiver (Cryptographically Verified) ───
     if (url.pathname === '/api/payhere-notify' || url.pathname === '/api/payments-lk-webhook') {
       if (request.method === 'POST') {
         try {
@@ -593,16 +594,24 @@ export default {
 
           const merchantSecret = env.PAYHERE_MERCHANT_SECRET || env.VITE_PAYHERE_SECRET || '';
 
-          // Verify md5sig if merchantSecret is configured
-          if (merchantSecret && md5sig) {
-            const hashedSecret = md5(merchantSecret).toUpperCase();
-            const rawString = `${merchant_id}${order_id}${payhere_amount}${payhere_currency}${status_code}${hashedSecret}`;
-            const localSig = md5(rawString).toUpperCase();
+          // Mandatory Signature Check: Reject any request missing the merchant secret or signature
+          if (!merchantSecret) {
+            console.error('[PayHere IPN] Server configuration error: PAYHERE_MERCHANT_SECRET is missing.');
+            return new Response('Server Configuration Error', { status: 500, headers: corsHeaders });
+          }
 
-            if (localSig !== md5sig.toUpperCase()) {
-              console.error('[PayHere IPN] Invalid MD5 signature for order:', order_id);
-              return new Response('Invalid Signature', { status: 400, headers: corsHeaders });
-            }
+          if (!md5sig) {
+            console.error('[PayHere IPN] Rejected unauthenticated IPN: Missing md5sig for order:', order_id);
+            return new Response('Missing Signature', { status: 400, headers: corsHeaders });
+          }
+
+          const hashedSecret = md5(merchantSecret).toUpperCase();
+          const rawString = `${merchant_id}${order_id}${payhere_amount}${payhere_currency}${status_code}${hashedSecret}`;
+          const localSig = md5(rawString).toUpperCase();
+
+          if (localSig !== md5sig.toUpperCase()) {
+            console.error('[PayHere IPN] Cryptographic verification failed! Invalid MD5 signature for order:', order_id);
+            return new Response('Invalid Signature', { status: 401, headers: corsHeaders });
           }
 
           const statusCode = parseInt(status_code, 10);
@@ -735,7 +744,18 @@ export default {
       }
     }
 
-    // Falls back to SPA static assets
-    return env.ASSETS.fetch(request);
+    // Falls back to SPA static assets with defensive security headers
+    const assetResponse = await env.ASSETS.fetch(request);
+    const responseHeaders = new Headers(assetResponse.headers);
+    responseHeaders.set('X-Frame-Options', 'SAMEORIGIN');
+    responseHeaders.set('X-Content-Type-Options', 'nosniff');
+    responseHeaders.set('Referrer-Policy', 'strict-origin-when-cross-origin');
+    responseHeaders.set('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+
+    return new Response(assetResponse.body, {
+      status: assetResponse.status,
+      statusText: assetResponse.statusText,
+      headers: responseHeaders,
+    });
   },
 };
