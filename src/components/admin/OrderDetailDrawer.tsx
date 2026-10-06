@@ -45,7 +45,7 @@ import {
 import { STORE_PHONE, STORE_SUPPORT_EMAIL } from '@/lib/constants';
 import PrintablePackingSlip from '@/components/admin/PrintablePackingSlip';
 import BankBadge from '@/components/BankBadge';
-import { compressToWebP } from '@/lib/image-compressor';
+import { uploadBankSlipFile, useSignedSlipUrl } from '@/lib/storage';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import { 
   calculateSLPostShipping, 
@@ -78,7 +78,8 @@ export default function OrderDetailDrawer({ order: propOrder, isOpen, onClose }:
     updateOrderPaymentStatus, 
     verifyBankTransferPayment, 
     uploadOrderBankSlip, 
-    products 
+    products,
+    adminUser,
   } = useAdminStore();
 
   // Always resolve to the latest live order from the admin store by orderId
@@ -105,6 +106,7 @@ export default function OrderDetailDrawer({ order: propOrder, isOpen, onClose }:
   const [refundAmountLKR, setRefundAmountLKR] = useState<number>(order?.total || 0);
   const [refundReason, setRefundReason] = useState('Customer requested return/cancellation');
   const [isProcessingRefund, setIsProcessingRefund] = useState(false);
+  const { signedUrl: activeSlipUrl } = useSignedSlipUrl(order?.bankTransferDetails?.slipUrl);
 
   // Synchronize local form inputs when active order changes
   useEffect(() => {
@@ -330,37 +332,14 @@ export default function OrderDetailDrawer({ order: propOrder, isOpen, onClose }:
 
     setIsUploadingAdminSlip(true);
     try {
-      let uploadedUrl = '';
-      if (file.type.startsWith('image/')) {
-        const webpFile = await compressToWebP(file, { maxWidth: 1400, maxHeight: 1400 });
-        if (isSupabaseConfigured()) {
-          const fileName = `order-slips/${order.orderId}-${Date.now()}-${webpFile.name}`;
-          const { error } = await supabase.storage.from('product-images').upload(fileName, webpFile);
-          if (!error) {
-            const { data } = supabase.storage.from('product-images').getPublicUrl(fileName);
-            uploadedUrl = data.publicUrl;
-          }
-        }
-        if (!uploadedUrl) {
-          uploadedUrl = await new Promise<string>((res) => {
-            const r = new FileReader();
-            r.onload = () => res(r.result as string);
-            r.readAsDataURL(webpFile);
-          });
-        }
-      } else {
-        uploadedUrl = await new Promise<string>((res) => {
-          const r = new FileReader();
-          r.onload = () => res(r.result as string);
-          r.readAsDataURL(file);
-        });
-      }
+      const uploadResult = await uploadBankSlipFile(order.orderId, file, adminUser?.id);
+      const uploadedPath = `order-slips/${uploadResult.path}`;
 
-      uploadOrderBankSlip(order.orderId, uploadedUrl, 'Attached by Store Admin');
+      uploadOrderBankSlip(order.orderId, uploadedPath, 'Attached by Store Admin');
       showToast('Deposit slip attached to order successfully!');
-    } catch (err) {
+    } catch (err: any) {
       console.error('[Admin Slip Upload Error]:', err);
-      showToast('Failed to attach deposit slip.');
+      showToast(err?.message || 'Failed to attach deposit slip.');
     } finally {
       setIsUploadingAdminSlip(false);
     }
@@ -597,9 +576,9 @@ export default function OrderDetailDrawer({ order: propOrder, isOpen, onClose }:
                           <div className="p-3 rounded-xl bg-white border border-emerald-200 flex items-center justify-between gap-3">
                             <div className="flex items-center gap-3">
                               <img
-                                src={bank!.slipUrl}
+                                src={activeSlipUrl || bank!.slipUrl}
                                 alt="Deposit Slip"
-                                onClick={() => setSlipModalUrl(bank!.slipUrl!)}
+                                onClick={() => setSlipModalUrl(activeSlipUrl || bank!.slipUrl!)}
                                 className="w-14 h-14 object-cover rounded-lg border border-emerald-300 shadow-xs cursor-pointer hover:opacity-90 transition-opacity"
                               />
                               <div>
@@ -614,7 +593,7 @@ export default function OrderDetailDrawer({ order: propOrder, isOpen, onClose }:
                                 )}
                                 <button
                                   type="button"
-                                  onClick={() => setSlipModalUrl(bank!.slipUrl!)}
+                                  onClick={() => setSlipModalUrl(activeSlipUrl || bank!.slipUrl!)}
                                   className="text-[10.5px] font-bold text-[#701626] underline hover:text-[#8E1E34] cursor-pointer"
                                 >
                                   Inspect Full Slip

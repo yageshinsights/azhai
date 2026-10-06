@@ -12,7 +12,7 @@ import { useAdminStore, cleanWhatsAppDigits } from '@/store/admin';
 import SEOHead from '@/components/SEOHead';
 import { STORE_PHONE, STORE_EMAIL, formatPhoneNumber } from '@/lib/constants';
 import BankBadge from '@/components/BankBadge';
-import { compressToWebP } from '@/lib/image-compressor';
+import { uploadBankSlipFile, useSignedSlipUrl } from '@/lib/storage';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import { 
   sendBrevoEmail, 
@@ -27,7 +27,7 @@ import {
 export default function OrderSuccess() {
   const { orderId } = useParams<{ orderId: string }>();
   const { lastOrder } = useCartStore();
-  const { isAuthenticated, orders: authOrders } = useAuthStore();
+  const { isAuthenticated, orders: authOrders, user } = useAuthStore();
   const adminOrders = useAdminStore((s) => s.orders);
   const settings = useAdminStore((s) => s.settings);
   const activeWhatsApp = settings?.whatsappNumber || STORE_PHONE;
@@ -303,6 +303,8 @@ export default function OrderSuccess() {
 
     return lastOrder || null;
   }, [orderId, lastOrder, authOrders, adminOrders, dbOrder]);
+
+  const { signedUrl: activeSignedSlipUrl } = useSignedSlipUrl(order?.bankTransferDetails?.slipUrl);
 
   // Check if unauthenticated customer email already has an atelier account
   useEffect(() => {
@@ -643,7 +645,7 @@ export default function OrderSuccess() {
                 customInstructions: 'Please state Order ID as the deposit reference.',
               };
 
-            const activeSlipUrl = localSlipUrl || order.bankTransferDetails?.slipUrl;
+            const activeSlipUrl = localSlipUrl || activeSignedSlipUrl || order.bankTransferDetails?.slipUrl;
 
             const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
               const file = e.target.files?.[0];
@@ -653,53 +655,22 @@ export default function OrderSuccess() {
               setSlipUploadError(null);
 
               try {
-                let uploadedUrl = '';
-                if (file.type.startsWith('image/')) {
-                  const webpFile = await compressToWebP(file, { maxWidth: 1400, maxHeight: 1400 });
-                  if (isSupabaseConfigured()) {
-                    const fileName = `order-slips/${order.orderId}-${Date.now()}-${webpFile.name}`;
-                    const { error } = await supabase.storage.from('product-images').upload(fileName, webpFile);
-                    if (!error) {
-                      const { data } = supabase.storage.from('product-images').getPublicUrl(fileName);
-                      uploadedUrl = data.publicUrl;
-                    }
-                  }
-                  if (!uploadedUrl) {
-                    uploadedUrl = await new Promise<string>((resolve) => {
-                      const r = new FileReader();
-                      r.onload = () => resolve(r.result as string);
-                      r.readAsDataURL(webpFile);
-                    });
-                  }
-                } else if (file.type === 'application/pdf') {
-                  if (isSupabaseConfigured()) {
-                    const safeName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
-                    const fileName = `order-slips/${order.orderId}-${Date.now()}-${safeName}`;
-                    const { error } = await supabase.storage.from('product-images').upload(fileName, file, {
-                      contentType: 'application/pdf',
-                      upsert: true,
-                    });
-                    if (!error) {
-                      const { data } = supabase.storage.from('product-images').getPublicUrl(fileName);
-                      uploadedUrl = data.publicUrl;
-                    }
-                  }
-                  if (!uploadedUrl) {
-                    throw new Error('PDF upload requires cloud storage connection. Please send your deposit slip via WhatsApp.');
-                  }
-                } else {
-                  throw new Error('Unsupported file type. Please upload a JPG, PNG, or PDF deposit slip.');
-                }
+                // 1. Instant local preview for customer session
+                const previewUrl = URL.createObjectURL(file);
+                setLocalSlipUrl(previewUrl);
 
-                setLocalSlipUrl(uploadedUrl);
-                useAdminStore.getState().uploadOrderBankSlip(order.orderId, uploadedUrl, referenceInput.trim());
+                // 2. Upload file to private 'order-slips' bucket
+                const uploadResult = await uploadBankSlipFile(order.orderId, file, user?.id);
+                const uploadedPath = `order-slips/${uploadResult.path}`;
+
+                useAdminStore.getState().uploadOrderBankSlip(order.orderId, uploadedPath, referenceInput.trim());
 
                 if (dbOrder && dbOrder.orderId === order.orderId) {
                   setDbOrder((prev: any) => ({
                     ...prev,
                     bankTransferDetails: {
                       ...(prev?.bankTransferDetails || {}),
-                      slipUrl: uploadedUrl,
+                      slipUrl: uploadedPath,
                       referenceNumber: referenceInput.trim() || prev?.bankTransferDetails?.referenceNumber,
                       submittedAt: new Date().toISOString(),
                     },
@@ -711,7 +682,7 @@ export default function OrderSuccess() {
                     ...lastOrder,
                     bankTransferDetails: {
                       ...(lastOrder.bankTransferDetails as any),
-                      slipUrl: uploadedUrl,
+                      slipUrl: uploadedPath,
                       referenceNumber: referenceInput.trim() || lastOrder.bankTransferDetails?.referenceNumber,
                       submittedAt: new Date().toISOString(),
                     },
@@ -724,7 +695,7 @@ export default function OrderSuccess() {
                 const targetBankName = bank?.bankName || order.bankTransferDetails?.bankName || 'Commercial Bank of Ceylon';
                 const targetRef = referenceInput.trim() || order.bankTransferDetails?.referenceNumber;
 
-                // 1. Send Customer Receipt
+                // 1. Send Customer Receipt (Links to customer order confirmation)
                 if (targetCustomerEmail) {
                   sendBrevoEmail({
                     to: [{ email: targetCustomerEmail, name: targetCustomerName }],
@@ -735,12 +706,12 @@ export default function OrderSuccess() {
                       total: order.total,
                       bankName: targetBankName,
                       referenceNumber: targetRef,
-                      slipUrl: uploadedUrl,
+                      slipUrl: `${window.location.origin}/order-success/${order.orderId}`,
                     }),
                   }).catch((e) => console.warn('[Brevo Slip Customer Receipt Error]:', e));
                 }
 
-                // 2. Send Admin Alert to Atelier Operations
+                // 2. Send Admin Alert to Atelier Operations (Direct link to secure Admin Orders portal)
                 const adminAlertEmail = import.meta.env.VITE_ADMIN_NOTIFICATION_EMAIL || settings?.studio?.email || STORE_EMAIL;
                 sendBrevoEmail({
                   to: [{ email: adminAlertEmail, name: 'Azhai Atelier Operations' }],
@@ -753,13 +724,13 @@ export default function OrderSuccess() {
                     total: order.total,
                     bankName: targetBankName,
                     referenceNumber: targetRef,
-                    slipUrl: uploadedUrl,
+                    slipUrl: `${window.location.origin}/admin/orders`,
                   }),
                 }).catch((e) => console.warn('[Brevo Slip Admin Alert Error]:', e));
 
               } catch (err: any) {
                 console.error('[Slip Upload Error]:', err);
-                setSlipUploadError('Failed to process slip image. Please try again or send via WhatsApp.');
+                setSlipUploadError(err?.message || 'Failed to process slip image. Please try again or send via WhatsApp.');
               } finally {
                 setIsUploadingSlip(false);
               }

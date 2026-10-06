@@ -8,9 +8,10 @@ import {
 import type { PlacedOrder, CartItem } from '@/store/cart';
 import { useAdminStore, cleanWhatsAppDigits } from '@/store/admin';
 import { useCartStore } from '@/store/cart';
+import { useAuthStore } from '@/store/auth';
 import { STORE_WHATSAPP_NUMBER, STORE_EMAIL } from '@/lib/constants';
 import BankBadge from '@/components/BankBadge';
-import { compressToWebP } from '@/lib/image-compressor';
+import { uploadBankSlipFile, useSignedSlipUrl } from '@/lib/storage';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import OrderReviewModal from '@/components/OrderReviewModal';
 import { 
@@ -61,11 +62,15 @@ export default function OrderDetail({ order, onBack }: OrderDetailProps) {
     setTimeout(() => setCopiedField(null), 2000);
   };
 
+  const { user } = useAuthStore();
+
   // Merge latest live status and tracking from admin store
   const liveOrder = useMemo(() => {
     const adminMatch = adminOrders.find((ao) => ao.orderId === order.orderId);
     return adminMatch || order;
   }, [adminOrders, order]);
+
+  const { signedUrl: activeSignedSlipUrl } = useSignedSlipUrl(liveOrder.bankTransferDetails?.slipUrl);
 
   const formattedDate = liveOrder.placedAt
     ? new Date(liveOrder.placedAt).toLocaleDateString('en-US', {
@@ -397,7 +402,7 @@ export default function OrderDetail({ order, onBack }: OrderDetailProps) {
                 (liveOrder.paymentMethod && liveOrder.paymentMethod.toLowerCase().includes('bank')) ||
                 Boolean(liveOrder.bankTransferDetails);
 
-              const activeSlip = localSlipUrl || liveOrder.bankTransferDetails?.slipUrl;
+              const activeSlip = localSlipUrl || activeSignedSlipUrl || liveOrder.bankTransferDetails?.slipUrl;
               const bank = liveOrder.bankTransferDetails || settings?.bankAccounts?.find(b => b.isActive) || settings?.bankAccounts?.[0];
 
               const handleSlipUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -408,46 +413,15 @@ export default function OrderDetail({ order, onBack }: OrderDetailProps) {
                 setSlipUploadError(null);
 
                 try {
-                  let uploadedUrl = '';
-                  if (file.type.startsWith('image/')) {
-                    const webpFile = await compressToWebP(file, { maxWidth: 1400, maxHeight: 1400 });
-                    if (isSupabaseConfigured()) {
-                      const fileName = `order-slips/${liveOrder.orderId}-${Date.now()}-${webpFile.name}`;
-                      const { error } = await supabase.storage.from('product-images').upload(fileName, webpFile);
-                      if (!error) {
-                        const { data } = supabase.storage.from('product-images').getPublicUrl(fileName);
-                        uploadedUrl = data.publicUrl;
-                      }
-                    }
-                    if (!uploadedUrl) {
-                      uploadedUrl = await new Promise<string>((resolve) => {
-                        const r = new FileReader();
-                        r.onload = () => resolve(r.result as string);
-                        r.readAsDataURL(webpFile);
-                      });
-                    }
-                  } else if (file.type === 'application/pdf') {
-                    if (isSupabaseConfigured()) {
-                      const safeName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
-                      const fileName = `order-slips/${liveOrder.orderId}-${Date.now()}-${safeName}`;
-                      const { error } = await supabase.storage.from('product-images').upload(fileName, file, {
-                        contentType: 'application/pdf',
-                        upsert: true,
-                      });
-                      if (!error) {
-                        const { data } = supabase.storage.from('product-images').getPublicUrl(fileName);
-                        uploadedUrl = data.publicUrl;
-                      }
-                    }
-                    if (!uploadedUrl) {
-                      throw new Error('PDF upload requires cloud storage. Please send your deposit slip via WhatsApp.');
-                    }
-                  } else {
-                    throw new Error('Unsupported file format. Please upload JPG, PNG, or PDF.');
-                  }
+                  // 1. Instant local preview
+                  const previewUrl = URL.createObjectURL(file);
+                  setLocalSlipUrl(previewUrl);
 
-                  setLocalSlipUrl(uploadedUrl);
-                  useAdminStore.getState().uploadOrderBankSlip(liveOrder.orderId, uploadedUrl, referenceInput.trim());
+                  // 2. Upload to private 'order-slips' bucket
+                  const uploadResult = await uploadBankSlipFile(liveOrder.orderId, file, user?.id);
+                  const uploadedPath = `order-slips/${uploadResult.path}`;
+
+                  useAdminStore.getState().uploadOrderBankSlip(liveOrder.orderId, uploadedPath, referenceInput.trim());
 
                   // Sync into cart last order if matching
                   const { lastOrder, setLastOrder } = useCartStore.getState();
@@ -456,7 +430,7 @@ export default function OrderDetail({ order, onBack }: OrderDetailProps) {
                       ...lastOrder,
                       bankTransferDetails: {
                         ...(lastOrder.bankTransferDetails as any),
-                        slipUrl: uploadedUrl,
+                        slipUrl: uploadedPath,
                         referenceNumber: referenceInput.trim() || lastOrder.bankTransferDetails?.referenceNumber,
                         submittedAt: new Date().toISOString(),
                       },
@@ -480,7 +454,7 @@ export default function OrderDetail({ order, onBack }: OrderDetailProps) {
                         total: liveOrder.total,
                         bankName: targetBankName,
                         referenceNumber: targetRef,
-                        slipUrl: uploadedUrl,
+                        slipUrl: `${window.location.origin}/account/orders`,
                       }),
                     }).catch((e) => console.warn('[Brevo Account Slip Customer Receipt Error]:', e));
                   }
@@ -498,13 +472,13 @@ export default function OrderDetail({ order, onBack }: OrderDetailProps) {
                       total: liveOrder.total,
                       bankName: targetBankName,
                       referenceNumber: targetRef,
-                      slipUrl: uploadedUrl,
+                      slipUrl: `${window.location.origin}/admin/orders`,
                     }),
                   }).catch((e) => console.warn('[Brevo Account Slip Admin Alert Error]:', e));
 
                 } catch (err: any) {
                   console.error('[Account Slip Upload Error]:', err);
-                  setSlipUploadError('Upload failed. Please try again or send via WhatsApp.');
+                  setSlipUploadError(err?.message || 'Upload failed. Please try again or send via WhatsApp.');
                 } finally {
                   setIsUploadingSlip(false);
                 }
