@@ -289,6 +289,105 @@ export default {
       }
     }
 
+    // ── 1c. Meta / WhatsApp Product Catalog Feeds (XML & CSV) ──────
+    if (url.pathname === '/meta-catalog.xml' || url.pathname === '/api/meta-catalog.xml' ||
+        url.pathname === '/meta-catalog.csv' || url.pathname === '/api/meta-catalog.csv' ||
+        url.pathname === '/google-merchant-feed.xml' || url.pathname === '/api/google-merchant-feed.xml') {
+      try {
+        const supabaseUrl = env.VITE_SUPABASE_URL || 'https://hrmcxxcrnxqhesiywqsc.supabase.co';
+        const supabaseKey = env.SUPABASE_SERVICE_ROLE_KEY || env.VITE_SUPABASE_ANON_KEY || 'sb_publishable_-ZSOc4XGHM2OysLhqKZ5yQ_4OPgdcAm';
+
+        const sbRes = await fetch(`${supabaseUrl}/rest/v1/products?select=*&order=id.asc`, {
+          headers: {
+            apikey: supabaseKey,
+            Authorization: `Bearer ${supabaseKey}`,
+          },
+        });
+
+        if (sbRes.ok) {
+          const products = await sbRes.json();
+          const baseUrl = 'https://azhaiclothing.lk';
+
+          if (url.pathname.endsWith('.csv')) {
+            const csvHeaders = ['id', 'title', 'description', 'availability', 'condition', 'price', 'link', 'image_link', 'brand', 'google_product_category', 'fb_product_category'];
+            const escapeCsv = (str) => `"${String(str || '').replace(/"/g, '""').replace(/\r?\n/g, ' ')}"`;
+            let csv = csvHeaders.join(',') + '\n';
+            for (const p of products) {
+              if (!p.slug) continue;
+              const priceNum = String(p.price || '').replace(/[^0-9]/g, '') || '0';
+              const imgUrl = Array.isArray(p.images) && p.images[0]
+                ? (typeof p.images[0] === 'string' ? p.images[0] : p.images[0].src)
+                : `${baseUrl}/og-azhai.jpg`;
+              csv += [
+                escapeCsv(`azhai_${p.id || p.slug}`),
+                escapeCsv(p.name),
+                escapeCsv(p.short_description || p.description || p.name),
+                escapeCsv(p.in_stock === false ? 'out of stock' : 'in stock'),
+                escapeCsv('new'),
+                escapeCsv(`${priceNum}.00 LKR`),
+                escapeCsv(`${baseUrl}/products/${p.slug}`),
+                escapeCsv(imgUrl),
+                escapeCsv('Azhai Clothing'),
+                escapeCsv('1604'),
+                escapeCsv('Apparel & Accessories > Clothing > Traditional & Ceremonial Clothing')
+              ].join(',') + '\n';
+            }
+
+            return new Response(csv, {
+              headers: {
+                'Content-Type': 'text/csv; charset=utf-8',
+                'Cache-Control': 'public, max-age=3600',
+                ...corsHeaders,
+              },
+            });
+          } else {
+            // XML feed format (Google Merchant / Meta RSS 2.0)
+            const escapeXml = (unsafe) => String(unsafe || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&apos;');
+            let xml = `<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:g="http://base.google.com/ns/1.0">
+  <channel>
+    <title>Azhai Clothing — Handcrafted Silk &amp; Festive Couture</title>
+    <link>${baseUrl}</link>
+    <description>Heirloom mulberry silks, handcrafted bridal kurtis, and bespoke ethnic couture in Colombo, Sri Lanka by Preethi.</description>\n`;
+
+            for (const p of products) {
+              if (!p.slug) continue;
+              const priceNum = String(p.price || '').replace(/[^0-9]/g, '') || '0';
+              const imgUrl = Array.isArray(p.images) && p.images[0]
+                ? (typeof p.images[0] === 'string' ? p.images[0] : p.images[0].src)
+                : `${baseUrl}/og-azhai.jpg`;
+              xml += `    <item>
+      <g:id>azhai_${p.id || p.slug}</g:id>
+      <g:title>${escapeXml(p.name)}</g:title>
+      <g:description>${escapeXml(p.short_description || p.description || p.name)}</g:description>
+      <g:link>${escapeXml(`${baseUrl}/products/${p.slug}`)}</g:link>
+      <g:image_link>${escapeXml(imgUrl)}</g:image_link>
+      <g:condition>new</g:condition>
+      <g:availability>${p.in_stock === false ? 'out_of_stock' : 'in_stock'}</g:availability>
+      <g:price>${priceNum}.00 LKR</g:price>
+      <g:brand>Azhai Clothing</g:brand>
+      <g:google_product_category>1604</g:google_product_category>
+      <g:product_type>Apparel &amp; Accessories &gt; Clothing &gt; Traditional &amp; Ceremonial Clothing</g:product_type>
+      <g:identifier_exists>no</g:identifier_exists>
+    </item>\n`;
+            }
+            xml += `  </channel>\n</rss>\n`;
+
+            return new Response(xml, {
+              headers: {
+                'Content-Type': 'application/xml; charset=utf-8',
+                'Cache-Control': 'public, max-age=3600',
+                ...corsHeaders,
+              },
+            });
+          }
+        }
+      } catch (err) {
+        console.warn('[Catalog Feed Worker Exception]:', err);
+      }
+      return env.ASSETS.fetch(request);
+    }
+
     // ── 2. PayHere.lk Initiate Checkout Session (Hash Generation) ──
     if (url.pathname === '/api/payhere-initiate' || url.pathname === '/api/create-payments-lk-checkout') {
       if (request.method === 'POST') {

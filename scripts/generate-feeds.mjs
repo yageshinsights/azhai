@@ -216,6 +216,47 @@ async function main() {
   const feedPath = path.join(publicDir, 'google-merchant-feed.xml');
   fs.writeFileSync(feedPath, feedXml, 'utf-8');
   console.log(`[Feeds Generator]: Successfully generated ${feedPath} (${products.length} products)`);
+
+  // 4. Generate Dedicated Meta / WhatsApp Catalog XML Feed (Identical RSS 2.0 format)
+  const metaXmlPath = path.join(publicDir, 'meta-catalog.xml');
+  fs.writeFileSync(metaXmlPath, feedXml, 'utf-8');
+  console.log(`[Feeds Generator]: Successfully generated ${metaXmlPath} (${products.length} products)`);
+
+  // 5. Generate Meta / WhatsApp Catalog CSV Feed (Universal format)
+  const csvHeaders = ['id', 'title', 'description', 'availability', 'condition', 'price', 'link', 'image_link', 'brand', 'google_product_category', 'fb_product_category'];
+  const escapeCsv = (str) => `"${String(str || '').replace(/"/g, '""').replace(/\r?\n/g, ' ')}"`;
+
+  let csvContent = csvHeaders.join(',') + '\n';
+  for (const prod of products) {
+    if (!prod.slug) continue;
+    const priceNum = String(prod.price || '').replace(/[^0-9]/g, '') || '0';
+    const formattedPrice = `${priceNum}.00 LKR`;
+    const prodUrl = `${BASE_URL}/products/${prod.slug}`;
+    const imgUrl = Array.isArray(prod.images) && prod.images[0]
+      ? (typeof prod.images[0] === 'string' ? prod.images[0] : prod.images[0].src)
+      : `${BASE_URL}/og-azhai.jpg`;
+    const description = prod.short_description || prod.description || prod.name;
+    const availability = prod.in_stock === false ? 'out of stock' : 'in stock';
+
+    const row = [
+      escapeCsv(`azhai_${prod.id || prod.slug}`),
+      escapeCsv(prod.name),
+      escapeCsv(description),
+      escapeCsv(availability),
+      escapeCsv('new'),
+      escapeCsv(formattedPrice),
+      escapeCsv(prodUrl),
+      escapeCsv(imgUrl),
+      escapeCsv('Azhai Clothing'),
+      escapeCsv('1604'),
+      escapeCsv('Apparel & Accessories > Clothing > Traditional & Ceremonial Clothing')
+    ];
+    csvContent += row.join(',') + '\n';
+  }
+
+  const csvPath = path.join(publicDir, 'meta-catalog.csv');
+  fs.writeFileSync(csvPath, csvContent, 'utf-8');
+  console.log(`[Feeds Generator]: Successfully generated ${csvPath} (${products.length} products)`);
 }
 
 main().catch((err) => {
