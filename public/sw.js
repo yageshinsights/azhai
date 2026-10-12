@@ -1,8 +1,7 @@
 // Azhai Boutique Service Worker
-const CACHE_NAME = 'azhai-boutique-v1';
+const CACHE_NAME = 'azhai-boutique-v3';
 
 const STATIC_ASSETS = [
-  '/',
   '/manifest.json',
   '/favicon.svg',
   '/logo-gold.png',
@@ -11,7 +10,7 @@ const STATIC_ASSETS = [
   '/lotus.svg'
 ];
 
-// Install Event - Pre-cache core app shell
+// Install Event - Pre-cache core brand icons & manifest
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
@@ -33,7 +32,7 @@ self.addEventListener('activate', (event) => {
   );
 });
 
-// Fetch Event - Network-First for Navigation (HTML), Stale-While-Revalidate for Assets
+// Fetch Event - Network-First for Navigation & JS/CSS Bundles, Stale-While-Revalidate for Media/Fonts
 self.addEventListener('fetch', (event) => {
   const { request } = event;
   const url = new URL(request.url);
@@ -51,12 +50,18 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // 1. Navigation Requests (HTML / Page Routes): Network-first with cache fallback
-  if (request.mode === 'navigate') {
+  // 1. Navigation Requests & JS/CSS Bundles: Network-first with cache fallback
+  const isCodeBundle =
+    request.mode === 'navigate' ||
+    request.destination === 'script' ||
+    request.destination === 'style' ||
+    url.pathname.match(/\.(js|css)$/);
+
+  if (isCodeBundle) {
     event.respondWith(
       fetch(request)
         .then((response) => {
-          if (response.status === 200) {
+          if (response && response.status === 200) {
             const responseClone = response.clone();
             caches.open(CACHE_NAME).then((cache) => cache.put(request, responseClone));
           }
@@ -65,25 +70,25 @@ self.addEventListener('fetch', (event) => {
         .catch(async () => {
           const cachedResponse = await caches.match(request);
           if (cachedResponse) return cachedResponse;
-          // Fallback to app shell index
-          const shell = await caches.match('/');
-          return shell || new Response('Offline - Azhai Boutique', {
-            headers: { 'Content-Type': 'text/html' }
-          });
+          if (request.mode === 'navigate') {
+            const shell = await caches.match('/');
+            return shell || new Response('Offline - Azhai Boutique', {
+              headers: { 'Content-Type': 'text/html' }
+            });
+          }
+          return new Response('', { status: 503 });
         })
     );
     return;
   }
 
-  // 2. Static Assets (Images, Fonts, CSS, JS): Stale-While-Revalidate
-  const isStaticAsset =
+  // 2. Static Media & Fonts (Images, Fonts): Stale-While-Revalidate
+  const isStaticMedia =
     request.destination === 'image' ||
-    request.destination === 'style' ||
-    request.destination === 'script' ||
     request.destination === 'font' ||
-    url.pathname.match(/\.(png|jpg|jpeg|svg|webp|woff2|ttf|css|js)$/);
+    url.pathname.match(/\.(png|jpg|jpeg|svg|webp|woff2|ttf)$/);
 
-  if (isStaticAsset) {
+  if (isStaticMedia) {
     event.respondWith(
       caches.match(request).then((cachedResponse) => {
         const fetchPromise = fetch(request)

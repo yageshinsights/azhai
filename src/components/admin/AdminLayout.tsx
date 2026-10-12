@@ -24,6 +24,7 @@ import {
   Mail
 } from 'lucide-react';
 import { useAdminStore } from '@/store/admin';
+import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import SEOHead from '@/components/SEOHead';
 
 interface AdminLayoutProps {
@@ -33,12 +34,44 @@ interface AdminLayoutProps {
 export default function AdminLayout({ children }: AdminLayoutProps) {
   const { adminUser, adminLogout, orders, inquiries, settings, toggleCOD, fetchSupabaseData } = useAdminStore();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [sessionMismatchEmail, setSessionMismatchEmail] = useState<string | null>(null);
   const location = useLocation();
   const navigate = useNavigate();
 
-  // Always refresh latest store data (orders, customer profiles, settings, products) on admin navigation
+  // Verify active Supabase Auth JWT has admin privileges & refresh latest store data
   useEffect(() => {
-    fetchSupabaseData();
+    let mounted = true;
+    const verifyAndFetch = async () => {
+      if (isSupabaseConfigured()) {
+        try {
+          const { data: { session } } = await supabase.auth.getSession();
+          if (!session?.user) {
+            if (mounted) setSessionMismatchEmail('Not signed into database session');
+          } else {
+            const { data: profile } = await supabase
+              .from('profiles')
+              .select('role, email')
+              .eq('id', session.user.id)
+              .single();
+            const activeRole = (profile?.role || 'customer').toLowerCase();
+            if (!['admin', 'owner', 'manager', 'dispatch'].includes(activeRole)) {
+              if (mounted) {
+                setSessionMismatchEmail(session.user.email || 'Customer Account');
+              }
+            } else if (mounted) {
+              setSessionMismatchEmail(null);
+            }
+          }
+        } catch {
+          // ignore
+        }
+      }
+      await fetchSupabaseData();
+    };
+    verifyAndFetch();
+    return () => {
+      mounted = false;
+    };
   }, [location.pathname, fetchSupabaseData]);
 
   const handleLogout = () => {
@@ -286,6 +319,27 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
 
       {/* ── MAIN CONTENT CONTAINER ── */}
       <main className="flex-1 lg:ml-72 p-3 sm:p-6 lg:p-8 max-w-7xl min-w-0 overflow-x-hidden">
+        {sessionMismatchEmail && (
+          <div className="mb-6 p-4 rounded-2xl bg-amber-50 border border-amber-300 text-amber-950 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
+            <div className="flex items-start gap-3">
+              <Shield className="w-5 h-5 text-amber-700 shrink-0 mt-0.5" />
+              <div className="space-y-0.5">
+                <p className="text-xs font-bold text-amber-950">
+                  Database Session Notice ({sessionMismatchEmail})
+                </p>
+                <p className="text-[11px] text-amber-800">
+                  Your browser&apos;s active authentication token switched to a customer/guest session during storefront testing. Re-authenticate your Admin account to view all patron orders and save database changes.
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={handleLogout}
+              className="px-4 py-2 rounded-xl bg-[#701626] hover:bg-[#8E1E34] text-white text-xs font-bold whitespace-nowrap transition-colors cursor-pointer shrink-0"
+            >
+              Re-Authenticate Admin
+            </button>
+          </div>
+        )}
         {children}
       </main>
     </div>

@@ -1076,19 +1076,48 @@ export default {
                 },
                 body: JSON.stringify({
                   p_order_code: String(order_id),
+                  p_merchant_id: String(merchant_id || expectedMerchantId),
                   p_payment_id: String(payment_id || ''),
                   p_payhere_amount: String(payhere_amount || '0.00'),
                   p_payhere_currency: String(payhere_currency || 'LKR'),
-                  p_status_code: statusCode,
+                  p_status_code: String(status_code ?? statusCode),
                   p_md5sig: String(md5sig),
+                  p_hashed_secret: hashedSecret,
                   p_method: String(method || 'Card'),
                   p_status_message: String(status_message || ''),
+                  p_card_no: String(params.get('card_no') || ''),
                 }),
               });
               if (rpcUpdateRes.ok) {
                 const rpcResult = await rpcUpdateRes.json();
                 if (rpcResult && rpcResult.success) {
                   rpcUpdated = true;
+                }
+              } else {
+                // Fallback to 8-param signature if older RPC version is installed
+                const legacyRes = await fetch(`${supabaseUrl}/rest/v1/rpc/worker_update_payhere_order`, {
+                  method: 'POST',
+                  headers: {
+                    apikey: supabaseKey,
+                    Authorization: `Bearer ${supabaseKey}`,
+                    'Content-Type': 'application/json',
+                  },
+                  body: JSON.stringify({
+                    p_order_code: String(order_id),
+                    p_payment_id: String(payment_id || ''),
+                    p_payhere_amount: String(payhere_amount || '0.00'),
+                    p_payhere_currency: String(payhere_currency || 'LKR'),
+                    p_status_code: statusCode,
+                    p_md5sig: String(md5sig),
+                    p_method: String(method || 'Card'),
+                    p_status_message: String(status_message || ''),
+                  }),
+                });
+                if (legacyRes.ok) {
+                  const legacyResult = await legacyRes.json();
+                  if (legacyResult && legacyResult.success) {
+                    rpcUpdated = true;
+                  }
                 }
               }
             } catch (rpcErr) {

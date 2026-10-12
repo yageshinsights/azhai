@@ -636,7 +636,7 @@ export const useAdminStore = create<AdminState>()(
           if (ordersFetchErr) {
             console.error('[Supabase Fetch Orders Error]:', ordersFetchErr);
           } else if (dbOrders) {
-            const mappedOrders: AdminOrder[] = dbOrders.map((o: any) => {
+            const mapDbOrderToAdmin = (o: any): AdminOrder => {
               const extractedPaymentId =
                 o.payment_id ||
                 (o.admin_notes
@@ -646,42 +646,81 @@ export const useAdminStore = create<AdminState>()(
                     o.admin_notes.match(/\b\d{6,16}\b/)?.[0]
                   : undefined);
 
+              const rawCust = o.customer_details || o.customer || {};
               return {
-                orderId: o.order_code,
-                items: (o.order_items || []).map((item: any) => ({
-                  id: item.product_id || 0,
-                  name: item.product_name,
-                  price: item.price,
-                  image: item.image_url || '',
-                  quantity: item.quantity,
-                  size: item.size,
-                  tailoring: item.custom_measurements || undefined,
+                orderId: o.order_code || o.orderId,
+                items: (o.order_items || o.items || []).map((item: any) => ({
+                  id: item.product_id || item.id || 0,
+                  name: item.product_name || item.name || 'Atelier Piece',
+                  price: item.price || 'LKR 0',
+                  image: item.image_url || item.image || '',
+                  quantity: Number(item.quantity) || 1,
+                  size: item.size || 'M',
+                  tailoring: item.custom_measurements || item.tailoring || undefined,
                 })),
-                subtotal: Number(o.subtotal),
+                subtotal: Number(o.subtotal || 0),
                 discount: Number(o.discount || 0),
                 shipping: Number(o.shipping || 0),
-                total: Number(o.total),
-                coupon: o.coupon_code || undefined,
-                giftNote: o.gift_note || undefined,
-                customer: o.customer_details,
-                deliveryMethod: o.delivery_method,
-                paymentMethod: o.payment_method,
-                placedAt: o.created_at,
-                status: o.status as OrderStatus,
-                paymentStatus: o.payment_status,
+                total: Number(o.total || 0),
+                coupon: o.coupon_code || o.coupon || undefined,
+                giftNote: o.gift_note || o.giftNote || undefined,
+                customer: {
+                  fullName: rawCust.fullName || rawCust.name || 'Valued Patron',
+                  email: rawCust.email || '',
+                  phone: rawCust.phone || '',
+                  address: rawCust.address || '',
+                  city: rawCust.city || 'Colombo',
+                  district: rawCust.district || 'Colombo',
+                  postalCode: rawCust.postalCode || '',
+                },
+                deliveryMethod: o.delivery_method || o.deliveryMethod || 'Standard Courier',
+                paymentMethod: o.payment_method || o.paymentMethod || 'Card Payment',
+                placedAt: o.created_at || o.placedAt || new Date().toISOString(),
+                status: (o.status || 'pending') as OrderStatus,
+                paymentStatus: o.payment_status || o.paymentStatus || 'pending_cod',
                 paymentId: extractedPaymentId || undefined,
                 payherePaymentId: extractedPaymentId || undefined,
                 paymentsLkPaymentId: extractedPaymentId || undefined,
-                courierPartner: o.courier_partner || undefined,
-                trackingNumber: o.tracking_number || undefined,
-                adminNotes: o.admin_notes || undefined,
-                bankTransferDetails: o.customer_details?.bank_transfer_details || o.bank_transfer_details || undefined,
-                costPrice: o.cost_price ? Number(o.cost_price) : Math.round(Number(o.subtotal) * 0.45),
+                courierPartner: o.courier_partner || o.courierPartner || 'Sri Lanka Post',
+                trackingNumber: o.tracking_number || o.trackingNumber || undefined,
+                adminNotes: o.admin_notes || o.adminNotes || undefined,
+                bankTransferDetails: rawCust?.bank_transfer_details || o.bank_transfer_details || o.bankTransferDetails || undefined,
+                costPrice: o.cost_price ? Number(o.cost_price) : Math.round(Number(o.subtotal || 0) * 0.45),
               };
-            });
+            };
 
-            // Supabase is the single source of truth for orders
-            set({ orders: mappedOrders });
+            const mappedOrders: AdminOrder[] = dbOrders.map(mapDbOrderToAdmin);
+            const dbOrderIds = new Set(mappedOrders.map((o) => o.orderId));
+
+            // Preserve any locally placed orders not returned by RLS (e.g. when testing checkout in same browser)
+            // and refresh their live status via get_order_by_code RPC
+            const existingLocal = get().orders || [];
+            const missingLocalOrders = existingLocal.filter((lo) => lo.orderId && !dbOrderIds.has(lo.orderId));
+
+            if (missingLocalOrders.length > 0) {
+              const refreshedLocal = await Promise.all(
+                missingLocalOrders.map(async (lo) => {
+                  try {
+                    const { data: rpcRows } = await supabase.rpc('get_order_by_code', {
+                      p_order_code: lo.orderId,
+                    });
+                    const rpcOrder = Array.isArray(rpcRows) ? rpcRows[0] : rpcRows;
+                    if (rpcOrder && rpcOrder.order_code) {
+                      return mapDbOrderToAdmin(rpcOrder);
+                    }
+                  } catch {
+                    // ignore RPC fallback error
+                  }
+                  return lo;
+                })
+              );
+              const combined = [...mappedOrders, ...refreshedLocal].sort(
+                (a, b) => new Date(b.placedAt).getTime() - new Date(a.placedAt).getTime()
+              );
+              set({ orders: combined });
+            } else {
+              set({ orders: mappedOrders });
+            }
           }
 
           // 6b. Fetch Customer Profiles & Sync CRM Registry strictly from DB
@@ -904,6 +943,7 @@ export const useAdminStore = create<AdminState>()(
                   avatar: profile?.avatar_url,
                 };
                 set({ adminUser, isAdminAuthenticated: true });
+                await get().fetchSupabaseData();
                 return { success: true };
               } else {
                 return { 

@@ -433,10 +433,12 @@ export default function Checkout() {
     // 2. Sync Order to Supabase Postgres (If Configured)
     if (isSupabaseConfigured()) {
       try {
-        const resolvedUserId = user?.id || (existingProfile?.id && isUUID(existingProfile.id) ? existingProfile.id : null);
-        const { data: insertedOrder, error: orderErr } = await supabase
+        const resolvedUserId = user?.id && isUUID(user.id) ? user.id : (existingProfile?.id && isUUID(existingProfile.id) ? existingProfile.id : null);
+        const orderUuid = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : undefined;
+        const { error: orderErr } = await supabase
           .from('orders')
           .insert({
+            ...(orderUuid ? { id: orderUuid } : {}),
             order_code: orderData.orderId,
             user_id: resolvedUserId,
             customer_details: {
@@ -457,11 +459,9 @@ export default function Checkout() {
             status: 'pending',
             courier_partner: orderData.courierPartner || 'Sri Lanka Post',
             tracking_number: orderData.trackingNumber || null,
-          })
-          .select()
-          .single();
+          });
 
-        if (insertedOrder && !orderErr) {
+        if (!orderErr && orderUuid) {
           const orderItemsPayload = items.map((item) => {
             // For catalog ready-to-wear pieces, pass product_id to link inventory and auto-decrement stock
             const isCatalogProduct = !item.tailoring && item.id && Number.isInteger(Number(item.id)) && Number(item.id) > 0;
@@ -473,7 +473,7 @@ export default function Checkout() {
             }
 
             return {
-              order_id: insertedOrder.id,
+              order_id: orderUuid,
               product_id: safeProductId,
               product_name: item.name,
               price: typeof item.price === 'string' ? item.price : `LKR ${Number(item.price).toLocaleString()}`,
@@ -706,10 +706,12 @@ export default function Checkout() {
 
       if (isSupabaseConfigured()) {
         try {
-          const resolvedUserId = user?.id || (existingProfile?.id && isUUID(existingProfile.id) ? existingProfile.id : null);
-          const { data: insertedOrder, error: orderErr } = await supabase
+          const resolvedUserId = user?.id && isUUID(user.id) ? user.id : (existingProfile?.id && isUUID(existingProfile.id) ? existingProfile.id : null);
+          const orderUuid = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : undefined;
+          const { error: orderErr } = await supabase
             .from('orders')
             .insert({
+              ...(orderUuid ? { id: orderUuid } : {}),
               order_code: orderData.orderId,
               user_id: resolvedUserId,
               customer_details: orderData.customer,
@@ -727,11 +729,9 @@ export default function Checkout() {
               status: 'pending',
               courier_partner: orderData.courierPartner || 'Sri Lanka Post',
               tracking_number: orderData.trackingNumber || null,
-            })
-            .select()
-            .single();
+            });
 
-          if (orderErr || !insertedOrder) {
+          if (orderErr || !orderUuid) {
             console.error('[PayHere Pre-Save Error]:', orderErr);
             setIsSubmitting(false);
             alert('Could not initialize your order in our database. Please check your connection and try again.');
@@ -742,7 +742,7 @@ export default function Checkout() {
             const isCatalogProduct = !item.tailoring && item.id && Number.isInteger(Number(item.id)) && Number(item.id) > 0;
             const safeProductId = isCatalogProduct ? Number(item.id) : null;
             return {
-              order_id: insertedOrder.id,
+              order_id: orderUuid,
               product_id: safeProductId,
               product_name: item.name,
               price: typeof item.price === 'string' ? item.price : `LKR ${Number(item.price).toLocaleString()}`,
