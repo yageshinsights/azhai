@@ -37,8 +37,8 @@ export interface AdminOrder extends PlacedOrder {
 export interface Coupon {
   id: string;
   code: string;
-  discountType: 'percentage' | 'fixed';
-  value: number; // e.g. 10 for 10% or 1000 for LKR 1000
+  discountType: 'percentage' | 'fixed' | 'free_shipping';
+  value: number; // e.g. 10 for 10% or 1000 for LKR 1000 (0 for free_shipping)
   minSpend?: number;
   maxDiscount?: number;
   usageCount: number;
@@ -552,17 +552,26 @@ export const useAdminStore = create<AdminState>()(
 
           if (!couponsErr && dbCoupons) {
             set({
-              coupons: dbCoupons.map((c) => ({
-                id: c.id,
-                code: c.code,
-                discountType: c.discount_type,
-                value: Number(c.value),
-                minSpend: c.min_spend ? Number(c.min_spend) : undefined,
-                maxDiscount: c.max_discount ? Number(c.max_discount) : undefined,
-                usageCount: c.usage_count || 0,
-                isActive: c.is_active,
-                expiresAt: c.expires_at || undefined,
-              })),
+              coupons: dbCoupons.map((c) => {
+                const isFreeShip =
+                  c.discount_type === 'free_shipping' ||
+                  Number(c.max_discount) === -1 ||
+                  (c.discount_type === 'fixed' && Number(c.value) === 0);
+                return {
+                  id: c.id,
+                  code: c.code,
+                  discountType: isFreeShip ? 'free_shipping' : c.discount_type,
+                  value: isFreeShip ? 0 : Number(c.value),
+                  minSpend: c.min_spend ? Number(c.min_spend) : undefined,
+                  maxDiscount:
+                    c.max_discount && Number(c.max_discount) > 0
+                      ? Number(c.max_discount)
+                      : undefined,
+                  usageCount: c.usage_count || 0,
+                  isActive: c.is_active,
+                  expiresAt: c.expires_at || undefined,
+                };
+              }),
             });
           }
 
@@ -1586,15 +1595,28 @@ export const useAdminStore = create<AdminState>()(
 
         if (isSupabaseConfigured()) {
           try {
-            await supabase.from('coupons').insert({
+            const { error } = await supabase.from('coupons').insert({
               code: couponData.code.toUpperCase(),
               discount_type: couponData.discountType,
-              value: couponData.value,
+              value: couponData.discountType === 'free_shipping' ? 0 : couponData.value,
               min_spend: couponData.minSpend || null,
-              max_discount: couponData.maxDiscount || null,
+              max_discount: couponData.discountType === 'free_shipping' ? -1 : (couponData.maxDiscount || null),
               is_active: couponData.isActive !== false,
               expires_at: couponData.expiresAt || null,
             });
+
+            // Fallback if DB check constraint still only allows ('percentage', 'fixed')
+            if (error && couponData.discountType === 'free_shipping') {
+              await supabase.from('coupons').insert({
+                code: couponData.code.toUpperCase(),
+                discount_type: 'fixed',
+                value: 0,
+                min_spend: couponData.minSpend || null,
+                max_discount: -1,
+                is_active: couponData.isActive !== false,
+                expires_at: couponData.expiresAt || null,
+              });
+            }
           } catch (err) {
             console.error('[Supabase Coupon Insert Error]:', err);
           }

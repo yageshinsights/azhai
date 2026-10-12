@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Tag, Percent, DollarSign, Calendar, Sparkles } from 'lucide-react';
+import { X, Percent, DollarSign, Truck } from 'lucide-react';
 import type { Coupon } from '@/store/admin';
 
 interface CouponModalProps {
@@ -11,9 +11,9 @@ interface CouponModalProps {
 
 export default function CouponModal({ isOpen, onClose, onSave }: CouponModalProps) {
   const [code, setCode] = useState('');
-  const [discountType, setDiscountType] = useState<'percentage' | 'fixed'>('percentage');
+  const [discountType, setDiscountType] = useState<'percentage' | 'fixed' | 'free_shipping'>('percentage');
   const [value, setValue] = useState(10);
-  const [minSpend, setMinSpend] = useState(15000);
+  const [minSpend, setMinSpend] = useState(0);
   const [expiresAt, setExpiresAt] = useState('2026-12-31');
 
   if (!isOpen) return null;
@@ -25,12 +25,13 @@ export default function CouponModal({ isOpen, onClose, onSave }: CouponModalProp
     onSave({
       code: code.trim().toUpperCase(),
       discountType,
-      value: Number(value),
+      value: discountType === 'free_shipping' ? 0 : Number(value),
       minSpend: Number(minSpend) || 0,
       isActive: true,
       expiresAt,
     });
 
+    setCode('');
     onClose();
   };
 
@@ -65,14 +66,25 @@ export default function CouponModal({ isOpen, onClose, onSave }: CouponModalProp
           <form onSubmit={handleSubmit} className="space-y-4">
             {/* Promo Code Name */}
             <div className="space-y-1">
-              <label className="block text-xs font-bold text-[#110B0E] uppercase tracking-wider">
-                Coupon Code *
-              </label>
+              <div className="flex items-center justify-between">
+                <label className="block text-xs font-bold text-[#110B0E] uppercase tracking-wider">
+                  Coupon Code *
+                </label>
+                {discountType === 'free_shipping' && (
+                  <button
+                    type="button"
+                    onClick={() => setCode('FREEDELIVERY')}
+                    className="text-[10px] font-bold text-[#701626] hover:underline"
+                  >
+                    Use "FREEDELIVERY"
+                  </button>
+                )}
+              </div>
               <input
                 type="text"
                 value={code}
                 onChange={(e) => setCode(e.target.value)}
-                placeholder="e.g. FESTIVE15"
+                placeholder={discountType === 'free_shipping' ? 'e.g. FREEDELIVERY or FREESHIP' : 'e.g. FESTIVE15'}
                 required
                 className="w-full px-3.5 py-2.5 rounded-xl bg-[#F7F4EE]/70 border border-[#C5A059]/30 text-xs font-bold uppercase tracking-widest text-[#701626] focus:border-[#701626] focus:bg-white focus:outline-none"
               />
@@ -83,61 +95,101 @@ export default function CouponModal({ isOpen, onClose, onSave }: CouponModalProp
               <label className="block text-xs font-bold text-[#110B0E] uppercase tracking-wider">
                 Discount Type
               </label>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-3 gap-2">
                 <button
                   type="button"
                   onClick={() => setDiscountType('percentage')}
-                  className={`py-2 px-3 rounded-xl text-xs font-bold border flex items-center justify-center gap-1.5 transition-all ${
+                  className={`py-2.5 px-2 rounded-xl text-[11px] font-bold border flex items-center justify-center gap-1 transition-all ${
                     discountType === 'percentage'
                       ? 'bg-[#701626] text-white border-[#701626]'
                       : 'bg-[#F7F4EE] text-[#6D6268] border-[#C5A059]/25'
                   }`}
                 >
-                  <Percent className="w-3.5 h-3.5" /> Percentage (%)
+                  <Percent className="w-3.5 h-3.5 shrink-0" /> Percentage
                 </button>
                 <button
                   type="button"
                   onClick={() => setDiscountType('fixed')}
-                  className={`py-2 px-3 rounded-xl text-xs font-bold border flex items-center justify-center gap-1.5 transition-all ${
+                  className={`py-2.5 px-2 rounded-xl text-[11px] font-bold border flex items-center justify-center gap-1 transition-all ${
                     discountType === 'fixed'
                       ? 'bg-[#701626] text-white border-[#701626]'
                       : 'bg-[#F7F4EE] text-[#6D6268] border-[#C5A059]/25'
                   }`}
                 >
-                  <DollarSign className="w-3.5 h-3.5" /> Fixed LKR Off
+                  <DollarSign className="w-3.5 h-3.5 shrink-0" /> Fixed LKR
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setDiscountType('free_shipping');
+                    if (!code.trim()) setCode('FREEDELIVERY');
+                  }}
+                  className={`py-2.5 px-2 rounded-xl text-[11px] font-bold border flex items-center justify-center gap-1 transition-all ${
+                    discountType === 'free_shipping'
+                      ? 'bg-[#701626] text-white border-[#701626]'
+                      : 'bg-[#F7F4EE] text-[#6D6268] border-[#C5A059]/25'
+                  }`}
+                >
+                  <Truck className="w-3.5 h-3.5 shrink-0" /> Free Delivery
                 </button>
               </div>
             </div>
 
-            {/* Discount Value */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div className="space-y-1">
-                <label className="block text-xs font-bold text-[#110B0E] uppercase tracking-wider">
-                  {discountType === 'percentage' ? 'Percentage Off (%)' : 'Amount Off (LKR)'} *
-                </label>
-                <input
-                  type="number"
-                  value={value}
-                  onChange={(e) => setValue(Number(e.target.value))}
-                  placeholder={discountType === 'percentage' ? '15' : '1500'}
-                  required
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-[#F7F4EE]/70 border border-[#C5A059]/30 text-xs font-bold focus:border-[#701626] focus:bg-white focus:outline-none"
-                />
+            {/* Discount Value & Min Spend */}
+            {discountType === 'free_shipping' ? (
+              <div className="space-y-3">
+                <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 flex items-center gap-2.5">
+                  <Truck className="w-4 h-4 text-emerald-700 shrink-0" />
+                  <p className="text-[11px] font-medium text-emerald-800 leading-snug">
+                    Waives 100% of island-wide delivery & postage charges at checkout.
+                  </p>
+                </div>
+                <div className="space-y-1">
+                  <label className="block text-xs font-bold text-[#110B0E] uppercase tracking-wider">
+                    Min Cart Spend (LKR) <span className="text-[10px] font-normal text-[#6D6268]">(0 = No minimum)</span>
+                  </label>
+                  <input
+                    type="number"
+                    min={0}
+                    value={minSpend}
+                    onChange={(e) => setMinSpend(Number(e.target.value))}
+                    placeholder="0"
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-[#F7F4EE]/70 border border-[#C5A059]/30 text-xs font-bold focus:border-[#701626] focus:bg-white focus:outline-none"
+                  />
+                </div>
               </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="block text-xs font-bold text-[#110B0E] uppercase tracking-wider">
+                    {discountType === 'percentage' ? 'Percentage Off (%)' : 'Amount Off (LKR)'} *
+                  </label>
+                  <input
+                    type="number"
+                    min={1}
+                    value={value}
+                    onChange={(e) => setValue(Number(e.target.value))}
+                    placeholder={discountType === 'percentage' ? '15' : '1500'}
+                    required
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-[#F7F4EE]/70 border border-[#C5A059]/30 text-xs font-bold focus:border-[#701626] focus:bg-white focus:outline-none"
+                  />
+                </div>
 
-              <div className="space-y-1">
-                <label className="block text-xs font-bold text-[#110B0E] uppercase tracking-wider">
-                  Min Cart Spend (LKR)
-                </label>
-                <input
-                  type="number"
-                  value={minSpend}
-                  onChange={(e) => setMinSpend(Number(e.target.value))}
-                  placeholder="15000"
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-[#F7F4EE]/70 border border-[#C5A059]/30 text-xs font-bold focus:border-[#701626] focus:bg-white focus:outline-none"
-                />
+                <div className="space-y-1">
+                  <label className="block text-xs font-bold text-[#110B0E] uppercase tracking-wider">
+                    Min Cart Spend (LKR)
+                  </label>
+                  <input
+                    type="number"
+                    min={0}
+                    value={minSpend}
+                    onChange={(e) => setMinSpend(Number(e.target.value))}
+                    placeholder="0"
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-[#F7F4EE]/70 border border-[#C5A059]/30 text-xs font-bold focus:border-[#701626] focus:bg-white focus:outline-none"
+                  />
+                </div>
               </div>
-            </div>
+            )}
 
             {/* Expiration Date */}
             <div className="space-y-1">

@@ -18,7 +18,8 @@ import {
   Copy,
   AlertCircle,
   ChevronDown,
-  Trash2
+  Trash2,
+  Tag
 } from 'lucide-react';
 import { useCartStore, type PlacedOrder } from '@/store/cart';
 import { useAuthStore } from '@/store/auth';
@@ -98,6 +99,11 @@ export default function Checkout() {
   const [selectedAddrId, setSelectedAddrId] = useState<string>(defaultAddr?.id || '');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showMobileSummary, setShowMobileSummary] = useState(false);
+
+  // Coupon state (initialized from CartDrawer navigation state or entered directly at checkout)
+  const [activeCouponCode, setActiveCouponCode] = useState<string | null>(state.appliedCoupon || null);
+  const [checkoutCouponInput, setCheckoutCouponInput] = useState('');
+  const [checkoutCouponError, setCheckoutCouponError] = useState<string | null>(null);
 
   // Existing Account Detection & Mandatory Inline Authentication
   const [existingProfile, setExistingProfile] = useState<{ id: string; fullName: string; email: string } | null>(null);
@@ -218,14 +224,35 @@ export default function Checkout() {
     return sum + Math.max(0, itemPrice) * qty;
   }, 0);
 
-  // Re-validate applied coupon against active store coupons instead of trusting raw router state
+  // Re-validate applied coupon against active store coupons (with built-in fallbacks matching CartDrawer)
+  const availableCoupons =
+    adminCoupons && adminCoupons.filter((c) => c.isActive).length > 0
+      ? adminCoupons.filter((c) => c.isActive)
+      : [
+          { id: 'def-1', code: 'AZHAI10', discountType: 'percentage' as const, value: 10, minSpend: 0, usageCount: 0, isActive: true },
+          { id: 'def-2', code: 'CEYLON1000', discountType: 'fixed' as const, value: 1000, minSpend: 0, usageCount: 0, isActive: true },
+        ];
+
+  const matchedCoupon = activeCouponCode
+    ? availableCoupons.find(
+        (c) => c.code.toUpperCase() === activeCouponCode.trim().toUpperCase() && c.isActive
+      ) ||
+      (activeCouponCode.trim().toUpperCase() === 'AZHAI10'
+        ? { id: 'fb-1', code: 'AZHAI10', discountType: 'percentage' as const, value: 10, minSpend: 0, usageCount: 0, isActive: true }
+        : activeCouponCode.trim().toUpperCase() === 'CEYLON1000'
+          ? { id: 'fb-2', code: 'CEYLON1000', discountType: 'fixed' as const, value: 1000, minSpend: 0, usageCount: 0, isActive: true }
+          : undefined)
+    : undefined;
+
+  const isCouponMinSpendMet = !matchedCoupon?.minSpend || rawTotal >= matchedCoupon.minSpend;
+  const isFreeShippingCouponApplied = Boolean(
+    matchedCoupon && matchedCoupon.discountType === 'free_shipping' && isCouponMinSpendMet
+  );
+
   const discount = (() => {
-    if (!state.appliedCoupon) return 0;
-    const matchedCoupon = (adminCoupons || []).find(
-      (c) => c.code.toUpperCase() === state.appliedCoupon?.trim().toUpperCase() && c.isActive
-    );
-    if (!matchedCoupon) return 0;
-    if (matchedCoupon.minSpend && rawTotal < matchedCoupon.minSpend) return 0;
+    if (!matchedCoupon || !isCouponMinSpendMet || matchedCoupon.discountType === 'free_shipping') {
+      return 0;
+    }
     let computed =
       matchedCoupon.discountType === 'percentage'
         ? Math.round((rawTotal * matchedCoupon.value) / 100)
@@ -235,6 +262,32 @@ export default function Checkout() {
     }
     return Math.min(rawTotal, Math.max(0, computed));
   })();
+
+  const handleApplyCheckoutCoupon = (codeToApply?: string) => {
+    setCheckoutCouponError(null);
+    const clean = (codeToApply ?? checkoutCouponInput).trim().toUpperCase();
+    if (!clean) return;
+
+    const found =
+      availableCoupons.find((c) => c.code.toUpperCase() === clean && c.isActive) ||
+      (clean === 'AZHAI10'
+        ? { id: 'fb-1', code: 'AZHAI10', discountType: 'percentage' as const, value: 10, minSpend: 0, usageCount: 0, isActive: true }
+        : clean === 'CEYLON1000'
+          ? { id: 'fb-2', code: 'CEYLON1000', discountType: 'fixed' as const, value: 1000, minSpend: 0, usageCount: 0, isActive: true }
+          : undefined);
+
+    if (!found) {
+      setCheckoutCouponError('Invalid or inactive coupon code.');
+      return;
+    }
+    if (found.minSpend && rawTotal < found.minSpend) {
+      setCheckoutCouponError(`Requires a minimum spend of LKR ${found.minSpend.toLocaleString()}`);
+      return;
+    }
+    setActiveCouponCode(found.code);
+    setCheckoutCouponInput('');
+    setCheckoutCouponError(null);
+  };
 
   // Exact Cumulative Cart Weight (Garments + Atelier Keepsake Packaging)
   const cartWeightGrams = estimateCartWeight(
@@ -262,19 +315,22 @@ export default function Checkout() {
   });
 
   const isFreeDeliveryEligible = Boolean(
-    settings.enableFreeShippingThreshold &&
-    settings.freeShippingThreshold &&
-    settings.freeShippingThreshold > 0 &&
-    (rawTotal - discount) >= settings.freeShippingThreshold
+    isFreeShippingCouponApplied ||
+    (settings.enableFreeShippingThreshold &&
+      settings.freeShippingThreshold &&
+      settings.freeShippingThreshold > 0 &&
+      (rawTotal - discount) >= settings.freeShippingThreshold)
   );
 
-  // Dynamic Shipping Fee (Standard SL Post weight-based vs COD formula + Free shipping threshold)
+  // Dynamic Shipping Fee (Standard SL Post weight-based vs COD formula + Free shipping coupon / threshold)
   let shippingFee = 0;
-  if (deliveryMethod === 'express') {
+  if (isFreeShippingCouponApplied) {
+    shippingFee = 0;
+  } else if (deliveryMethod === 'express') {
     shippingFee = settings.expressShippingFee || 850;
   } else {
     if (isFreeDeliveryEligible) {
-      // Complimentary shipping: Postage is free; for COD, only the SL Post Money Order handling fee applies
+      // Complimentary shipping threshold: Postage is free; for COD, only the SL Post Money Order handling fee applies
       shippingFee = paymentMethod === 'cod' ? (slPostCalc.moneyOrderCommission + slPostCalc.serviceCharge) : 0;
     } else {
       if (paymentMethod === 'cod') {
@@ -389,7 +445,7 @@ export default function Checkout() {
             },
             delivery_notes: deliveryNotes.trim() || null,
             gift_note: state.giftNote || null,
-            coupon_code: state.appliedCoupon || null,
+            coupon_code: activeCouponCode || null,
             subtotal: orderData.subtotal,
             discount: orderData.discount,
             shipping: orderData.shipping,
@@ -582,7 +638,7 @@ export default function Checkout() {
       discount,
       shipping: shippingFee,
       total: finalTotal,
-      coupon: state.appliedCoupon,
+      coupon: activeCouponCode || undefined,
       giftNote: state.giftNote,
       deliveryNotes: deliveryNotes.trim() || undefined,
       customer: {
@@ -659,7 +715,7 @@ export default function Checkout() {
               customer_details: orderData.customer,
               delivery_notes: deliveryNotes.trim() || null,
               gift_note: state.giftNote || null,
-              coupon_code: state.appliedCoupon || null,
+              coupon_code: activeCouponCode || null,
               subtotal: orderData.subtotal,
               discount: orderData.discount,
               shipping: orderData.shipping,
@@ -960,6 +1016,77 @@ export default function Checkout() {
                   ))}
                 </div>
 
+                {/* Mobile Promo Code Box */}
+                <div className="pt-3 border-t border-[#C5A059]/20 space-y-2">
+                  <span className="text-[11px] font-bold text-[#110B0E] flex items-center gap-1.5">
+                    <Tag className="w-3.5 h-3.5 text-[#701626]" />
+                    <span>Offers & Promo Code</span>
+                  </span>
+                  {activeCouponCode && (discount > 0 || isFreeShippingCouponApplied) ? (
+                    <div className="flex items-center justify-between p-2.5 rounded-xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-800">
+                      <span className="font-bold">
+                        {isFreeShippingCouponApplied
+                          ? `🚚 '${activeCouponCode}' Applied (Free Delivery!)`
+                          : `✨ '${activeCouponCode}' Applied (-LKR ${discount.toLocaleString('en-US')})`}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setActiveCouponCode(null);
+                          setCheckoutCouponError(null);
+                        }}
+                        className="text-emerald-700 hover:underline font-semibold text-[11px]"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="space-y-1.5">
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          placeholder="Enter Promo or Free Delivery Code"
+                          value={checkoutCouponInput}
+                          onChange={(e) => setCheckoutCouponInput(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              handleApplyCheckoutCoupon();
+                            }
+                          }}
+                          className="flex-1 px-3 py-2 text-xs bg-[#FCFBF8] border border-[#C5A059]/50 rounded-xl uppercase font-semibold text-[#110B0E] focus:outline-none focus:border-[#701626]"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => handleApplyCheckoutCoupon()}
+                          className="px-4 py-2 bg-[#701626] text-white text-xs font-bold rounded-xl hover:bg-[#8E1E34] transition-colors"
+                        >
+                          Apply
+                        </button>
+                      </div>
+                      {checkoutCouponError && (
+                        <p className="text-[11px] text-rose-600 font-medium">{checkoutCouponError}</p>
+                      )}
+                      <div className="flex flex-wrap gap-1.5 pt-1">
+                        {availableCoupons.slice(0, 3).map((c) => (
+                          <button
+                            key={`mob-coup-${c.id}`}
+                            type="button"
+                            onClick={() => handleApplyCheckoutCoupon(c.code)}
+                            className="text-[10px] bg-[#F7F4EE] hover:bg-[#701626]/10 text-[#701626] font-bold px-2.5 py-1 rounded-lg border border-[#C5A059]/40 transition-colors"
+                          >
+                            {c.discountType === 'free_shipping'
+                              ? `🚚 ${c.code} (Free Delivery)`
+                              : c.discountType === 'percentage'
+                                ? `⚡ ${c.code} (${c.value}% Off)`
+                                : `💖 ${c.code} (LKR ${c.value.toLocaleString()} Off)`}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
                 {/* Mobile Breakdown */}
                 <div className="pt-3 border-t border-[#C5A059]/20 space-y-1.5 text-xs">
                   <div className="flex justify-between text-[#6D6268]">
@@ -968,8 +1095,14 @@ export default function Checkout() {
                   </div>
                   {discount > 0 && (
                     <div className="flex justify-between text-emerald-700 font-semibold">
-                      <span>Discount ({state.appliedCoupon})</span>
+                      <span>Discount ({activeCouponCode})</span>
                       <span>- LKR {discount.toLocaleString('en-US')}</span>
+                    </div>
+                  )}
+                  {isFreeShippingCouponApplied && (
+                    <div className="flex justify-between text-emerald-700 font-semibold">
+                      <span>🚚 Free Delivery ({activeCouponCode})</span>
+                      <span>Applied</span>
                     </div>
                   )}
                   <div className="flex justify-between text-[#6D6268]">
@@ -1620,6 +1753,86 @@ export default function Checkout() {
                 )}
               </div>
 
+              {/* 5. Promo Code & Free Delivery Coupon */}
+              <div className="p-6 sm:p-7 rounded-[2rem] bg-white border border-[#C5A059]/35 shadow-sm space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <span className="w-7 h-7 rounded-full bg-[#701626] text-white text-xs font-bold flex items-center justify-center">
+                      5
+                    </span>
+                    <h2 className="font-display text-xl sm:text-2xl font-bold text-[#110B0E] flex items-center gap-2">
+                      <span>Promo Code & Offers</span>
+                    </h2>
+                  </div>
+                  <Tag className="w-4 h-4 text-[#701626]" />
+                </div>
+
+                {activeCouponCode && (discount > 0 || isFreeShippingCouponApplied) ? (
+                  <div className="flex items-center justify-between p-3.5 rounded-2xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-800">
+                    <span className="font-bold">
+                      {isFreeShippingCouponApplied
+                        ? `🚚 '${activeCouponCode}' Applied — Complimentary Island-wide Delivery Unlocked!`
+                        : `✨ '${activeCouponCode}' Applied — You Saved LKR ${discount.toLocaleString('en-US')}!`}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setActiveCouponCode(null);
+                        setCheckoutCouponError(null);
+                      }}
+                      className="text-emerald-700 hover:underline font-bold text-xs ml-3 shrink-0"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    <div className="flex gap-2.5">
+                      <input
+                        type="text"
+                        placeholder="Enter Promo or Free Delivery Code (e.g. FREEDELIVERY, AZHAI10)"
+                        value={checkoutCouponInput}
+                        onChange={(e) => setCheckoutCouponInput(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            handleApplyCheckoutCoupon();
+                          }
+                        }}
+                        className="flex-1 px-4 py-3 text-xs bg-[#FCFBF8] border border-[#C5A059]/50 rounded-xl uppercase font-bold tracking-wider text-[#110B0E] focus:outline-none focus:border-[#701626]"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => handleApplyCheckoutCoupon()}
+                        className="px-6 py-3 bg-[#701626] text-white text-xs uppercase tracking-wider font-bold rounded-xl hover:bg-[#8E1E34] transition-colors shrink-0"
+                      >
+                        Apply Code
+                      </button>
+                    </div>
+                    {checkoutCouponError && (
+                      <p className="text-xs text-rose-600 font-medium">{checkoutCouponError}</p>
+                    )}
+                    <div className="flex flex-wrap items-center gap-2 pt-0.5">
+                      <span className="text-[10px] uppercase tracking-wider text-[#6D6268] font-bold">Available Offers:</span>
+                      {availableCoupons.slice(0, 4).map((c) => (
+                        <button
+                          key={`form-coup-${c.id}`}
+                          type="button"
+                          onClick={() => handleApplyCheckoutCoupon(c.code)}
+                          className="text-[11px] bg-[#F7F4EE] hover:bg-[#701626]/10 text-[#701626] font-bold px-3 py-1.5 rounded-xl border border-[#C5A059]/40 transition-colors cursor-pointer"
+                        >
+                          {c.discountType === 'free_shipping'
+                            ? `🚚 ${c.code} (Free Delivery)`
+                            : c.discountType === 'percentage'
+                              ? `⚡ ${c.code} (${c.value}% Off)`
+                              : `💖 ${c.code} (LKR ${c.value.toLocaleString()} Off)`}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
               {/* Submit Button */}
               <motion.button
                 type="submit"
@@ -1707,6 +1920,79 @@ export default function Checkout() {
                 </div>
               )}
 
+              {/* Promo / Free Delivery Coupon Box */}
+              <div className="pt-3 border-t border-[#C5A059]/20 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-bold text-[#110B0E] flex items-center gap-1.5">
+                    <Tag className="w-3.5 h-3.5 text-[#701626]" />
+                    <span>Offers & Promo Code</span>
+                  </span>
+                </div>
+                {activeCouponCode && (discount > 0 || isFreeShippingCouponApplied) ? (
+                  <div className="flex items-center justify-between p-2.5 rounded-xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-800">
+                    <span className="font-bold">
+                      {isFreeShippingCouponApplied
+                        ? `🚚 '${activeCouponCode}' Applied (Free Delivery!)`
+                        : `✨ '${activeCouponCode}' Applied (-LKR ${discount.toLocaleString('en-US')})`}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setActiveCouponCode(null);
+                        setCheckoutCouponError(null);
+                      }}
+                      className="text-emerald-700 hover:underline font-semibold text-[11px]"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        placeholder="Promo or Free Delivery Code"
+                        value={checkoutCouponInput}
+                        onChange={(e) => setCheckoutCouponInput(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            handleApplyCheckoutCoupon();
+                          }
+                        }}
+                        className="flex-1 px-3 py-2 text-xs bg-[#FCFBF8] border border-[#C5A059]/50 rounded-xl uppercase font-semibold text-[#110B0E] focus:outline-none focus:border-[#701626]"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => handleApplyCheckoutCoupon()}
+                        className="px-4 py-2 bg-[#701626] text-white text-xs font-bold rounded-xl hover:bg-[#8E1E34] transition-colors"
+                      >
+                        Apply
+                      </button>
+                    </div>
+                    {checkoutCouponError && (
+                      <p className="text-[11px] text-rose-600 font-medium">{checkoutCouponError}</p>
+                    )}
+                    <div className="flex flex-wrap gap-1.5 pt-0.5">
+                      {availableCoupons.slice(0, 3).map((c) => (
+                        <button
+                          key={`side-coup-${c.id}`}
+                          type="button"
+                          onClick={() => handleApplyCheckoutCoupon(c.code)}
+                          className="text-[10px] bg-[#F7F4EE] hover:bg-[#701626]/10 text-[#701626] font-bold px-2.5 py-1 rounded-lg border border-[#C5A059]/40 transition-colors cursor-pointer"
+                        >
+                          {c.discountType === 'free_shipping'
+                            ? `🚚 ${c.code} (Free Delivery)`
+                            : c.discountType === 'percentage'
+                              ? `⚡ ${c.code} (${c.value}% Off)`
+                              : `💖 ${c.code} (LKR ${c.value.toLocaleString()} Off)`}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
               {/* Breakdown */}
               <div className="pt-4 border-t border-[#C5A059]/20 space-y-2 text-xs">
                 <div className="flex justify-between text-[#6D6268]">
@@ -1716,8 +2002,15 @@ export default function Checkout() {
 
                 {discount > 0 && (
                   <div className="flex justify-between text-emerald-700 font-semibold">
-                    <span>Discount ({state.appliedCoupon})</span>
+                    <span>Discount ({activeCouponCode})</span>
                     <span>- LKR {discount.toLocaleString('en-US')}</span>
+                  </div>
+                )}
+
+                {isFreeShippingCouponApplied && (
+                  <div className="flex justify-between text-emerald-700 font-semibold">
+                    <span>🚚 Free Delivery Coupon ({activeCouponCode})</span>
+                    <span>Waived</span>
                   </div>
                 )}
 
@@ -1738,11 +2031,15 @@ export default function Checkout() {
                       )}
                     </span>
                   </div>
-                  {deliveryMethod === 'standard' && isFreeDeliveryEligible && (
+                  {isFreeShippingCouponApplied ? (
+                    <p className="text-[10px] text-emerald-700 text-right font-medium">
+                      🚚 Complimentary Delivery via Coupon ({activeCouponCode})
+                    </p>
+                  ) : deliveryMethod === 'standard' && isFreeDeliveryEligible ? (
                     <p className="text-[10px] text-emerald-700 text-right font-medium">
                       ✨ Complimentary Island-wide Delivery (Orders over LKR {(settings.freeShippingThreshold || 15000).toLocaleString()})
                     </p>
-                  )}
+                  ) : null}
                   {deliveryMethod === 'standard' && !isFreeDeliveryEligible && paymentMethod === 'cod' && (
                     <p className="text-[10px] text-[#6D6268]/80 text-right">
                       Postage LKR {slPostCalc.postageFee} + Money Order LKR {slPostCalc.moneyOrderCommission} + Fee LKR 50

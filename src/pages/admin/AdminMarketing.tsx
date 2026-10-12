@@ -457,7 +457,15 @@ export default function AdminMarketing() {
                           {c.code}
                         </td>
                         <td className="p-3.5 font-bold text-[#110B0E] whitespace-nowrap">
-                          {c.discountType === 'percentage' ? `${c.value}% Off Cart` : `LKR ${c.value.toLocaleString()} Flat Off`}
+                          {c.discountType === 'free_shipping' ? (
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 text-[11px] font-bold">
+                              🚚 Free Island-wide Delivery
+                            </span>
+                          ) : c.discountType === 'percentage' ? (
+                            `${c.value}% Off Cart`
+                          ) : (
+                            `LKR ${c.value.toLocaleString()} Flat Off`
+                          )}
                         </td>
                         <td className="p-3.5 text-[#6D6268] whitespace-nowrap">
                           {c.minSpend ? `LKR ${c.minSpend.toLocaleString()}` : 'No Minimum'}

@@ -22,6 +22,7 @@ export default function CartDrawer() {
   const [couponCode, setCouponCode] = useState('');
   const [appliedCoupon, setAppliedCoupon] = useState<string | null>(null);
   const [discountAmount, setDiscountAmount] = useState(0);
+  const [isFreeShippingCoupon, setIsFreeShippingCoupon] = useState(false);
   const [couponError, setCouponError] = useState<string | null>(null);
   const [isGiftNoteOpen, setIsGiftNoteOpen] = useState(false);
   const [giftNote, setGiftNote] = useState('');
@@ -45,6 +46,13 @@ export default function CartDrawer() {
         setCouponError(`This coupon requires a minimum spend of LKR ${matchedCoupon.minSpend.toLocaleString()}`);
         return;
       }
+      if (matchedCoupon.discountType === 'free_shipping') {
+        setIsFreeShippingCoupon(true);
+        setDiscountAmount(0);
+        setAppliedCoupon(matchedCoupon.code);
+        setCouponError(null);
+        return;
+      }
       let disc = 0;
       if (matchedCoupon.discountType === 'percentage') {
         disc = Math.round(rawTotal * (matchedCoupon.value / 100));
@@ -54,6 +62,7 @@ export default function CartDrawer() {
       } else {
         disc = matchedCoupon.value;
       }
+      setIsFreeShippingCoupon(false);
       setDiscountAmount(disc);
       setAppliedCoupon(matchedCoupon.code);
       setCouponError(null);
@@ -63,21 +72,24 @@ export default function CartDrawer() {
     // Default promotional fallbacks
     if (clean === 'AZHAI10') {
       const disc = Math.round(rawTotal * 0.10);
+      setIsFreeShippingCoupon(false);
       setDiscountAmount(disc);
       setAppliedCoupon('AZHAI10');
       setCouponError(null);
     } else if (clean === 'CEYLON1000') {
+      setIsFreeShippingCoupon(false);
       setDiscountAmount(1000);
       setAppliedCoupon('CEYLON1000');
       setCouponError(null);
     } else {
-      setCouponError('Invalid coupon code. Try AZHAI10 or CEYLON1000');
+      setCouponError('Invalid or inactive coupon code.');
     }
   };
 
   const removeCoupon = () => {
     setAppliedCoupon(null);
     setDiscountAmount(0);
+    setIsFreeShippingCoupon(false);
     setCouponCode('');
     setCouponError(null);
   };
@@ -88,6 +100,7 @@ export default function CartDrawer() {
       state: {
         appliedCoupon,
         discountAmount,
+        isFreeShippingCoupon,
         giftNote: isGiftNoteOpen ? giftNote : ''
       }
     });
@@ -108,7 +121,8 @@ export default function CartDrawer() {
   );
 
   const estimatedPostage = calculateSLPostPostage(cartWeight).fee;
-  const shippingCost = rawTotal >= freeShippingThreshold ? 0 : (rawTotal > 0 ? estimatedPostage : 0);
+  const qualifiesForThresholdFreeShip = enableFreeShippingThreshold && rawTotal >= freeShippingThreshold;
+  const shippingCost = (isFreeShippingCoupon || qualifiesForThresholdFreeShip) ? 0 : (rawTotal > 0 ? estimatedPostage : 0);
   const finalTotal = Math.max(0, rawTotal - discountAmount + shippingCost);
 
   return (
@@ -295,14 +309,18 @@ export default function CartDrawer() {
 
                       {appliedCoupon ? (
                         <div className="flex items-center justify-between p-2.5 rounded-xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-800">
-                          <span className="font-bold">✨ '{appliedCoupon}' Applied (Saved LKR {discountAmount.toLocaleString('en-US')})</span>
+                          <span className="font-bold">
+                            {isFreeShippingCoupon
+                              ? `🚚 '${appliedCoupon}' Applied (Free Island-wide Delivery!)`
+                              : `✨ '${appliedCoupon}' Applied (Saved LKR ${discountAmount.toLocaleString('en-US')})`}
+                          </span>
                           <button onClick={removeCoupon} className="text-emerald-700 hover:underline font-semibold text-[11px]">Remove</button>
                         </div>
                       ) : (
                         <div className="flex gap-2">
                           <input
                             type="text"
-                            placeholder="Enter AZHAI10 or CEYLON1000"
+                            placeholder="Enter Promo Code"
                             value={couponCode}
                             onChange={(e) => setCouponCode(e.target.value)}
                             className="flex-1 px-3 py-1.5 text-xs bg-[#FCFBF8] border border-[#C5A059]/50 rounded-xl uppercase font-semibold text-[#110B0E] focus:outline-none focus:border-[#701626]"
@@ -325,19 +343,26 @@ export default function CartDrawer() {
 
                       {/* Quick Apply Pills */}
                       {!appliedCoupon && (
-                        <div className="flex gap-2 pt-1">
-                          <button 
-                            onClick={() => applyCoupon('AZHAI10')} 
-                            className="text-[10px] bg-[#F7F4EE] hover:bg-[#701626]/10 text-[#701626] font-bold px-2.5 py-1 rounded-lg border border-[#C5A059]/40 transition-colors"
-                          >
-                            ⚡ AZHAI10 (10% Off)
-                          </button>
-                          <button 
-                            onClick={() => applyCoupon('CEYLON1000')} 
-                            className="text-[10px] bg-[#F7F4EE] hover:bg-[#701626]/10 text-[#701626] font-bold px-2.5 py-1 rounded-lg border border-[#C5A059]/40 transition-colors"
-                          >
-                            💖 CEYLON1000 (LKR 1,000 Off)
-                          </button>
+                        <div className="flex flex-wrap gap-2 pt-1">
+                          {(storeCoupons && storeCoupons.filter((c) => c.isActive).length > 0
+                            ? storeCoupons.filter((c) => c.isActive).slice(0, 3)
+                            : [
+                                { id: '1', code: 'AZHAI10', discountType: 'percentage' as const, value: 10 },
+                                { id: '2', code: 'CEYLON1000', discountType: 'fixed' as const, value: 1000 },
+                              ]
+                          ).map((c) => (
+                            <button
+                              key={c.id}
+                              onClick={() => applyCoupon(c.code)}
+                              className="text-[10px] bg-[#F7F4EE] hover:bg-[#701626]/10 text-[#701626] font-bold px-2.5 py-1 rounded-lg border border-[#C5A059]/40 transition-colors"
+                            >
+                              {c.discountType === 'free_shipping'
+                                ? `🚚 ${c.code} (Free Delivery)`
+                                : c.discountType === 'percentage'
+                                  ? `⚡ ${c.code} (${c.value}% Off)`
+                                  : `💖 ${c.code} (LKR ${c.value.toLocaleString()} Off)`}
+                            </button>
+                          ))}
                         </div>
                       )}
                     </div>
