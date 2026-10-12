@@ -283,7 +283,7 @@ export default defineConfig(({ mode }) => {
           });
 
           // ── PayHere.lk Dev Server Proxy ────────────────────────────
-          const payhereMerchantId = env.PAYHERE_MERCHANT_ID || env.VITE_PAYHERE_MERCHANT_ID || '1237099';
+          const payhereMerchantId = env.PAYHERE_MERCHANT_ID || env.VITE_PAYHERE_MERCHANT_ID || '262596';
           const payhereSecret = env.PAYHERE_MERCHANT_SECRET || env.VITE_PAYHERE_SECRET || '';
           const isPayhereSandbox = (env.PAYHERE_ENV === 'sandbox' || env.VITE_PAYHERE_SANDBOX === 'true');
 

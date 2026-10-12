@@ -3,11 +3,26 @@
   "name": "azhai",
   "main": "worker/index.js",
   "compatibility_date": "2026-09-11",
+  "workers_dev": true,
+  "preview_urls": true,
   "observability": {
     "enabled": true
   },
+  "routes": [
+    {
+      "pattern": "azhaiclothing.lk",
+      "zone_name": "azhaiclothing.lk",
+      "custom_domain": true
+    }
+  ],
   "vars": {
-    "VITE_GTM_ID": "GTM-5JFH9Q8R"
+    "VITE_GTM_ID": "GTM-5JFH9Q8R",
+    "VITE_PAYHERE_SANDBOX": "false",
+    "PAYHERE_ENV": "live",
+    "PAYHERE_MERCHANT_ID": "262596",
+    "VITE_PAYHERE_MERCHANT_ID": "262596",
+    "PAYHERE_APP_ID": "4J9MIkGRpEQ48fcz91XSly3sXGroFNt4b1Bm3fovjIl",
+    "PAYHERE_API_KEY": "4J9MIkGRpEQ48fcz91XSly3sXGroFNt4b1Bm3fovjIl"
   },
   "assets": {
     "directory": "./dist",
