@@ -274,7 +274,7 @@ export default function AdminMarketing() {
         customerName: 'Preethi',
         title: 'Bespoke Atelier Tailoring Deposit (Order #AZH-84920)',
         amount: 5000,
-        paymentUrl: 'https://sandbox.payhere.lk/pay/azhai-sample-link',
+        paymentUrl: 'https://www.payhere.lk/pay/azhai-sample-link',
         description: 'Advance deposit for custom handloom weaving and artisan tailoring.',
       });
     }

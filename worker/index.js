@@ -124,17 +124,76 @@ function generatePayHereHash(merchantId, orderId, amount, currency, merchantSecr
   return md5(dataToHash).toUpperCase();
 }
 
+/**
+ * Strips HTML tags, emojis, and control characters that trigger PayHere's
+ * "Something Went Wrong" error page (per https://support.payhere.lk/faq/troubleshooting).
+ */
+function sanitizePayHereText(input, fallback = '') {
+  if (!input) return fallback;
+  const cleaned = String(input)
+    .replace(/<[^>]*>/g, ' ')
+    // Strip surrogate pairs / emojis / pictographs
+    .replace(/[\uD800-\uDBFF][\uDC00-\uDFFF]/g, '')
+    .replace(/[^\x20-\x7E\u00A0-\u024F]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return cleaned || fallback;
+}
+
+/**
+ * Verifies that an incoming request to a privileged admin endpoint (/api/payhere-refund,
+ * /api/payhere-payment-link) carries a valid Supabase JWT belonging to an authenticated admin.
+ */
+async function verifyAdminRequest(request, env) {
+  const authHeader = request.headers.get('Authorization') || '';
+  if (!authHeader.startsWith('Bearer ')) {
+    return { authorized: false, error: 'Missing or invalid Authorization Bearer token.' };
+  }
+  const token = authHeader.slice(7).trim();
+  if (!token) {
+    return { authorized: false, error: 'Empty Authorization Bearer token.' };
+  }
+
+  const supabaseUrl = env.VITE_SUPABASE_URL || 'https://hrmcxxcrnxqhesiywqsc.supabase.co';
+  const supabaseAnonKey = env.VITE_SUPABASE_ANON_KEY || 'sb_publishable_-ZSOc4XGHM2OysLhqKZ5yQ_4OPgdcAm';
+
+  try {
+    const userRes = await fetch(`${supabaseUrl}/auth/v1/user`, {
+      headers: {
+        apikey: supabaseAnonKey,
+        Authorization: `Bearer ${token}`,
+      },
+    });
+    if (!userRes.ok) {
+      return { authorized: false, error: 'Invalid or expired admin session token.' };
+    }
+    const user = await userRes.json();
+    const email = (user?.email || '').toLowerCase();
+    const isAdminRole =
+      user?.app_metadata?.role === 'admin' ||
+      user?.user_metadata?.role === 'admin' ||
+      ['admin@azhai.lk', 'preethi@azhaiclothing.lk', 'hello@azhaiclothing.lk', 'orders@azhaiclothing.lk'].includes(email);
+
+    if (!isAdminRole) {
+      return { authorized: false, error: 'Forbidden: Admin privileges required.' };
+    }
+    return { authorized: true, user };
+  } catch (err) {
+    return { authorized: false, error: 'Failed to verify admin credentials against authentication server.' };
+  }
+}
+
 async function getPayHereOAuthToken(env) {
-  const isSandbox = (env.PAYHERE_ENV === 'sandbox' || env.VITE_PAYHERE_SANDBOX !== 'false');
+  const isSandbox = (env.PAYHERE_ENV === 'sandbox' || env.VITE_PAYHERE_SANDBOX === 'true');
   const tokenUrl = isSandbox
     ? 'https://sandbox.payhere.lk/merchant/v1/oauth/token'
     : 'https://www.payhere.lk/merchant/v1/oauth/token';
 
-  const appId = env.PAYHERE_APP_ID || '';
-  const appSecret = env.PAYHERE_APP_SECRET || '';
+  const appId = env.PAYHERE_APP_ID || env.PAYHERE_API_KEY || '';
+  const appSecret = env.PAYHERE_APP_SECRET || env.PAYHERE_API_SECRET || '';
 
   if (!appId || !appSecret) {
-    throw new Error('PayHere App ID and App Secret must be configured in environment for refund API.');
+    throw new Error('PayHere API Key (App ID) and Secret must be configured in environment for OAuth API.');
   }
 
   const credentials = btoa(`${appId}:${appSecret}`);
@@ -154,6 +213,41 @@ async function getPayHereOAuthToken(env) {
 
   const data = await response.json();
   return data.access_token;
+}
+
+/**
+ * Queries PayHere Retrieval API (/merchant/v1/payment/search) by order_id
+ * to look up payment details or verify transaction status.
+ */
+async function searchPayHerePaymentByOrderId(orderId, env) {
+  const appId = env.PAYHERE_APP_ID || env.PAYHERE_API_KEY || '';
+  const appSecret = env.PAYHERE_APP_SECRET || env.PAYHERE_API_SECRET || '';
+  if (!appId || !appSecret || !orderId) return null;
+
+  try {
+    const accessToken = await getPayHereOAuthToken(env);
+    const isSandbox = (env.PAYHERE_ENV === 'sandbox' || env.VITE_PAYHERE_SANDBOX === 'true');
+    const searchUrl = isSandbox
+      ? `https://sandbox.payhere.lk/merchant/v1/payment/search?order_id=${encodeURIComponent(orderId)}`
+      : `https://www.payhere.lk/merchant/v1/payment/search?order_id=${encodeURIComponent(orderId)}`;
+
+    const res = await fetch(searchUrl, {
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+      },
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    if (data && data.status === 1 && Array.isArray(data.data) && data.data.length > 0) {
+      return data.data[0];
+    }
+    return null;
+  } catch (err) {
+    console.warn('[PayHere Retrieval API lookup warning]:', err);
+    return null;
+  }
 }
 
 export default {
@@ -392,31 +486,105 @@ export default {
     if (url.pathname === '/api/payhere-initiate' || url.pathname === '/api/create-payments-lk-checkout') {
       if (request.method === 'POST') {
         try {
+          if (origin && !isAllowedOrigin) {
+            return new Response(JSON.stringify({ error: 'Origin not allowed' }), {
+              status: 403,
+              headers: { 'Content-Type': 'application/json', ...corsHeaders },
+            });
+          }
+
           const body = await request.json();
           const merchantId = env.PAYHERE_MERCHANT_ID || env.VITE_PAYHERE_MERCHANT_ID || '1237099';
           const merchantSecret = env.PAYHERE_MERCHANT_SECRET || env.VITE_PAYHERE_SECRET || '';
-          const isSandbox = (env.PAYHERE_ENV === 'sandbox' || env.VITE_PAYHERE_SANDBOX !== 'false');
+          const isSandbox = (env.PAYHERE_ENV === 'sandbox' || env.VITE_PAYHERE_SANDBOX === 'true');
+
+          if (!merchantSecret) {
+            return new Response(
+              JSON.stringify({ error: 'Server configuration error: PayHere Merchant Secret is not configured.' }),
+              { status: 500, headers: { 'Content-Type': 'application/json', ...corsHeaders } }
+            );
+          }
 
           const { orderId, amount, amountCents, currency: passedCurrency, description, customer, items } = body;
-          const finalAmount = amount !== undefined ? Number(amount) : (amountCents ? (Number(amountCents) / 100) : 0);
+          let finalAmount = amount !== undefined ? Number(amount) : (amountCents ? (Number(amountCents) / 100) : 0);
 
-          if (!orderId || !finalAmount) {
+          if (!orderId) {
             return new Response(
-              JSON.stringify({ error: 'Missing required checkout fields: orderId, amount' }),
+              JSON.stringify({ error: 'Missing required checkout field: orderId' }),
               { status: 400, headers: { 'Content-Type': 'application/json', ...corsHeaders } }
             );
           }
 
-          const currency = passedCurrency || 'LKR';
+          // Authoritative Order Lookup: Verify order total in Supabase so client cannot tamper with amount
+          const supabaseUrl = env.VITE_SUPABASE_URL || 'https://hrmcxxcrnxqhesiywqsc.supabase.co';
+          const supabaseKey = env.SUPABASE_SERVICE_ROLE_KEY || env.VITE_SUPABASE_ANON_KEY || 'sb_publishable_-ZSOc4XGHM2OysLhqKZ5yQ_4OPgdcAm';
+          let dbOrder = null;
+
+          if (supabaseUrl && supabaseKey) {
+            try {
+              const rpcRes = await fetch(`${supabaseUrl}/rest/v1/rpc/get_order_by_code`, {
+                method: 'POST',
+                headers: {
+                  apikey: supabaseKey,
+                  Authorization: `Bearer ${supabaseKey}`,
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ p_order_code: String(orderId) }),
+              });
+              if (rpcRes.ok) {
+                const rows = await rpcRes.json();
+                dbOrder = Array.isArray(rows) ? rows[0] : rows;
+              }
+            } catch (lookupErr) {
+              console.warn('[PayHere Initiate DB Lookup Warning]:', lookupErr);
+            }
+          }
+
+          if (dbOrder) {
+            if (dbOrder.payment_status === 'paid') {
+              return new Response(
+                JSON.stringify({ error: 'This order has already been paid.' }),
+                { status: 400, headers: { 'Content-Type': 'application/json', ...corsHeaders } }
+              );
+            }
+            const dbTotal = Number(dbOrder.total);
+            if (dbTotal > 0) {
+              finalAmount = dbTotal;
+            }
+          }
+
+          if (!finalAmount || finalAmount <= 0 || Number.isNaN(finalAmount)) {
+            return new Response(
+              JSON.stringify({ error: 'Invalid or missing checkout amount.' }),
+              { status: 400, headers: { 'Content-Type': 'application/json', ...corsHeaders } }
+            );
+          }
+
+          const currency = (passedCurrency || 'LKR').toUpperCase();
+          if (currency !== 'LKR') {
+            return new Response(
+              JSON.stringify({ error: 'Only LKR currency is supported for checkout.' }),
+              { status: 400, headers: { 'Content-Type': 'application/json', ...corsHeaders } }
+            );
+          }
+
           const formattedAmount = finalAmount.toFixed(2);
-          const hash = generatePayHereHash(merchantId, orderId, finalAmount, currency, merchantSecret);
+          const hash = generatePayHereHash(merchantId, String(orderId), finalAmount, currency, merchantSecret);
 
           const notifyUrl = `${url.origin}/api/payhere-notify`;
           const returnUrl = `${url.origin}/order-success/${orderId}?payhere=success`;
           const cancelUrl = `${url.origin}/checkout?status=cancelled&order_id=${orderId}`;
 
-          const firstName = customer?.firstName || customer?.name?.split(' ')[0] || 'Valued';
-          const lastName = customer?.lastName || customer?.name?.split(' ').slice(1).join(' ') || 'Patron';
+          const rawFirstName = customer?.firstName || customer?.name?.split(' ')[0] || dbOrder?.customer_name?.split(' ')[0] || 'Valued';
+          const rawLastName = customer?.lastName || customer?.name?.split(' ').slice(1).join(' ') || dbOrder?.customer_name?.split(' ').slice(1).join(' ') || 'Patron';
+          const safeItems = sanitizePayHereText(items || description || `Azhai Order #${orderId}`, `Azhai Order #${orderId}`).slice(0, 200);
+          const safeFirstName = sanitizePayHereText(rawFirstName, 'Valued').slice(0, 80);
+          const safeLastName = sanitizePayHereText(rawLastName, 'Patron').slice(0, 80);
+          const safeEmail = (customer?.email || dbOrder?.customer_email || 'concierge@azhaiclothing.lk').trim();
+          const safePhone = (customer?.phone || dbOrder?.customer_phone || '0770000000').trim();
+          const safeAddress = sanitizePayHereText(customer?.address || dbOrder?.shipping_address?.address || 'Colombo', 'Colombo').slice(0, 200);
+          const safeCity = sanitizePayHereText(customer?.city || dbOrder?.shipping_address?.city || 'Colombo', 'Colombo').slice(0, 80);
+          const safeCountry = sanitizePayHereText(customer?.country || 'Sri Lanka', 'Sri Lanka').slice(0, 80);
 
           return new Response(
             JSON.stringify({
@@ -424,23 +592,23 @@ export default {
               sandbox: isSandbox,
               merchant_id: merchantId,
               order_id: String(orderId),
-              items: items || description || `Azhai Order #${orderId}`,
+              items: safeItems,
               amount: formattedAmount,
               currency,
               hash,
               return_url: returnUrl,
               cancel_url: cancelUrl,
               notify_url: notifyUrl,
-              first_name: firstName,
-              last_name: lastName,
-              email: customer?.email || '',
-              phone: customer?.phone || '',
-              address: customer?.address || '',
-              city: customer?.city || 'Colombo',
-              country: customer?.country || 'Sri Lanka',
-              delivery_address: customer?.address || '',
-              delivery_city: customer?.city || 'Colombo',
-              delivery_country: customer?.country || 'Sri Lanka',
+              first_name: safeFirstName,
+              last_name: safeLastName,
+              email: safeEmail,
+              phone: safePhone,
+              address: safeAddress,
+              city: safeCity,
+              country: safeCountry,
+              delivery_address: safeAddress,
+              delivery_city: safeCity,
+              delivery_country: safeCountry,
             }),
             { status: 200, headers: { 'Content-Type': 'application/json', ...corsHeaders } }
           );
@@ -453,10 +621,119 @@ export default {
       }
     }
 
-    // ── 3. PayHere.lk Card Refund ─────────────────────────────
+    // ── 2b. PayHere Order Payment Verification Endpoint ─────────
+    if (url.pathname === '/api/payhere-verify') {
+      try {
+        let orderId = url.searchParams.get('orderId') || url.searchParams.get('order_id') || '';
+        if (!orderId && request.method === 'POST') {
+          const body = await request.json().catch(() => ({}));
+          orderId = body.orderId || body.order_id || '';
+        }
+        if (!orderId) {
+          return new Response(JSON.stringify({ error: 'Missing orderId' }), {
+            status: 400,
+            headers: { 'Content-Type': 'application/json', ...corsHeaders },
+          });
+        }
+
+        const supabaseUrl = env.VITE_SUPABASE_URL || 'https://hrmcxxcrnxqhesiywqsc.supabase.co';
+        const supabaseKey = env.SUPABASE_SERVICE_ROLE_KEY || env.VITE_SUPABASE_ANON_KEY || 'sb_publishable_-ZSOc4XGHM2OysLhqKZ5yQ_4OPgdcAm';
+
+        let dbOrder = null;
+        const rpcRes = await fetch(`${supabaseUrl}/rest/v1/rpc/get_order_by_code`, {
+          method: 'POST',
+          headers: {
+            apikey: supabaseKey,
+            Authorization: `Bearer ${supabaseKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ p_order_code: String(orderId) }),
+        });
+        if (rpcRes.ok) {
+          const rows = await rpcRes.json();
+          dbOrder = Array.isArray(rows) ? rows[0] : rows;
+        }
+
+        if (dbOrder && dbOrder.payment_status === 'paid') {
+          return new Response(
+            JSON.stringify({
+              verified: true,
+              payment_status: 'paid',
+              status: dbOrder.status || 'confirmed',
+              admin_notes: dbOrder.admin_notes || '',
+            }),
+            { status: 200, headers: { 'Content-Type': 'application/json', ...corsHeaders } }
+          );
+        }
+
+        if (dbOrder && dbOrder.admin_notes && /Failed\/Cancelled/i.test(dbOrder.admin_notes)) {
+          return new Response(
+            JSON.stringify({
+              verified: false,
+              failed: true,
+              payment_status: dbOrder.payment_status || 'pending_card',
+              status: dbOrder.status || 'pending',
+              admin_notes: dbOrder.admin_notes,
+              error: 'Your card payment was declined or cancelled by the bank. Please try again.',
+            }),
+            { status: 200, headers: { 'Content-Type': 'application/json', ...corsHeaders } }
+          );
+        }
+
+        // Fallback: If IPN hasn't arrived yet and PayHere Retrieval API credentials are configured, check PayHere directly
+        const phPayment = await searchPayHerePaymentByOrderId(orderId, env);
+        if (phPayment && phPayment.status === 'RECEIVED') {
+          const paidAmount = Number(phPayment.amount || 0);
+          const expectedTotal = dbOrder ? Number(dbOrder.total || 0) : 0;
+          if (paidAmount >= expectedTotal - 0.01) {
+            return new Response(
+              JSON.stringify({
+                verified: true,
+                payment_status: 'paid',
+                status: 'confirmed',
+                payment_id: phPayment.payment_id,
+              }),
+              { status: 200, headers: { 'Content-Type': 'application/json', ...corsHeaders } }
+            );
+          }
+        }
+
+        return new Response(
+          JSON.stringify({
+            verified: false,
+            payment_status: dbOrder?.payment_status || 'pending_card',
+            status: dbOrder?.status || 'pending',
+            admin_notes: dbOrder?.admin_notes || '',
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json', ...corsHeaders } }
+        );
+      } catch (err) {
+        return new Response(
+          JSON.stringify({ verified: false, error: err.message || 'Verification error' }),
+          { status: 500, headers: { 'Content-Type': 'application/json', ...corsHeaders } }
+        );
+      }
+    }
+
+    // ── 3. PayHere.lk Card Refund (Admin Authenticated) ─────────
     if (url.pathname === '/api/payhere-refund' || url.pathname === '/api/refund-payments-lk') {
       if (request.method === 'POST') {
         try {
+          if (origin && !isAllowedOrigin) {
+            return new Response(JSON.stringify({ error: 'Origin not allowed' }), {
+              status: 403,
+              headers: { 'Content-Type': 'application/json', ...corsHeaders },
+            });
+          }
+
+          const authCheck = await verifyAdminRequest(request, env);
+          if (!authCheck.authorized) {
+            return new Response(JSON.stringify({ error: authCheck.error || 'Unauthorized' }), {
+              status: 401,
+              headers: { 'Content-Type': 'application/json', ...corsHeaders },
+            });
+          }
+
           const body = await request.json();
           let { paymentId, orderId, reference, amount, amountCents, reason, adminNotes } = body;
           const targetRef = orderId || reference;
@@ -483,19 +760,20 @@ export default {
 
             if (!resolvedPaymentId && targetRef && supabaseUrl && supabaseKey) {
               try {
-                const ordLookup = await fetch(
-                  `${supabaseUrl}/rest/v1/orders?order_code=eq.${encodeURIComponent(targetRef)}&select=admin_notes,payment_status`,
-                  {
-                    headers: {
-                      'apikey': supabaseKey,
-                      'Authorization': `Bearer ${supabaseKey}`,
-                    },
-                  }
-                );
+                const ordLookup = await fetch(`${supabaseUrl}/rest/v1/rpc/get_order_by_code`, {
+                  method: 'POST',
+                  headers: {
+                    apikey: supabaseKey,
+                    Authorization: `Bearer ${supabaseKey}`,
+                    'Content-Type': 'application/json',
+                  },
+                  body: JSON.stringify({ p_order_code: String(targetRef) }),
+                });
                 if (ordLookup.ok) {
                   const ordRows = await ordLookup.json();
-                  if (ordRows && ordRows[0]?.admin_notes) {
-                    const match = ordRows[0].admin_notes.match(/Payment ID:\s*(\d+)/i) || ordRows[0].admin_notes.match(/\b\d{6,16}\b/);
+                  const row = Array.isArray(ordRows) ? ordRows[0] : ordRows;
+                  if (row?.admin_notes) {
+                    const match = row.admin_notes.match(/Payment ID:\s*(\d+)/i) || row.admin_notes.match(/\b\d{6,16}\b/);
                     if (match) {
                       resolvedPaymentId = match[1] || match[0];
                     }
@@ -503,6 +781,14 @@ export default {
                 }
               } catch (dbErr) {
                 console.warn('[Refund paymentId DB lookup warning]:', dbErr);
+              }
+            }
+
+            // 3. Fallback: Query PayHere Retrieval API by order_id
+            if (!resolvedPaymentId && targetRef) {
+              const phRecord = await searchPayHerePaymentByOrderId(targetRef, env);
+              if (phRecord && phRecord.payment_id) {
+                resolvedPaymentId = String(phRecord.payment_id);
               }
             }
           }
@@ -519,14 +805,14 @@ export default {
           }
 
           const accessToken = await getPayHereOAuthToken(env);
-          const isSandbox = (env.PAYHERE_ENV === 'sandbox' || env.VITE_PAYHERE_SANDBOX !== 'false');
+          const isSandbox = (env.PAYHERE_ENV === 'sandbox' || env.VITE_PAYHERE_SANDBOX === 'true');
           const refundUrl = isSandbox
             ? 'https://sandbox.payhere.lk/merchant/v1/payment/refund'
             : 'https://www.payhere.lk/merchant/v1/payment/refund';
 
           const refundPayload = {
             payment_id: Number(resolvedPaymentId) || resolvedPaymentId,
-            description: reason || 'Merchant initiated refund via Azhai Admin',
+            description: sanitizePayHereText(reason || 'Merchant initiated refund via Azhai Admin', 'Merchant initiated refund'),
           };
           if (finalAmount) {
             refundPayload.amount = Number(finalAmount.toFixed(2));
@@ -551,16 +837,17 @@ export default {
             );
           }
 
-          // Automatically sync refund status to Supabase if order code is known
+          // Automatically sync refund status to Supabase using admin's JWT or service role key
           const supabaseUrl = env.VITE_SUPABASE_URL || 'https://hrmcxxcrnxqhesiywqsc.supabase.co';
           const supabaseKey = env.SUPABASE_SERVICE_ROLE_KEY || env.VITE_SUPABASE_ANON_KEY;
+          const authBearer = env.SUPABASE_SERVICE_ROLE_KEY ? `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}` : (request.headers.get('Authorization') || `Bearer ${supabaseKey}`);
           if (targetRef && supabaseUrl && supabaseKey) {
             try {
               await fetch(`${supabaseUrl}/rest/v1/orders?order_code=eq.${encodeURIComponent(targetRef)}`, {
                 method: 'PATCH',
                 headers: {
                   'apikey': supabaseKey,
-                  'Authorization': `Bearer ${supabaseKey}`,
+                  'Authorization': authBearer,
                   'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({
@@ -586,22 +873,44 @@ export default {
       }
     }
 
-    // ── 4. PayHere Hosted Payment Link Generator ───────────────
+    // ── 4. PayHere Hosted Payment Link Generator (Admin Authenticated) ───
     if (url.pathname === '/api/payhere-payment-link' || url.pathname === '/api/create-payments-lk-payment-link') {
       if (request.method === 'POST') {
         try {
+          if (origin && !isAllowedOrigin) {
+            return new Response(JSON.stringify({ error: 'Origin not allowed' }), {
+              status: 403,
+              headers: { 'Content-Type': 'application/json', ...corsHeaders },
+            });
+          }
+
+          const authCheck = await verifyAdminRequest(request, env);
+          if (!authCheck.authorized) {
+            return new Response(JSON.stringify({ error: authCheck.error || 'Unauthorized' }), {
+              status: 401,
+              headers: { 'Content-Type': 'application/json', ...corsHeaders },
+            });
+          }
+
           const body = await request.json();
           const merchantId = env.PAYHERE_MERCHANT_ID || env.VITE_PAYHERE_MERCHANT_ID || '1237099';
           const merchantSecret = env.PAYHERE_MERCHANT_SECRET || env.VITE_PAYHERE_SECRET || '';
-          const isSandbox = (env.PAYHERE_ENV === 'sandbox' || env.VITE_PAYHERE_SANDBOX !== 'false');
+          const isSandbox = (env.PAYHERE_ENV === 'sandbox' || env.VITE_PAYHERE_SANDBOX === 'true');
+
+          if (!merchantSecret) {
+            return new Response(
+              JSON.stringify({ error: 'Server configuration error: PayHere Merchant Secret is not configured.' }),
+              { status: 500, headers: { 'Content-Type': 'application/json', ...corsHeaders } }
+            );
+          }
 
           const { title, amount, amountCents, orderId: passedOrderId, description, customer } = body;
           const orderId = passedOrderId || `AZH-PLINK-${Date.now().toString(36).toUpperCase()}`;
           const finalAmount = amount !== undefined ? Number(amount) : (amountCents ? (Number(amountCents) / 100) : 0);
 
-          if (!finalAmount) {
+          if (!finalAmount || finalAmount <= 0) {
             return new Response(
-              JSON.stringify({ error: 'Missing required field: amount' }),
+              JSON.stringify({ error: 'Missing or invalid required field: amount' }),
               { status: 400, headers: { 'Content-Type': 'application/json', ...corsHeaders } }
             );
           }
@@ -620,15 +929,15 @@ export default {
             cancel_url: `${url.origin}/checkout?status=cancelled&order_id=${orderId}`,
             notify_url: `${url.origin}/api/payhere-notify`,
             order_id: orderId,
-            items: title || description || 'Azhai Bespoke Couture Payment',
+            items: sanitizePayHereText(title || description || 'Azhai Bespoke Couture Payment', 'Azhai Bespoke Couture Payment'),
             currency: currency,
             amount: formattedAmount,
-            first_name: customer?.name?.split(' ')[0] || 'Valued',
-            last_name: customer?.name?.split(' ').slice(1).join(' ') || 'Patron',
-            email: customer?.email || 'concierge@azhaiclothing.lk',
-            phone: customer?.phone || '0771234567',
-            address: customer?.address || 'Azhai Boutique Atelier',
-            city: customer?.city || 'Colombo',
+            first_name: sanitizePayHereText(customer?.name?.split(' ')[0] || 'Valued', 'Valued'),
+            last_name: sanitizePayHereText(customer?.name?.split(' ').slice(1).join(' ') || 'Patron', 'Patron'),
+            email: (customer?.email || 'concierge@azhaiclothing.lk').trim(),
+            phone: (customer?.phone || '0771234567').trim(),
+            address: sanitizePayHereText(customer?.address || 'Azhai Boutique Atelier', 'Azhai Boutique Atelier'),
+            city: sanitizePayHereText(customer?.city || 'Colombo', 'Colombo'),
             country: 'Sri Lanka',
             hash: hash,
           });
@@ -691,6 +1000,7 @@ export default {
             status_message,
           } = params;
 
+          const expectedMerchantId = env.PAYHERE_MERCHANT_ID || env.VITE_PAYHERE_MERCHANT_ID || '1237099';
           const merchantSecret = env.PAYHERE_MERCHANT_SECRET || env.VITE_PAYHERE_SECRET || '';
 
           // Mandatory Signature Check: Reject any request missing the merchant secret or signature
@@ -702,6 +1012,11 @@ export default {
           if (!md5sig) {
             console.error('[PayHere IPN] Rejected unauthenticated IPN: Missing md5sig for order:', order_id);
             return new Response('Missing Signature', { status: 400, headers: corsHeaders });
+          }
+
+          if (merchant_id && String(merchant_id).trim() !== String(expectedMerchantId).trim()) {
+            console.error('[PayHere IPN] Merchant ID mismatch:', merchant_id);
+            return new Response('Invalid Merchant ID', { status: 401, headers: corsHeaders });
           }
 
           const hashedSecret = md5(merchantSecret).toUpperCase();
@@ -718,67 +1033,156 @@ export default {
           const supabaseKey = env.SUPABASE_SERVICE_ROLE_KEY || env.VITE_SUPABASE_ANON_KEY || 'sb_publishable_-ZSOc4XGHM2OysLhqKZ5yQ_4OPgdcAm';
 
           if (order_id && supabaseUrl) {
-            if (statusCode === 2) {
-              // 2 = SUCCESS
-              await fetch(`${supabaseUrl}/rest/v1/orders?order_code=eq.${encodeURIComponent(order_id)}`, {
-                method: 'PATCH',
+            // 1. Fetch existing order via RPC to verify amount & currency and check if already paid
+            let dbOrder = null;
+            try {
+              const rpcLookup = await fetch(`${supabaseUrl}/rest/v1/rpc/get_order_by_code`, {
+                method: 'POST',
                 headers: {
-                  'apikey': supabaseKey,
-                  'Authorization': `Bearer ${supabaseKey}`,
+                  apikey: supabaseKey,
+                  Authorization: `Bearer ${supabaseKey}`,
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ p_order_code: String(order_id) }),
+              });
+              if (rpcLookup.ok) {
+                const rows = await rpcLookup.json();
+                dbOrder = Array.isArray(rows) ? rows[0] : rows;
+              }
+            } catch (e) {
+              console.warn('[PayHere IPN Order Lookup Warning]:', e);
+            }
+
+            const wasAlreadyPaid = dbOrder?.payment_status === 'paid';
+
+            if (statusCode === 2 && dbOrder) {
+              const paidAmt = Number(payhere_amount || 0);
+              const expectedAmt = Number(dbOrder.total || 0);
+              if (paidAmt < expectedAmt - 0.01 || (payhere_currency && payhere_currency.toUpperCase() !== 'LKR')) {
+                console.error(`[PayHere IPN] Amount/Currency mismatch for ${order_id}: expected ${expectedAmt} LKR, got ${paidAmt} ${payhere_currency}`);
+                return new Response('Amount or Currency Mismatch', { status: 400, headers: corsHeaders });
+              }
+            }
+
+            // 2. Execute SECURITY DEFINER RPC `worker_update_payhere_order` (works even without service_role key)
+            let rpcUpdated = false;
+            try {
+              const rpcUpdateRes = await fetch(`${supabaseUrl}/rest/v1/rpc/worker_update_payhere_order`, {
+                method: 'POST',
+                headers: {
+                  apikey: supabaseKey,
+                  Authorization: `Bearer ${supabaseKey}`,
                   'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({
+                  p_order_code: String(order_id),
+                  p_payment_id: String(payment_id || ''),
+                  p_payhere_amount: String(payhere_amount || '0.00'),
+                  p_payhere_currency: String(payhere_currency || 'LKR'),
+                  p_status_code: statusCode,
+                  p_md5sig: String(md5sig),
+                  p_method: String(method || 'Card'),
+                  p_status_message: String(status_message || ''),
+                }),
+              });
+              if (rpcUpdateRes.ok) {
+                const rpcResult = await rpcUpdateRes.json();
+                if (rpcResult && rpcResult.success) {
+                  rpcUpdated = true;
+                }
+              }
+            } catch (rpcErr) {
+              console.warn('[PayHere IPN RPC Update Fallback]:', rpcErr);
+            }
+
+            // 3. Fallback direct PATCH if service_role key is present or RPC migration hasn't been applied yet
+            if (!rpcUpdated) {
+              let patchBody = null;
+              if (statusCode === 2) {
+                patchBody = {
                   payment_status: 'paid',
                   status: 'confirmed',
                   admin_notes: `Paid via PayHere (Payment ID: ${payment_id || 'N/A'}, Method: ${method || 'Card'})`,
                   updated_at: new Date().toISOString(),
-                }),
-              });
-            } else if (statusCode === 0) {
-              // 0 = PENDING
-              await fetch(`${supabaseUrl}/rest/v1/orders?order_code=eq.${encodeURIComponent(order_id)}`, {
-                method: 'PATCH',
-                headers: {
-                  'apikey': supabaseKey,
-                  'Authorization': `Bearer ${supabaseKey}`,
-                  'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
+                };
+              } else if (statusCode === 0) {
+                patchBody = {
                   payment_status: 'pending_card',
                   admin_notes: `PayHere Payment Pending (Payment ID: ${payment_id || 'N/A'})`,
                   updated_at: new Date().toISOString(),
-                }),
-              });
-            } else if (statusCode === -1 || statusCode === -2) {
-              // -1 = CANCELED, -2 = FAILED
-              await fetch(`${supabaseUrl}/rest/v1/orders?order_code=eq.${encodeURIComponent(order_id)}`, {
-                method: 'PATCH',
-                headers: {
-                  'apikey': supabaseKey,
-                  'Authorization': `Bearer ${supabaseKey}`,
-                  'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
+                };
+              } else if (statusCode === -1 || statusCode === -2) {
+                patchBody = {
                   payment_status: 'pending_card',
                   admin_notes: `PayHere Payment Failed/Cancelled: ${status_message || status_code} (Payment ID: ${payment_id || 'N/A'})`,
                   updated_at: new Date().toISOString(),
-                }),
-              });
-            } else if (statusCode === -3) {
-              // -3 = CHARGEDBACK
-              await fetch(`${supabaseUrl}/rest/v1/orders?order_code=eq.${encodeURIComponent(order_id)}`, {
-                method: 'PATCH',
-                headers: {
-                  'apikey': supabaseKey,
-                  'Authorization': `Bearer ${supabaseKey}`,
-                  'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
+                };
+              } else if (statusCode === -3) {
+                patchBody = {
                   payment_status: 'refunded',
                   admin_notes: `PayHere Chargeback (Payment ID: ${payment_id || 'N/A'})`,
                   updated_at: new Date().toISOString(),
-                }),
-              });
+                };
+              }
+
+              if (patchBody) {
+                await fetch(`${supabaseUrl}/rest/v1/orders?order_code=eq.${encodeURIComponent(order_id)}`, {
+                  method: 'PATCH',
+                  headers: {
+                    apikey: supabaseKey,
+                    Authorization: `Bearer ${supabaseKey}`,
+                    'Content-Type': 'application/json',
+                  },
+                  body: JSON.stringify(patchBody),
+                });
+              }
+            }
+
+            // 4. Server-Side Brevo Transactional Emails on Confirmed Payment (status_code === 2)
+            const brevoKey = env.BREVO_API_KEY || env.VITE_BREVO_API_KEY;
+            if (statusCode === 2 && !wasAlreadyPaid && dbOrder && brevoKey) {
+              try {
+                const customerEmail = dbOrder.customer_email;
+                const customerName = dbOrder.customer_name || 'Valued Patron';
+                const totalFormatted = Number(dbOrder.total || payhere_amount || 0).toLocaleString();
+
+                if (customerEmail) {
+                  await fetch('https://api.brevo.com/v3/smtp/email', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'api-key': brevoKey },
+                    body: JSON.stringify({
+                      sender: { name: 'Azhai Atelier', email: 'orders@azhaiclothing.lk' },
+                      to: [{ email: customerEmail, name: customerName }],
+                      subject: `Payment Confirmed — Order #${order_id} | Azhai`,
+                      htmlContent: `<div style="font-family: Georgia, serif; max-width: 600px; margin: 0 auto; padding: 32px; background: #FAF7F2; color: #1A1412; border: 1px solid #E5DEC9;">
+                        <h2 style="margin-top: 0; color: #1A1412;">Thank You for Your Order, ${sanitizePayHereText(customerName, 'Valued Patron')}</h2>
+                        <p style="font-size: 15px; line-height: 1.6; color: #4A3F3A;">We have received your payment of <strong>LKR ${totalFormatted}</strong> via PayHere (${sanitizePayHereText(method || 'Card', 'Card')}) for Order <strong>#${sanitizePayHereText(order_id)}</strong>.</p>
+                        <p style="font-size: 14px; line-height: 1.6; color: #4A3F3A;">PayHere Payment Reference: <strong>#${sanitizePayHereText(payment_id || 'N/A')}</strong></p>
+                        <p style="margin-top: 24px;"><a href="https://azhaiclothing.lk/order-success/${encodeURIComponent(order_id)}" style="display: inline-block; padding: 12px 24px; background: #1A1412; color: #FAF7F2; text-decoration: none; font-size: 12px; letter-spacing: 2px; text-transform: uppercase;">View Order Status</a></p>
+                      </div>`,
+                    }),
+                  });
+                }
+
+                await fetch('https://api.brevo.com/v3/smtp/email', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json', 'api-key': brevoKey },
+                  body: JSON.stringify({
+                    sender: { name: 'Azhai Order System', email: 'orders@azhaiclothing.lk' },
+                    to: [{ email: 'orders@azhaiclothing.lk', name: 'Azhai Orders' }],
+                    subject: `[PAID] Order #${order_id} — LKR ${totalFormatted} (${method || 'PayHere'})`,
+                    htmlContent: `<p>Order <strong>#${sanitizePayHereText(order_id)}</strong> has been cryptographically verified and marked as <strong>PAID</strong> via PayHere IPN.</p>
+                      <ul>
+                        <li><strong>Customer:</strong> ${sanitizePayHereText(customerName)} (${sanitizePayHereText(customerEmail || 'N/A')})</li>
+                        <li><strong>Amount:</strong> LKR ${totalFormatted}</li>
+                        <li><strong>PayHere Payment ID:</strong> ${sanitizePayHereText(payment_id || 'N/A')}</li>
+                        <li><strong>Method:</strong> ${sanitizePayHereText(method || 'Card')}</li>
+                      </ul>`,
+                  }),
+                });
+              } catch (emailErr) {
+                console.warn('[PayHere IPN Brevo Email Warning]:', emailErr);
+              }
             }
           }
 

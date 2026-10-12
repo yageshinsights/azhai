@@ -14,6 +14,7 @@ import { STORE_PHONE, STORE_EMAIL, formatPhoneNumber } from '@/lib/constants';
 import BankBadge from '@/components/BankBadge';
 import { uploadBankSlipFile, useSignedSlipUrl } from '@/lib/storage';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
+import { verifyPayHereOrderPayment } from '@/lib/payhere';
 import { 
   sendBrevoEmail, 
   buildOrderConfirmationHtml,
@@ -130,10 +131,11 @@ export default function OrderSuccess() {
     }
   }, [orderId, lastOrder, authOrders, adminOrders]);
 
-  // Handle return from PayHere Payment Gateway (?payhere=success or legacy ?payments_lk=success)
+  // Handle return from PayHere Payment Gateway (?payhere=success):
+  // Never write payment_status='paid' from the client browser; instead verify against the server/IPN!
   useEffect(() => {
     const searchParams = new URLSearchParams(location.search);
-    const isPaymentSuccess = searchParams.get('payhere') === 'success' || searchParams.get('payments_lk') === 'success';
+    const isPaymentReturn = searchParams.get('payhere') === 'success' || searchParams.get('payments_lk') === 'success';
     const returnedPaymentId =
       searchParams.get('payment_id') ||
       searchParams.get('paymentId') ||
@@ -142,48 +144,38 @@ export default function OrderSuccess() {
       searchParams.get('checkout_id') ||
       undefined;
 
-    if (isPaymentSuccess && orderId) {
-      // 1. Clear cart upon verified return
-      useCartStore.getState().clearCart();
+    if (!isPaymentReturn || !orderId) return;
 
-      // Update in-memory lastOrder to paid
-      const curLast = useCartStore.getState().lastOrder;
-      if (curLast && (!curLast.orderId || curLast.orderId === orderId)) {
-        useCartStore.getState().setLastOrder({
-          ...curLast,
-          paymentStatus: 'paid',
-          status: 'pending',
-          paymentId: returnedPaymentId || curLast.paymentId,
-          paymentsLkPaymentId: returnedPaymentId || curLast.paymentsLkPaymentId,
-        });
-      }
+    let isCancelled = false;
+    (async () => {
+      const verifyRes = await verifyPayHereOrderPayment(orderId);
+      if (isCancelled) return;
 
-      // 2. Update status in Supabase if configured (client-side + server fallback)
-      if (isSupabaseConfigured()) {
-        const updatePayload: Record<string, any> = {
-          payment_status: 'paid',
-          status: 'pending',
-        };
-        if (returnedPaymentId) {
-          updatePayload.admin_notes = `Paid via PayHere (Payment ID: ${returnedPaymentId})`;
-        } else {
-          updatePayload.admin_notes = 'Paid via PayHere';
+      if (verifyRes.verified) {
+        useCartStore.getState().clearCart();
+
+        const curLast = useCartStore.getState().lastOrder;
+        if (curLast && (!curLast.orderId || curLast.orderId === orderId)) {
+          useCartStore.getState().setLastOrder({
+            ...curLast,
+            paymentStatus: 'paid',
+            status: 'confirmed',
+            paymentId: returnedPaymentId || curLast.paymentId,
+            paymentsLkPaymentId: returnedPaymentId || curLast.paymentsLkPaymentId,
+          });
         }
 
-        supabase
-          .from('orders')
-          .update(updatePayload)
-          .eq('order_code', orderId)
-          .then(({ error }) => {
-            if (error) {
-              console.warn('[PayHere Return DB Update Warning]:', error);
-            }
-          });
-      }
+        setDbOrder((prev: any) =>
+          prev ? { ...prev, paymentStatus: 'paid', status: 'confirmed' } : prev
+        );
 
-      // 3. Update payment status in local Admin store for UI display
-      useAdminStore.getState().updateOrderPaymentStatus(orderId, 'paid', returnedPaymentId);
-    }
+        useAdminStore.getState().updateOrderPaymentStatus(orderId, 'paid', returnedPaymentId);
+      }
+    })();
+
+    return () => {
+      isCancelled = true;
+    };
   }, [location.search, orderId]);
 
   // Multi-tier order lookup: lastOrder -> authOrders -> adminOrders -> dbOrder
@@ -335,12 +327,12 @@ export default function OrderSuccess() {
     };
   }, [isAuthenticated, order?.customer?.email]);
 
-  // Trigger Brevo receipt and admin alert for verified card returns
+  // Trigger Brevo receipt and admin alert only for server-verified paid card returns
   useEffect(() => {
     const searchParams = new URLSearchParams(location.search);
     const isPaymentSuccess = searchParams.get('payhere') === 'success' || searchParams.get('payments_lk') === 'success';
 
-    if (!isPaymentSuccess || !orderId || !order || !order.customer?.email) return;
+    if (!isPaymentSuccess || !orderId || !order || !order.customer?.email || order.paymentStatus !== 'paid') return;
 
     const dispatchKey = `azhai_card_email_dispatched_${orderId}`;
     if (sessionStorage.getItem(dispatchKey)) return;

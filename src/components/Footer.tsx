@@ -6,6 +6,7 @@ import { useAdminStore, cleanWhatsAppDigits } from '@/store/admin';
 import { STORE_INSTAGRAM_URL, STORE_EMAIL, STORE_ADDRESS_FULL, STORE_PHONE, formatPhoneNumber } from '@/lib/constants';
 import { sendBrevoEmail, buildNewsletterWelcomeHtml, createOrUpdateBrevoContact, BREVO_LISTS } from '@/lib/brevo';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
+import PaymentMethodBadges from '@/components/PaymentMethodBadges';
 
 function NewsletterFooterForm() {
   const [email, setEmail] = useState('');
@@ -270,7 +271,12 @@ export default function Footer() {
           <NewsletterFooterForm />
         </div>
 
-        <div className="mt-14 pt-6 border-t border-[#C5A059]/30 flex flex-col sm:flex-row items-center justify-between gap-3 text-[11px] text-[#6D6268]">
+        {/* ── ACCEPTED PAYMENT METHODS (PAYHERE LIVE) ── */}
+        <div className="mt-10 pt-6 border-t border-[#C5A059]/25">
+          <PaymentMethodBadges variant="footer" />
+        </div>
+
+        <div className="mt-8 pt-6 border-t border-[#C5A059]/30 flex flex-col sm:flex-row items-center justify-between gap-3 text-[11px] text-[#6D6268]">
           <p>© 2026 Azhai Clothing by Preethi (Sri Lanka). All rights reserved.</p>
           <p className="flex items-center gap-1.5 text-[#701626] font-medium">
             <span>Build with</span>

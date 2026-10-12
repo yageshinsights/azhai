@@ -25,9 +25,10 @@ import { useAuthStore } from '@/store/auth';
 import { useAdminStore } from '@/store/admin';
 import { STORE_EMAIL } from '@/lib/constants';
 import BankBadge from '@/components/BankBadge';
+import PaymentMethodBadges from '@/components/PaymentMethodBadges';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import { sendBrevoEmail, buildOrderConfirmationHtml, buildAdminOrderAlertHtml, createOrUpdateBrevoContact, BREVO_LISTS } from '@/lib/brevo';
-import { initiatePayHereCheckout } from '@/lib/payhere';
+import { initiatePayHereCheckout, verifyPayHereOrderPayment } from '@/lib/payhere';
 import { isUUID } from '@/lib/auth-utils';
 import SEOHead from '@/components/SEOHead';
 import { 
@@ -70,10 +71,11 @@ export default function Checkout() {
   const location = useLocation();
   const state = (location.state as { appliedCoupon?: string; discountAmount?: number; giftNote?: string }) || {};
 
-  const { items, removeItem, clearCart, setLastOrder, totalPrice } = useCartStore();
+  const { items, removeItem, clearCart, setLastOrder } = useCartStore();
   const { user, isAuthenticated, addresses, addAddress, addOrder, login } = useAuthStore();
   const settings = useAdminStore((s) => s.settings);
   const adminProducts = useAdminStore((s) => s.products);
+  const adminCoupons = useAdminStore((s) => s.coupons);
 
   // Default address pre-fill
   const defaultAddr = addresses.find((a) => a.isDefault) || addresses[0];
@@ -198,8 +200,41 @@ export default function Checkout() {
     setTimeout(() => setCopiedBankAcc(false), 2000);
   };
 
-  const rawTotal = totalPrice();
-  const discount = state.discountAmount || 0;
+  // Re-verify item prices against authoritative catalog (adminProducts) to prevent localStorage tampering
+  const rawTotal = items.reduce((sum, item) => {
+    const qty = Math.max(1, Math.floor(Number(item.quantity) || 1));
+    if (!item.tailoring && adminProducts && adminProducts.length > 0) {
+      const catalogMatch = adminProducts.find(
+        (p) => String(p.id) === String(item.id) || p.name === item.name
+      );
+      if (catalogMatch && catalogMatch.price) {
+        const catalogPrice = parseInt(String(catalogMatch.price).replace(/[^0-9]/g, ''), 10) || 0;
+        if (catalogPrice > 0) {
+          return sum + catalogPrice * qty;
+        }
+      }
+    }
+    const itemPrice = parseInt(String(item.price).replace(/[^0-9]/g, ''), 10) || 0;
+    return sum + Math.max(0, itemPrice) * qty;
+  }, 0);
+
+  // Re-validate applied coupon against active store coupons instead of trusting raw router state
+  const discount = (() => {
+    if (!state.appliedCoupon) return 0;
+    const matchedCoupon = (adminCoupons || []).find(
+      (c) => c.code.toUpperCase() === state.appliedCoupon?.trim().toUpperCase() && c.isActive
+    );
+    if (!matchedCoupon) return 0;
+    if (matchedCoupon.minSpend && rawTotal < matchedCoupon.minSpend) return 0;
+    let computed =
+      matchedCoupon.discountType === 'percentage'
+        ? Math.round((rawTotal * matchedCoupon.value) / 100)
+        : matchedCoupon.value;
+    if (matchedCoupon.maxDiscount && computed > matchedCoupon.maxDiscount) {
+      computed = matchedCoupon.maxDiscount;
+    }
+    return Math.min(rawTotal, Math.max(0, computed));
+  })();
 
   // Exact Cumulative Cart Weight (Garments + Atelier Keepsake Packaging)
   const cartWeightGrams = estimateCartWeight(
@@ -253,14 +288,12 @@ export default function Checkout() {
   const finalTotal = Math.max(0, rawTotal - discount + shippingFee);
   const maxAllowedCOD = Math.min(settings.maxCODAmount || SL_POST_MAX_COD_VALUE_LKR, SL_POST_MAX_COD_VALUE_LKR);
 
-  // Auto-switch payment method away from disabled options (Card disabled for now; COD disabled if admin turned off or over limit)
+  // Auto-switch payment method away from COD if admin turned off COD or order exceeds SL Post COD limit
   useEffect(() => {
-    if (paymentMethod === 'card') {
-      setPaymentMethod(settings.enableCOD && finalTotal <= maxAllowedCOD ? 'cod' : 'bank');
-    } else if (!settings.enableCOD && paymentMethod === 'cod') {
-      setPaymentMethod('bank');
+    if (!settings.enableCOD && paymentMethod === 'cod') {
+      setPaymentMethod('card');
     } else if (finalTotal > maxAllowedCOD && paymentMethod === 'cod') {
-      setPaymentMethod('bank');
+      setPaymentMethod('card');
     }
   }, [settings.enableCOD, paymentMethod, finalTotal, maxAllowedCOD]);
 
@@ -364,7 +397,7 @@ export default function Checkout() {
             cost_price: Math.round(orderData.subtotal * 0.45),
             delivery_method: orderData.deliveryMethod,
             payment_method: orderData.paymentMethod,
-            payment_status: paymentMethod === 'card' ? 'paid' : paymentMethod === 'bank' ? 'pending_bank' : 'pending_cod',
+            payment_status: paymentMethod === 'bank' ? 'pending_bank' : 'pending_cod',
             status: 'pending',
             courier_partner: orderData.courierPartner || 'Sri Lanka Post',
             tracking_number: orderData.trackingNumber || null,
@@ -491,8 +524,8 @@ export default function Checkout() {
   const handlePlaceOrder = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!fullName || !phone || !address || !city) {
-      alert('Please fill in your name, phone number, address, and city.');
+    if (!fullName.trim() || !email.trim() || !email.includes('@') || !phone.trim() || !address.trim() || !city.trim()) {
+      alert('Please fill in your full name, valid email address, phone number, street address, and city.');
       return;
     }
 
@@ -553,13 +586,13 @@ export default function Checkout() {
       giftNote: state.giftNote,
       deliveryNotes: deliveryNotes.trim() || undefined,
       customer: {
-        fullName,
-        email,
-        phone,
-        address,
-        city,
+        fullName: fullName.trim(),
+        email: email.trim(),
+        phone: phone.trim(),
+        address: address.trim(),
+        city: city.trim(),
         district,
-        postalCode,
+        postalCode: postalCode.trim(),
       },
       courierPartner: 'Sri Lanka Post',
       trackingNumber: generateSLPostTrackingNumber(),
@@ -577,11 +610,11 @@ export default function Checkout() {
         paymentMethod === 'cod'
           ? 'Cash on Delivery (COD)'
           : paymentMethod === 'card'
-          ? 'Credit / Debit Card (Visa/Mastercard)'
+          ? 'Online Card, Wallets & LankaQR (PayHere)'
           : 'Direct Bank Deposit',
       paymentStatus:
         paymentMethod === 'card'
-          ? 'paid'
+          ? 'pending_card'
           : paymentMethod === 'bank'
           ? 'pending_bank'
           : 'pending_cod',
@@ -601,28 +634,17 @@ export default function Checkout() {
       placedAt: new Date().toISOString(),
     };
 
-    // Online Card Payment (Temporarily disabled until live API access is activated)
-    const ENABLE_CARD_PAYMENT = false;
-    if (paymentMethod === 'card' && !ENABLE_CARD_PAYMENT) {
-      setIsSubmitting(false);
-      setPaymentMethod(settings.enableCOD && finalTotal <= maxAllowedCOD ? 'cod' : 'bank');
-      alert('Online Card & LankaQR payments are coming soon! Please choose Direct Bank Transfer or Cash on Delivery.');
-      return;
-    }
-
     if (paymentMethod === 'card') {
       if (finalTotal <= 0) {
-        // Zero-balance orders (e.g. 100% discount promo) bypass external payment gateways
-        orderData.paymentStatus = 'paid';
-        orderData.status = 'pending';
-        await finalizeOrderPlacement(orderData);
+        setIsSubmitting(false);
+        alert('Order total must be greater than LKR 0 for online card payment.');
         return;
       }
 
       // Step 1: Pre-save order as pending_card before launching payment
       orderData.paymentStatus = 'pending_card';
       orderData.status = 'pending';
-      orderData.paymentMethod = 'Online Card & LankaQR (PayHere)';
+      orderData.paymentMethod = 'Online Card, Wallets & LankaQR (PayHere)';
       setLastOrder(orderData);
       useAdminStore.getState().syncNewOrder(orderData);
 
@@ -644,7 +666,7 @@ export default function Checkout() {
               total: orderData.total,
               cost_price: Math.round(orderData.subtotal * 0.45),
               delivery_method: orderData.deliveryMethod,
-              payment_method: 'Online Card & LankaQR (PayHere)',
+              payment_method: 'Online Card, Wallets & LankaQR (PayHere)',
               payment_status: 'pending_card',
               status: 'pending',
               courier_partner: orderData.courierPartner || 'Sri Lanka Post',
@@ -653,42 +675,46 @@ export default function Checkout() {
             .select()
             .single();
 
-          if (orderErr) {
+          if (orderErr || !insertedOrder) {
             console.error('[PayHere Pre-Save Error]:', orderErr);
+            setIsSubmitting(false);
+            alert('Could not initialize your order in our database. Please check your connection and try again.');
+            return;
           }
 
-          if (insertedOrder) {
-            const baseOrderItems = items.map((item) => {
-              const isCatalogProduct = !item.tailoring && item.id && Number.isInteger(Number(item.id)) && Number(item.id) > 0;
-              const safeProductId = isCatalogProduct ? Number(item.id) : null;
-              return {
-                order_id: insertedOrder.id,
-                product_id: safeProductId,
-                product_name: item.name,
-                price: typeof item.price === 'string' ? item.price : `LKR ${Number(item.price).toLocaleString()}`,
-                image_url: item.image || null,
-                size: item.tailoring ? `Tailored (${item.tailoring.sizeLabel}) - ${item.tailoring.fabricName}` : item.size || 'M',
-                quantity: Number(item.quantity) || 1,
-              };
-            });
+          const baseOrderItems = items.map((item) => {
+            const isCatalogProduct = !item.tailoring && item.id && Number.isInteger(Number(item.id)) && Number(item.id) > 0;
+            const safeProductId = isCatalogProduct ? Number(item.id) : null;
+            return {
+              order_id: insertedOrder.id,
+              product_id: safeProductId,
+              product_name: item.name,
+              price: typeof item.price === 'string' ? item.price : `LKR ${Number(item.price).toLocaleString()}`,
+              image_url: item.image || null,
+              size: item.tailoring ? `Tailored (${item.tailoring.sizeLabel}) - ${item.tailoring.fabricName}` : item.size || 'M',
+              quantity: Number(item.quantity) || 1,
+            };
+          });
 
-            const hasTailoring = items.some((i) => i.tailoring);
-            if (hasTailoring) {
-              const withMeasurements = baseOrderItems.map((it, idx) => ({
-                ...it,
-                custom_measurements: items[idx].tailoring || null,
-              }));
-              const { error: itemsErr } = await supabase.from('order_items').insert(withMeasurements);
-              if (itemsErr) {
-                console.warn('[PayHere Pre-Save Items with measurements notice, falling back to base payload]:', itemsErr);
-                await supabase.from('order_items').insert(baseOrderItems);
-              }
-            } else {
+          const hasTailoring = items.some((i) => i.tailoring);
+          if (hasTailoring) {
+            const withMeasurements = baseOrderItems.map((it, idx) => ({
+              ...it,
+              custom_measurements: items[idx].tailoring || null,
+            }));
+            const { error: itemsErr } = await supabase.from('order_items').insert(withMeasurements);
+            if (itemsErr) {
+              console.warn('[PayHere Pre-Save Items with measurements notice, falling back to base payload]:', itemsErr);
               await supabase.from('order_items').insert(baseOrderItems);
             }
+          } else {
+            await supabase.from('order_items').insert(baseOrderItems);
           }
         } catch (dbErr) {
-          console.warn('[PayHere Pre-Save Warning]:', dbErr);
+          console.error('[PayHere Pre-Save Exception]:', dbErr);
+          setIsSubmitting(false);
+          alert('Could not initialize your order. Please try again.');
+          return;
         }
       }
 
@@ -701,15 +727,110 @@ export default function Checkout() {
           name: fullName.trim(),
           email: email.trim(),
           phone: phone.replace(/[^\d+]/g, '').trim(),
-          address,
-          city,
-          postalCode,
+          address: address.trim(),
+          city: city.trim(),
+          postalCode: postalCode.trim(),
           country: 'Sri Lanka',
         },
       });
 
       if (checkoutRes.success) {
-        // Payment authorized successfully! Navigate to OrderSuccess
+        // Step 3: Verify payment status with server / IPN (PayHere's onCompleted fires even on failed payments)
+        const verifyRes = await verifyPayHereOrderPayment(generatedOrderId);
+
+        if (verifyRes.error) {
+          setIsSubmitting(false);
+          alert(verifyRes.error);
+          return;
+        }
+
+        const verifiedOrderData = {
+          ...orderData,
+          paymentStatus: (verifyRes.verified ? 'paid' : 'pending_card') as 'paid' | 'pending_card',
+          status: (verifyRes.verified ? 'confirmed' : 'pending') as 'confirmed' | 'pending',
+        };
+
+        if (isAuthenticated && saveAddressToAccount && !selectedAddrId) {
+          addAddress({
+            label: 'Home',
+            fullName,
+            phone,
+            address,
+            city,
+            district,
+            postalCode,
+            isDefault: addresses.length === 0,
+          });
+        }
+
+        addOrder(verifiedOrderData);
+        setLastOrder(verifiedOrderData);
+        if (verifyRes.verified) {
+          useAdminStore.getState().updateOrderPaymentStatus(generatedOrderId, 'paid');
+        }
+
+        // Send rich HTML confirmation & admin alert emails only when payment is verified
+        if (verifyRes.verified) {
+          sessionStorage.setItem(`azhai_card_email_dispatched_${generatedOrderId}`, 'true');
+          try {
+            const emailHtml = buildOrderConfirmationHtml({
+              orderId: verifiedOrderData.orderId,
+              customerName: fullName,
+              total: finalTotal,
+              items: items.map((i) => ({ name: i.name, size: i.size, quantity: i.quantity, price: i.price, image: i.image, tailoring: i.tailoring })),
+              deliveryMethod: verifiedOrderData.deliveryMethod,
+              paymentMethod: verifiedOrderData.paymentMethod,
+            });
+
+            createOrUpdateBrevoContact({
+              email,
+              name: fullName,
+              attributes: {
+                CITY: city,
+                DISTRICT: district,
+                SMS: phone,
+                LAST_ORDER_ID: verifiedOrderData.orderId,
+              },
+              listIds: [BREVO_LISTS.CUSTOMERS],
+            }).catch(() => {});
+
+            await sendBrevoEmail({
+              to: [{ email, name: fullName }],
+              subject: `✨ Payment Confirmed #${verifiedOrderData.orderId} — Azhai Boutique by Preethi`,
+              htmlContent: emailHtml,
+            });
+
+            const adminEmail = import.meta.env.VITE_ADMIN_NOTIFICATION_EMAIL || settings?.studio?.email || STORE_EMAIL;
+            const adminHtml = buildAdminOrderAlertHtml({
+              orderId: verifiedOrderData.orderId,
+              customerName: fullName,
+              customerEmail: email,
+              customerPhone: phone,
+              customerAddress: address,
+              city,
+              district,
+              total: finalTotal,
+              items: items.map((i) => ({ name: i.name, size: i.size, quantity: i.quantity, price: i.price, image: i.image, tailoring: i.tailoring })),
+              deliveryMethod: verifiedOrderData.deliveryMethod,
+              paymentMethod: verifiedOrderData.paymentMethod,
+            });
+
+            await sendBrevoEmail({
+              to: [{ email: adminEmail, name: 'Azhai Store Owner' }],
+              subject: `💳 New Paid Order #${verifiedOrderData.orderId} (LKR ${finalTotal.toLocaleString()})`,
+              htmlContent: adminHtml,
+            });
+          } catch (emailErr) {
+            console.warn('[PayHere Confirmation Email Warning]:', emailErr);
+          }
+        }
+
+        if (isSupabaseConfigured() && email) {
+          supabase.from('abandoned_carts').delete().eq('customer_email', email.toLowerCase().trim()).then();
+        }
+
+        clearCart();
+        setIsSubmitting(false);
         navigate(`/order-success/${generatedOrderId}?payhere=success`);
         return;
       }
@@ -1314,28 +1435,30 @@ export default function Checkout() {
                     </div>
                   )}
 
-                  {/* Online Card (Temporarily Disabled - Coming Soon!) */}
-                  <div className="p-4 rounded-2xl border border-dashed border-[#C5A059]/40 bg-[#FCFBF8]/80 opacity-80 cursor-not-allowed flex flex-col justify-between space-y-2 select-none">
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="flex items-start sm:items-center gap-2 min-w-0 flex-1">
-                        <CreditCard className="w-4 h-4 text-[#6D6268] shrink-0 mt-0.5 sm:mt-0" />
-                        <span className="text-xs font-bold text-[#6D6268] leading-snug">Online Card & LankaQR</span>
+                  {/* Online Card, Wallets & LankaQR (PayHere Live) */}
+                  <label className={`p-4 rounded-2xl border cursor-pointer transition-all flex flex-col justify-between space-y-2.5 ${
+                    paymentMethod === 'card'
+                      ? 'border-[#701626] bg-[#701626]/5 ring-1 ring-[#701626]'
+                      : 'border-[#C5A059]/30 bg-[#FCFBF8] hover:border-[#C5A059]'
+                  }`}>
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <CreditCard className="w-4 h-4 text-[#701626] shrink-0" />
+                        <span className="text-xs font-bold text-[#110B0E] leading-snug">Online Card & Wallets</span>
                       </div>
-                      <span className="text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-[#701626]/10 text-[#701626] border border-[#C5A059]/40 flex items-center gap-1 shadow-xs whitespace-nowrap shrink-0">
-                        <Sparkles className="w-2.5 h-2.5 text-[#C5A059] shrink-0" />
-                        <span>Coming Soon!</span>
-                      </span>
+                      <input
+                        type="radio"
+                        name="payment"
+                        checked={paymentMethod === 'card'}
+                        onChange={() => setPaymentMethod('card')}
+                        className="text-[#701626] shrink-0"
+                      />
                     </div>
-                    <div className="flex flex-wrap items-center gap-1.5 pt-0.5 opacity-60">
-                      <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-gray-100 text-gray-600 border border-gray-200">Visa</span>
-                      <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-gray-100 text-gray-600 border border-gray-200">Mastercard</span>
-                      <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-gray-100 text-gray-600 border border-gray-200">AMEX</span>
-                      <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-gray-100 text-gray-600 border border-gray-200">LankaQR</span>
-                    </div>
+                    <PaymentMethodBadges variant="checkout" />
                     <p className="text-[11px] text-[#6D6268] leading-relaxed">
-                      Online card payments are currently being integrated with our acquiring bank and will launch soon. Please choose <strong>Cash on Delivery (COD)</strong> or <strong>Direct Bank Transfer</strong> for your order.
+                      Instant, CBSL-approved checkout via <strong>PayHere</strong> — supports Visa, Mastercard, AMEX, ComBank Q+, FriMi, Genie, iPay, HelaPay & Google Pay.
                     </p>
-                  </div>
+                  </label>
 
                   {/* Direct Bank Deposit */}
                   <label className={`p-4 rounded-2xl border cursor-pointer transition-all flex flex-col justify-between space-y-2 ${
@@ -1512,7 +1635,9 @@ export default function Checkout() {
                   </span>
                 ) : (
                   <span>
-                    {paymentMethod === 'bank'
+                    {paymentMethod === 'card'
+                      ? `Pay Securely Online · LKR ${finalTotal.toLocaleString('en-US')}`
+                      : paymentMethod === 'bank'
                       ? `Place Order & Transfer · LKR ${finalTotal.toLocaleString('en-US')}`
                       : `Place Order · LKR ${finalTotal.toLocaleString('en-US')}`}
                   </span>

@@ -1,13 +1,13 @@
 /**
  * PayHere.lk Payment Gateway Integration
  * Central Bank of Sri Lanka (CBSL) Compliant Payment Gateway
- * Supports: Visa, MasterCard, AMEX, LankaQR, eZ Cash, mCash, Genie, FriMi
+ * Supports: Visa, Mastercard, American Express, ComBank Q+, FriMi, Genie, iPay, HelaPay, Google Pay
  */
 
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 
 export function getPayHereSandboxMode(): boolean {
-  return import.meta.env.VITE_PAYHERE_SANDBOX !== 'false';
+  return import.meta.env.VITE_PAYHERE_SANDBOX === 'true';
 }
 
 export interface PayHereCustomer {
@@ -244,10 +244,12 @@ export async function initiatePayHereCheckout(
     // 3. Launch PayHere Popup Modal
     return new Promise<PayHereCheckoutResult>((resolve) => {
       window.payhere.onCompleted = function (completedOrderId: string) {
-        console.log('[PayHere] Payment completed for order:', completedOrderId);
+        // Per official PayHere docs: onCompleted fires when checkout finishes,
+        // whether payment succeeded or failed. Callers must verify via IPN/API.
+        console.log('[PayHere] Checkout completed for order:', completedOrderId);
         resolve({
           success: true,
-          orderId: completedOrderId,
+          orderId: completedOrderId || params.orderId,
           checkoutUrl: session.return_url,
         });
       };
@@ -305,6 +307,98 @@ export async function initiatePayHereCheckout(
 }
 
 /**
+ * Verifies the authoritative payment status of an order after PayHere modal completion.
+ * Since PayHere's JS SDK `onCompleted` callback fires even when a card is declined,
+ * this helper checks `/api/payhere-verify` (which queries Supabase & PayHere Retrieval API)
+ * with short polling for in-flight IPN webhooks.
+ */
+export async function verifyPayHereOrderPayment(orderId: string): Promise<{
+  verified: boolean;
+  paymentStatus: string;
+  status: string;
+  adminNotes?: string;
+  error?: string;
+}> {
+  const maxAttempts = 4;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      const res = await fetch(`/api/payhere-verify?orderId=${encodeURIComponent(orderId)}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.payment_status === 'paid') {
+          return {
+            verified: true,
+            paymentStatus: 'paid',
+            status: data.status || 'confirmed',
+            adminNotes: data.admin_notes,
+          };
+        }
+        if (data.failed || (data.admin_notes && /Failed\/Cancelled/i.test(data.admin_notes))) {
+          return {
+            verified: false,
+            paymentStatus: data.payment_status || 'pending_card',
+            status: data.status || 'pending',
+            adminNotes: data.admin_notes,
+            error: data.error || 'Your card payment was declined or cancelled by the bank. Please try again.',
+          };
+        }
+      }
+    } catch {
+      // Fallback to direct RPC check if worker endpoint is unreachable
+    }
+
+    if (isSupabaseConfigured()) {
+      try {
+        const { data } = await supabase.rpc('get_order_by_code', { p_order_code: orderId });
+        const row = Array.isArray(data) ? data[0] : data;
+        if (row) {
+          if (row.payment_status === 'paid') {
+            return {
+              verified: true,
+              paymentStatus: 'paid',
+              status: row.status || 'confirmed',
+              adminNotes: row.admin_notes,
+            };
+          }
+          if (row.admin_notes && /Failed\/Cancelled/i.test(row.admin_notes)) {
+            return {
+              verified: false,
+              paymentStatus: row.payment_status || 'pending_card',
+              status: row.status || 'pending',
+              adminNotes: row.admin_notes,
+              error: 'Your card payment was declined or cancelled by the bank. Please try again.',
+            };
+          }
+        }
+      } catch {}
+    }
+
+    if (attempt < maxAttempts) {
+      await new Promise((r) => setTimeout(r, 1200));
+    }
+  }
+
+  return {
+    verified: false,
+    paymentStatus: 'pending_card',
+    status: 'pending',
+  };
+}
+
+async function getAdminAuthHeaders(): Promise<Record<string, string>> {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (isSupabaseConfigured()) {
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      if (sessionData.session?.access_token) {
+        headers['Authorization'] = `Bearer ${sessionData.session.access_token}`;
+      }
+    } catch {}
+  }
+  return headers;
+}
+
+/**
  * 1-Click Partial/Full Card Refund via PayHere API
  */
 export async function requestPayHereRefund(params: {
@@ -317,20 +411,7 @@ export async function requestPayHereRefund(params: {
   adminNotes?: string;
 }): Promise<{ success: boolean; data?: any; error?: string }> {
   try {
-    let authHeader = '';
-    if (isSupabaseConfigured()) {
-      try {
-        const { data: sessionData } = await supabase.auth.getSession();
-        if (sessionData.session?.access_token) {
-          authHeader = `Bearer ${sessionData.session.access_token}`;
-        }
-      } catch {}
-    }
-
-    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-    if (authHeader) {
-      headers['Authorization'] = authHeader;
-    }
+    const headers = await getAdminAuthHeaders();
 
     const res = await fetch('/api/payhere-refund', {
       method: 'POST',
@@ -361,9 +442,11 @@ export async function createPayHerePaymentLink(params: {
   customer?: PayHereCustomer;
 }): Promise<{ success: boolean; id?: string; url?: string; error?: string }> {
   try {
+    const headers = await getAdminAuthHeaders();
+
     const res = await fetch('/api/payhere-payment-link', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify(params),
     });
 

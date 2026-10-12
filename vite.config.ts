@@ -124,6 +124,53 @@ function generatePayHereHash(merchantId: string, orderId: string, amount: number
   return md5(dataToHash).toUpperCase();
 }
 
+function sanitizePayHereText(input: any, fallback = ''): string {
+  if (!input) return fallback;
+  const cleaned = String(input)
+    .replace(/<[^>]*>/g, ' ')
+    .replace(/[\uD800-\uDBFF][\uDC00-\uDFFF]/g, '')
+    .replace(/[^\x20-\x7E\u00A0-\u024F]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return cleaned || fallback;
+}
+
+async function verifyViteAdminRequest(req: any, env: Record<string, string>) {
+  const authHeader = req.headers['authorization'] || '';
+  if (!authHeader.startsWith('Bearer ')) {
+    return { authorized: false, error: 'Missing or invalid Authorization Bearer token.' };
+  }
+  const token = authHeader.slice(7).trim();
+  if (!token) {
+    return { authorized: false, error: 'Empty Authorization Bearer token.' };
+  }
+
+  const sUrl = env.VITE_SUPABASE_URL || 'https://hrmcxxcrnxqhesiywqsc.supabase.co';
+  const sAnonKey = env.VITE_SUPABASE_ANON_KEY || 'sb_publishable_-ZSOc4XGHM2OysLhqKZ5yQ_4OPgdcAm';
+
+  try {
+    const userRes = await fetch(`${sUrl}/auth/v1/user`, {
+      headers: { apikey: sAnonKey, Authorization: `Bearer ${token}` },
+    });
+    if (!userRes.ok) {
+      return { authorized: false, error: 'Invalid or expired admin session token.' };
+    }
+    const user: any = await userRes.json();
+    const email = (user?.email || '').toLowerCase();
+    const isAdminRole =
+      user?.app_metadata?.role === 'admin' ||
+      user?.user_metadata?.role === 'admin' ||
+      ['admin@azhai.lk', 'preethi@azhaiclothing.lk', 'hello@azhaiclothing.lk', 'orders@azhaiclothing.lk'].includes(email);
+
+    if (!isAdminRole) {
+      return { authorized: false, error: 'Forbidden: Admin privileges required.' };
+    }
+    return { authorized: true, user };
+  } catch {
+    return { authorized: false, error: 'Failed to verify admin credentials.' };
+  }
+}
+
 import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
@@ -154,12 +201,17 @@ export default defineConfig(({ mode }) => {
               req.on('end', async () => {
                 try {
                   const parsed = JSON.parse(body);
-                  const apiKey = env.VITE_BREVO_API_KEY || parsed.apiKey;
+                  const apiKey = env.BREVO_API_KEY || env.VITE_BREVO_API_KEY;
                   if (!apiKey) {
                     res.statusCode = 400;
                     res.setHeader('Content-Type', 'application/json');
                     res.end(JSON.stringify({ error: 'Brevo API key is not set in .env' }));
                     return;
+                  }
+                  const payload = parsed.payload || {};
+                  const allowedSenderEmails = ['orders@azhaiclothing.lk', 'hello@azhaiclothing.lk', 'support@azhaiclothing.lk'];
+                  if (payload.sender && payload.sender.email && !allowedSenderEmails.includes(payload.sender.email.toLowerCase())) {
+                    payload.sender.email = 'orders@azhaiclothing.lk';
                   }
                   const brevoRes = await fetch('https://api.brevo.com/v3/smtp/email', {
                     method: 'POST',
@@ -167,7 +219,7 @@ export default defineConfig(({ mode }) => {
                       'Content-Type': 'application/json',
                       'api-key': apiKey,
                     },
-                    body: JSON.stringify(parsed.payload),
+                    body: JSON.stringify(payload),
                   });
                   const data = await brevoRes.json();
                   res.statusCode = brevoRes.status;
@@ -200,7 +252,7 @@ export default defineConfig(({ mode }) => {
               req.on('end', async () => {
                 try {
                   const parsed = JSON.parse(body);
-                  const apiKey = env.VITE_BREVO_API_KEY || parsed.apiKey;
+                  const apiKey = env.BREVO_API_KEY || env.VITE_BREVO_API_KEY;
                   if (!apiKey) {
                     res.statusCode = 400;
                     res.setHeader('Content-Type', 'application/json');
@@ -233,7 +285,7 @@ export default defineConfig(({ mode }) => {
           // ── PayHere.lk Dev Server Proxy ────────────────────────────
           const payhereMerchantId = env.PAYHERE_MERCHANT_ID || env.VITE_PAYHERE_MERCHANT_ID || '1237099';
           const payhereSecret = env.PAYHERE_MERCHANT_SECRET || env.VITE_PAYHERE_SECRET || '';
-          const isPayhereSandbox = (env.PAYHERE_ENV === 'sandbox' || env.VITE_PAYHERE_SANDBOX !== 'false');
+          const isPayhereSandbox = (env.PAYHERE_ENV === 'sandbox' || env.VITE_PAYHERE_SANDBOX === 'true');
 
           // 1. Checkout Session Initiation & Hash Generation
           const handlePayHereInitiate = (req: any, res: any) => {
@@ -241,20 +293,65 @@ export default defineConfig(({ mode }) => {
             req.on('data', (c: any) => { body += c; });
             req.on('end', async () => {
               try {
-                const parsed = JSON.parse(body);
-                const { orderId, amount, amountCents, currency: passedCurrency, description, customer, items } = parsed;
-                const finalAmount = amount !== undefined ? Number(amount) : (amountCents ? (Number(amountCents) / 100) : 0);
-
-                if (!orderId || !finalAmount) {
-                  res.statusCode = 400;
+                if (!payhereSecret) {
+                  res.statusCode = 500;
                   res.setHeader('Content-Type', 'application/json');
-                  res.end(JSON.stringify({ error: 'Missing required checkout fields: orderId, amount' }));
+                  res.end(JSON.stringify({ error: 'Server configuration error: PAYHERE_MERCHANT_SECRET is missing in .env' }));
                   return;
                 }
 
-                const currency = passedCurrency || 'LKR';
+                const parsed = JSON.parse(body);
+                const { orderId, amount, amountCents, currency: passedCurrency, description, customer, items } = parsed;
+                let finalAmount = amount !== undefined ? Number(amount) : (amountCents ? (Number(amountCents) / 100) : 0);
+
+                if (!orderId) {
+                  res.statusCode = 400;
+                  res.setHeader('Content-Type', 'application/json');
+                  res.end(JSON.stringify({ error: 'Missing required checkout field: orderId' }));
+                  return;
+                }
+
+                const sUrl = env.VITE_SUPABASE_URL || 'https://hrmcxxcrnxqhesiywqsc.supabase.co';
+                const sKey = env.SUPABASE_SERVICE_ROLE_KEY || env.VITE_SUPABASE_ANON_KEY || 'sb_publishable_-ZSOc4XGHM2OysLhqKZ5yQ_4OPgdcAm';
+                let dbOrder: any = null;
+
+                if (sUrl && sKey) {
+                  try {
+                    const rpcRes = await fetch(`${sUrl}/rest/v1/rpc/get_order_by_code`, {
+                      method: 'POST',
+                      headers: { apikey: sKey, Authorization: `Bearer ${sKey}`, 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ p_order_code: String(orderId) }),
+                    });
+                    if (rpcRes.ok) {
+                      const rows: any = await rpcRes.json();
+                      dbOrder = Array.isArray(rows) ? rows[0] : rows;
+                    }
+                  } catch {}
+                }
+
+                if (dbOrder) {
+                  if (dbOrder.payment_status === 'paid') {
+                    res.statusCode = 400;
+                    res.setHeader('Content-Type', 'application/json');
+                    res.end(JSON.stringify({ error: 'This order has already been paid.' }));
+                    return;
+                  }
+                  const dbTotal = Number(dbOrder.total);
+                  if (dbTotal > 0) {
+                    finalAmount = dbTotal;
+                  }
+                }
+
+                if (!finalAmount || finalAmount <= 0 || Number.isNaN(finalAmount)) {
+                  res.statusCode = 400;
+                  res.setHeader('Content-Type', 'application/json');
+                  res.end(JSON.stringify({ error: 'Invalid or missing checkout amount.' }));
+                  return;
+                }
+
+                const currency = (passedCurrency || 'LKR').toUpperCase();
                 const formattedAmount = finalAmount.toFixed(2);
-                const hash = generatePayHereHash(payhereMerchantId, orderId, finalAmount, currency, payhereSecret);
+                const hash = generatePayHereHash(payhereMerchantId, String(orderId), finalAmount, currency, payhereSecret);
 
                 const host = req.headers.host || 'localhost:5173';
                 const protocol = req.headers['x-forwarded-proto'] || 'http';
@@ -264,8 +361,16 @@ export default defineConfig(({ mode }) => {
                 const returnUrl = `${origin}/order-success/${orderId}?payhere=success`;
                 const cancelUrl = `${origin}/checkout?status=cancelled&order_id=${orderId}`;
 
-                const firstName = customer?.firstName || customer?.name?.split(' ')[0] || 'Valued';
-                const lastName = customer?.lastName || customer?.name?.split(' ').slice(1).join(' ') || 'Patron';
+                const rawFirstName = customer?.firstName || customer?.name?.split(' ')[0] || dbOrder?.customer_name?.split(' ')[0] || 'Valued';
+                const rawLastName = customer?.lastName || customer?.name?.split(' ').slice(1).join(' ') || dbOrder?.customer_name?.split(' ').slice(1).join(' ') || 'Patron';
+                const safeItems = sanitizePayHereText(items || description || `Azhai Order #${orderId}`, `Azhai Order #${orderId}`).slice(0, 200);
+                const safeFirstName = sanitizePayHereText(rawFirstName, 'Valued').slice(0, 80);
+                const safeLastName = sanitizePayHereText(rawLastName, 'Patron').slice(0, 80);
+                const safeEmail = (customer?.email || dbOrder?.customer_email || 'concierge@azhaiclothing.lk').trim();
+                const safePhone = (customer?.phone || dbOrder?.customer_phone || '0770000000').trim();
+                const safeAddress = sanitizePayHereText(customer?.address || dbOrder?.shipping_address?.address || 'Colombo', 'Colombo').slice(0, 200);
+                const safeCity = sanitizePayHereText(customer?.city || dbOrder?.shipping_address?.city || 'Colombo', 'Colombo').slice(0, 80);
+                const safeCountry = sanitizePayHereText(customer?.country || 'Sri Lanka', 'Sri Lanka').slice(0, 80);
 
                 res.statusCode = 200;
                 res.setHeader('Content-Type', 'application/json');
@@ -274,23 +379,23 @@ export default defineConfig(({ mode }) => {
                   sandbox: isPayhereSandbox,
                   merchant_id: payhereMerchantId,
                   order_id: String(orderId),
-                  items: items || description || `Azhai Order #${orderId}`,
+                  items: safeItems,
                   amount: formattedAmount,
                   currency,
                   hash,
                   return_url: returnUrl,
                   cancel_url: cancelUrl,
                   notify_url: notifyUrl,
-                  first_name: firstName,
-                  last_name: lastName,
-                  email: customer?.email || '',
-                  phone: customer?.phone || '',
-                  address: customer?.address || '',
-                  city: customer?.city || 'Colombo',
-                  country: customer?.country || 'Sri Lanka',
-                  delivery_address: customer?.address || '',
-                  delivery_city: customer?.city || 'Colombo',
-                  delivery_country: customer?.country || 'Sri Lanka',
+                  first_name: safeFirstName,
+                  last_name: safeLastName,
+                  email: safeEmail,
+                  phone: safePhone,
+                  address: safeAddress,
+                  city: safeCity,
+                  country: safeCountry,
+                  delivery_address: safeAddress,
+                  delivery_city: safeCity,
+                  delivery_country: safeCountry,
                 }));
               } catch (err: any) {
                 res.statusCode = 500;
@@ -309,12 +414,61 @@ export default defineConfig(({ mode }) => {
             else next();
           });
 
+          // 1b. PayHere Verify Endpoint
+          server.middlewares.use('/api/payhere-verify', async (req: any, res: any) => {
+            try {
+              const reqUrl = new URL(req.url || '', 'http://localhost:5173');
+              const orderId = reqUrl.searchParams.get('orderId') || reqUrl.searchParams.get('order_id') || '';
+              if (!orderId) {
+                res.statusCode = 400;
+                res.setHeader('Content-Type', 'application/json');
+                res.end(JSON.stringify({ error: 'Missing orderId' }));
+                return;
+              }
+              const sUrl = env.VITE_SUPABASE_URL || 'https://hrmcxxcrnxqhesiywqsc.supabase.co';
+              const sKey = env.SUPABASE_SERVICE_ROLE_KEY || env.VITE_SUPABASE_ANON_KEY || 'sb_publishable_-ZSOc4XGHM2OysLhqKZ5yQ_4OPgdcAm';
+              let dbOrder: any = null;
+              const rpcRes = await fetch(`${sUrl}/rest/v1/rpc/get_order_by_code`, {
+                method: 'POST',
+                headers: { apikey: sKey, Authorization: `Bearer ${sKey}`, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ p_order_code: String(orderId) }),
+              });
+              if (rpcRes.ok) {
+                const rows: any = await rpcRes.json();
+                dbOrder = Array.isArray(rows) ? rows[0] : rows;
+              }
+
+              const isFailed = dbOrder?.admin_notes && /Failed\/Cancelled/i.test(dbOrder.admin_notes);
+              res.statusCode = 200;
+              res.setHeader('Content-Type', 'application/json');
+              res.end(JSON.stringify({
+                verified: dbOrder?.payment_status === 'paid',
+                failed: Boolean(isFailed),
+                payment_status: dbOrder?.payment_status || 'pending_card',
+                status: dbOrder?.status || 'pending',
+                admin_notes: dbOrder?.admin_notes || '',
+              }));
+            } catch (err: any) {
+              res.statusCode = 500;
+              res.setHeader('Content-Type', 'application/json');
+              res.end(JSON.stringify({ verified: false, error: err.message }));
+            }
+          });
+
           // 2. PayHere Refund Proxy
           const handlePayHereRefund = (req: any, res: any) => {
             let body = '';
             req.on('data', (c: any) => { body += c; });
             req.on('end', async () => {
               try {
+                const authCheck = await verifyViteAdminRequest(req, env);
+                if (!authCheck.authorized) {
+                  res.statusCode = 401;
+                  res.setHeader('Content-Type', 'application/json');
+                  res.end(JSON.stringify({ error: authCheck.error || 'Unauthorized' }));
+                  return;
+                }
+
                 const parsed = JSON.parse(body);
                 let { paymentId, orderId, reference, amount, amountCents, reason, adminNotes } = parsed;
                 const targetRef = orderId || reference;
@@ -334,12 +488,15 @@ export default defineConfig(({ mode }) => {
                   const sKey = env.SUPABASE_SERVICE_ROLE_KEY || env.VITE_SUPABASE_ANON_KEY;
                   if (!resolvedPaymentId && targetRef && sUrl && sKey) {
                     try {
-                      const dbLookup = await fetch(`${sUrl}/rest/v1/orders?order_code=eq.${encodeURIComponent(targetRef)}&select=admin_notes`, {
-                        headers: { apikey: sKey, Authorization: `Bearer ${sKey}` },
+                      const dbLookup = await fetch(`${sUrl}/rest/v1/rpc/get_order_by_code`, {
+                        method: 'POST',
+                        headers: { apikey: sKey, Authorization: `Bearer ${sKey}`, 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ p_order_code: String(targetRef) }),
                       });
                       if (dbLookup.ok) {
                         const rows: any = await dbLookup.json();
-                        const match = rows[0]?.admin_notes?.match(/Payment ID:\s*(\d+)/i) || rows[0]?.admin_notes?.match(/\b\d{6,16}\b/);
+                        const row = Array.isArray(rows) ? rows[0] : rows;
+                        const match = row?.admin_notes?.match(/Payment ID:\s*(\d+)/i) || row?.admin_notes?.match(/\b\d{6,16}\b/);
                         if (match) resolvedPaymentId = match[1] || match[0];
                       }
                     } catch (e) {
@@ -348,24 +505,14 @@ export default defineConfig(({ mode }) => {
                   }
                 }
 
-                if (!resolvedPaymentId) {
-                  res.statusCode = 400;
-                  res.setHeader('Content-Type', 'application/json');
-                  res.end(JSON.stringify({
-                    error: `No PayHere Payment ID found for order #${targetRef || 'unknown'}. Please provide the numeric Payment ID from your PayHere Dashboard.`,
-                    code: 'PAYMENT_ID_REQUIRED',
-                  }));
-                  return;
-                }
-
-                const appId = env.PAYHERE_APP_ID || '';
-                const appSecret = env.PAYHERE_APP_SECRET || '';
+                const appId = env.PAYHERE_APP_ID || env.PAYHERE_API_KEY || '';
+                const appSecret = env.PAYHERE_APP_SECRET || env.PAYHERE_API_SECRET || '';
 
                 if (!appId || !appSecret) {
                   res.statusCode = 400;
                   res.setHeader('Content-Type', 'application/json');
                   res.end(JSON.stringify({
-                    error: 'PayHere App ID and App Secret must be set in .env to process refunds.',
+                    error: 'PayHere API Key and Secret must be set in .env to process refunds.',
                     code: 'CREDENTIALS_REQUIRED',
                   }));
                   return;
@@ -396,13 +543,41 @@ export default defineConfig(({ mode }) => {
                 const tokenData: any = await tokenRes.json();
                 const accessToken = tokenData.access_token;
 
+                // Fallback: Query PayHere Retrieval API if payment_id is still unknown
+                if (!resolvedPaymentId && targetRef) {
+                  try {
+                    const searchUrl = isPayhereSandbox
+                      ? `https://sandbox.payhere.lk/merchant/v1/payment/search?order_id=${encodeURIComponent(targetRef)}`
+                      : `https://www.payhere.lk/merchant/v1/payment/search?order_id=${encodeURIComponent(targetRef)}`;
+                    const sRes = await fetch(searchUrl, {
+                      headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+                    });
+                    if (sRes.ok) {
+                      const sData: any = await sRes.json();
+                      if (sData?.status === 1 && Array.isArray(sData.data) && sData.data[0]?.payment_id) {
+                        resolvedPaymentId = String(sData.data[0].payment_id);
+                      }
+                    }
+                  } catch {}
+                }
+
+                if (!resolvedPaymentId) {
+                  res.statusCode = 400;
+                  res.setHeader('Content-Type', 'application/json');
+                  res.end(JSON.stringify({
+                    error: `No PayHere Payment ID found for order #${targetRef || 'unknown'}. Please provide the numeric Payment ID from your PayHere Dashboard.`,
+                    code: 'PAYMENT_ID_REQUIRED',
+                  }));
+                  return;
+                }
+
                 const refundUrl = isPayhereSandbox
                   ? 'https://sandbox.payhere.lk/merchant/v1/payment/refund'
                   : 'https://www.payhere.lk/merchant/v1/payment/refund';
 
                 const refundPayload: any = {
                   payment_id: Number(resolvedPaymentId) || resolvedPaymentId,
-                  description: reason || 'Merchant initiated refund via Azhai Admin',
+                  description: sanitizePayHereText(reason || 'Merchant initiated refund via Azhai Admin', 'Merchant initiated refund'),
                 };
                 if (finalAmount) {
                   refundPayload.amount = Number(finalAmount.toFixed(2));
@@ -429,14 +604,15 @@ export default defineConfig(({ mode }) => {
                   return;
                 }
 
-                // Sync status to Supabase
+                // Sync status to Supabase using admin's JWT or service role key
                 const sUrl = env.VITE_SUPABASE_URL || 'https://hrmcxxcrnxqhesiywqsc.supabase.co';
                 const sKey = env.SUPABASE_SERVICE_ROLE_KEY || env.VITE_SUPABASE_ANON_KEY;
+                const authBearer = env.SUPABASE_SERVICE_ROLE_KEY ? `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}` : (req.headers['authorization'] || `Bearer ${sKey}`);
                 if (targetRef && sUrl && sKey) {
                   try {
                     await fetch(`${sUrl}/rest/v1/orders?order_code=eq.${encodeURIComponent(targetRef)}`, {
                       method: 'PATCH',
-                      headers: { apikey: sKey, Authorization: `Bearer ${sKey}`, 'Content-Type': 'application/json' },
+                      headers: { apikey: sKey, Authorization: authBearer, 'Content-Type': 'application/json' },
                       body: JSON.stringify({ payment_status: 'refunded', updated_at: new Date().toISOString() }),
                     });
                   } catch (e) {
@@ -470,15 +646,30 @@ export default defineConfig(({ mode }) => {
             req.on('data', (c: any) => { body += c; });
             req.on('end', async () => {
               try {
+                const authCheck = await verifyViteAdminRequest(req, env);
+                if (!authCheck.authorized) {
+                  res.statusCode = 401;
+                  res.setHeader('Content-Type', 'application/json');
+                  res.end(JSON.stringify({ error: authCheck.error || 'Unauthorized' }));
+                  return;
+                }
+
+                if (!payhereSecret) {
+                  res.statusCode = 500;
+                  res.setHeader('Content-Type', 'application/json');
+                  res.end(JSON.stringify({ error: 'Server configuration error: PAYHERE_MERCHANT_SECRET is missing' }));
+                  return;
+                }
+
                 const parsed = JSON.parse(body);
                 const { title, amount, amountCents, orderId: passedOrderId, description, customer } = parsed;
                 const orderId = passedOrderId || `AZH-PLINK-${Date.now().toString(36).toUpperCase()}`;
                 const finalAmount = amount !== undefined ? Number(amount) : (amountCents ? (Number(amountCents) / 100) : 0);
 
-                if (!finalAmount) {
+                if (!finalAmount || finalAmount <= 0) {
                   res.statusCode = 400;
                   res.setHeader('Content-Type', 'application/json');
-                  res.end(JSON.stringify({ error: 'Missing required field: amount' }));
+                  res.end(JSON.stringify({ error: 'Missing or invalid required field: amount' }));
                   return;
                 }
 
@@ -500,15 +691,15 @@ export default defineConfig(({ mode }) => {
                   cancel_url: `${origin}/checkout?status=cancelled&order_id=${orderId}`,
                   notify_url: `${origin}/api/payhere-notify`,
                   order_id: orderId,
-                  items: title || description || 'Azhai Bespoke Couture Payment',
+                  items: sanitizePayHereText(title || description || 'Azhai Bespoke Couture Payment', 'Azhai Bespoke Couture Payment'),
                   currency: currency,
                   amount: formattedAmount,
-                  first_name: customer?.name?.split(' ')[0] || 'Valued',
-                  last_name: customer?.name?.split(' ').slice(1).join(' ') || 'Patron',
-                  email: customer?.email || 'concierge@azhaiclothing.lk',
-                  phone: customer?.phone || '0771234567',
-                  address: customer?.address || 'Azhai Boutique Atelier',
-                  city: customer?.city || 'Colombo',
+                  first_name: sanitizePayHereText(customer?.name?.split(' ')[0] || 'Valued', 'Valued'),
+                  last_name: sanitizePayHereText(customer?.name?.split(' ').slice(1).join(' ') || 'Patron', 'Patron'),
+                  email: (customer?.email || 'concierge@azhaiclothing.lk').trim(),
+                  phone: (customer?.phone || '0771234567').trim(),
+                  address: sanitizePayHereText(customer?.address || 'Azhai Boutique Atelier', 'Azhai Boutique Atelier'),
+                  city: sanitizePayHereText(customer?.city || 'Colombo', 'Colombo'),
                   country: 'Sri Lanka',
                   hash: hash,
                 });
@@ -566,7 +757,7 @@ export default defineConfig(({ mode }) => {
                   params = JSON.parse(body || '{}');
                 }
 
-                const { merchant_id, order_id, payment_id, payhere_amount, payhere_currency, status_code, md5sig, method } = params;
+                const { merchant_id, order_id, payment_id, payhere_amount, payhere_currency, status_code, md5sig, method, status_message } = params;
 
                 // Mandatory Signature Verification: Reject any notification without signature or secret
                 if (!payhereSecret) {
@@ -577,6 +768,12 @@ export default defineConfig(({ mode }) => {
                 if (!md5sig) {
                   res.statusCode = 400;
                   res.end('Missing Signature');
+                  return;
+                }
+
+                if (merchant_id && String(merchant_id).trim() !== String(payhereMerchantId).trim()) {
+                  res.statusCode = 401;
+                  res.end('Invalid Merchant ID');
                   return;
                 }
 
@@ -594,7 +791,29 @@ export default defineConfig(({ mode }) => {
                 const sKey = env.SUPABASE_SERVICE_ROLE_KEY || env.VITE_SUPABASE_ANON_KEY || 'sb_publishable_-ZSOc4XGHM2OysLhqKZ5yQ_4OPgdcAm';
 
                 if (order_id && sUrl) {
-                  if (statusCode === 2) {
+                  let rpcUpdated = false;
+                  try {
+                    const rpcRes = await fetch(`${sUrl}/rest/v1/rpc/worker_update_payhere_order`, {
+                      method: 'POST',
+                      headers: { apikey: sKey, Authorization: `Bearer ${sKey}`, 'Content-Type': 'application/json' },
+                      body: JSON.stringify({
+                        p_order_code: String(order_id),
+                        p_payment_id: String(payment_id || ''),
+                        p_payhere_amount: String(payhere_amount || '0.00'),
+                        p_payhere_currency: String(payhere_currency || 'LKR'),
+                        p_status_code: statusCode,
+                        p_md5sig: String(md5sig),
+                        p_method: String(method || 'Card'),
+                        p_status_message: String(status_message || ''),
+                      }),
+                    });
+                    if (rpcRes.ok) {
+                      const rpcData: any = await rpcRes.json();
+                      if (rpcData?.success) rpcUpdated = true;
+                    }
+                  } catch {}
+
+                  if (!rpcUpdated && statusCode === 2) {
                     await fetch(`${sUrl}/rest/v1/orders?order_code=eq.${encodeURIComponent(order_id)}`, {
                       method: 'PATCH',
                       headers: { apikey: sKey, Authorization: `Bearer ${sKey}`, 'Content-Type': 'application/json' },
