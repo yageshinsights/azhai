@@ -69,21 +69,7 @@ export default function CartDrawer() {
       return;
     }
 
-    // Default promotional fallbacks
-    if (clean === 'AZHAI10') {
-      const disc = Math.round(rawTotal * 0.10);
-      setIsFreeShippingCoupon(false);
-      setDiscountAmount(disc);
-      setAppliedCoupon('AZHAI10');
-      setCouponError(null);
-    } else if (clean === 'CEYLON1000') {
-      setIsFreeShippingCoupon(false);
-      setDiscountAmount(1000);
-      setAppliedCoupon('CEYLON1000');
-      setCouponError(null);
-    } else {
-      setCouponError('Invalid or inactive coupon code.');
-    }
+    setCouponError('Invalid or inactive coupon code.');
   };
 
   const removeCoupon = () => {
@@ -339,31 +325,6 @@ export default function CartDrawer() {
                           <span className="w-1.5 h-1.5 rounded-full bg-rose-600 shrink-0" />
                           <span>{couponError}</span>
                         </p>
-                      )}
-
-                      {/* Quick Apply Pills */}
-                      {!appliedCoupon && (
-                        <div className="flex flex-wrap gap-2 pt-1">
-                          {(storeCoupons && storeCoupons.filter((c) => c.isActive).length > 0
-                            ? storeCoupons.filter((c) => c.isActive).slice(0, 3)
-                            : [
-                                { id: '1', code: 'AZHAI10', discountType: 'percentage' as const, value: 10 },
-                                { id: '2', code: 'CEYLON1000', discountType: 'fixed' as const, value: 1000 },
-                              ]
-                          ).map((c) => (
-                            <button
-                              key={c.id}
-                              onClick={() => applyCoupon(c.code)}
-                              className="text-[10px] bg-[#F7F4EE] hover:bg-[#701626]/10 text-[#701626] font-bold px-2.5 py-1 rounded-lg border border-[#C5A059]/40 transition-colors"
-                            >
-                              {c.discountType === 'free_shipping'
-                                ? `🚚 ${c.code} (Free Delivery)`
-                                : c.discountType === 'percentage'
-                                  ? `⚡ ${c.code} (${c.value}% Off)`
-                                  : `💖 ${c.code} (LKR ${c.value.toLocaleString()} Off)`}
-                            </button>
-                          ))}
-                        </div>
                       )}
                     </div>
 

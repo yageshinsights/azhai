@@ -224,24 +224,13 @@ export default function Checkout() {
     return sum + Math.max(0, itemPrice) * qty;
   }, 0);
 
-  // Re-validate applied coupon against active store coupons (with built-in fallbacks matching CartDrawer)
-  const availableCoupons =
-    adminCoupons && adminCoupons.filter((c) => c.isActive).length > 0
-      ? adminCoupons.filter((c) => c.isActive)
-      : [
-          { id: 'def-1', code: 'AZHAI10', discountType: 'percentage' as const, value: 10, minSpend: 0, usageCount: 0, isActive: true },
-          { id: 'def-2', code: 'CEYLON1000', discountType: 'fixed' as const, value: 1000, minSpend: 0, usageCount: 0, isActive: true },
-        ];
+  // Re-validate applied coupon strictly against active store coupons
+  const availableCoupons = (adminCoupons || []).filter((c) => c.isActive);
 
   const matchedCoupon = activeCouponCode
     ? availableCoupons.find(
         (c) => c.code.toUpperCase() === activeCouponCode.trim().toUpperCase() && c.isActive
-      ) ||
-      (activeCouponCode.trim().toUpperCase() === 'AZHAI10'
-        ? { id: 'fb-1', code: 'AZHAI10', discountType: 'percentage' as const, value: 10, minSpend: 0, usageCount: 0, isActive: true }
-        : activeCouponCode.trim().toUpperCase() === 'CEYLON1000'
-          ? { id: 'fb-2', code: 'CEYLON1000', discountType: 'fixed' as const, value: 1000, minSpend: 0, usageCount: 0, isActive: true }
-          : undefined)
+      )
     : undefined;
 
   const isCouponMinSpendMet = !matchedCoupon?.minSpend || rawTotal >= matchedCoupon.minSpend;
@@ -268,13 +257,7 @@ export default function Checkout() {
     const clean = (codeToApply ?? checkoutCouponInput).trim().toUpperCase();
     if (!clean) return;
 
-    const found =
-      availableCoupons.find((c) => c.code.toUpperCase() === clean && c.isActive) ||
-      (clean === 'AZHAI10'
-        ? { id: 'fb-1', code: 'AZHAI10', discountType: 'percentage' as const, value: 10, minSpend: 0, usageCount: 0, isActive: true }
-        : clean === 'CEYLON1000'
-          ? { id: 'fb-2', code: 'CEYLON1000', discountType: 'fixed' as const, value: 1000, minSpend: 0, usageCount: 0, isActive: true }
-          : undefined);
+    const found = availableCoupons.find((c) => c.code.toUpperCase() === clean && c.isActive);
 
     if (!found) {
       setCheckoutCouponError('Invalid or inactive coupon code.');
@@ -1067,22 +1050,6 @@ export default function Checkout() {
                       {checkoutCouponError && (
                         <p className="text-[11px] text-rose-600 font-medium">{checkoutCouponError}</p>
                       )}
-                      <div className="flex flex-wrap gap-1.5 pt-1">
-                        {availableCoupons.slice(0, 3).map((c) => (
-                          <button
-                            key={`mob-coup-${c.id}`}
-                            type="button"
-                            onClick={() => handleApplyCheckoutCoupon(c.code)}
-                            className="text-[10px] bg-[#F7F4EE] hover:bg-[#701626]/10 text-[#701626] font-bold px-2.5 py-1 rounded-lg border border-[#C5A059]/40 transition-colors"
-                          >
-                            {c.discountType === 'free_shipping'
-                              ? `🚚 ${c.code} (Free Delivery)`
-                              : c.discountType === 'percentage'
-                                ? `⚡ ${c.code} (${c.value}% Off)`
-                                : `💖 ${c.code} (LKR ${c.value.toLocaleString()} Off)`}
-                          </button>
-                        ))}
-                      </div>
                     </div>
                   )}
                 </div>
@@ -1790,7 +1757,7 @@ export default function Checkout() {
                     <div className="flex gap-2.5">
                       <input
                         type="text"
-                        placeholder="Enter Promo or Free Delivery Code (e.g. FREEDELIVERY, AZHAI10)"
+                        placeholder="Enter Promo or Free Delivery Code"
                         value={checkoutCouponInput}
                         onChange={(e) => setCheckoutCouponInput(e.target.value)}
                         onKeyDown={(e) => {
@@ -1812,23 +1779,6 @@ export default function Checkout() {
                     {checkoutCouponError && (
                       <p className="text-xs text-rose-600 font-medium">{checkoutCouponError}</p>
                     )}
-                    <div className="flex flex-wrap items-center gap-2 pt-0.5">
-                      <span className="text-[10px] uppercase tracking-wider text-[#6D6268] font-bold">Available Offers:</span>
-                      {availableCoupons.slice(0, 4).map((c) => (
-                        <button
-                          key={`form-coup-${c.id}`}
-                          type="button"
-                          onClick={() => handleApplyCheckoutCoupon(c.code)}
-                          className="text-[11px] bg-[#F7F4EE] hover:bg-[#701626]/10 text-[#701626] font-bold px-3 py-1.5 rounded-xl border border-[#C5A059]/40 transition-colors cursor-pointer"
-                        >
-                          {c.discountType === 'free_shipping'
-                            ? `🚚 ${c.code} (Free Delivery)`
-                            : c.discountType === 'percentage'
-                              ? `⚡ ${c.code} (${c.value}% Off)`
-                              : `💖 ${c.code} (LKR ${c.value.toLocaleString()} Off)`}
-                        </button>
-                      ))}
-                    </div>
                   </div>
                 )}
               </div>
@@ -1973,22 +1923,6 @@ export default function Checkout() {
                     {checkoutCouponError && (
                       <p className="text-[11px] text-rose-600 font-medium">{checkoutCouponError}</p>
                     )}
-                    <div className="flex flex-wrap gap-1.5 pt-0.5">
-                      {availableCoupons.slice(0, 3).map((c) => (
-                        <button
-                          key={`side-coup-${c.id}`}
-                          type="button"
-                          onClick={() => handleApplyCheckoutCoupon(c.code)}
-                          className="text-[10px] bg-[#F7F4EE] hover:bg-[#701626]/10 text-[#701626] font-bold px-2.5 py-1 rounded-lg border border-[#C5A059]/40 transition-colors cursor-pointer"
-                        >
-                          {c.discountType === 'free_shipping'
-                            ? `🚚 ${c.code} (Free Delivery)`
-                            : c.discountType === 'percentage'
-                              ? `⚡ ${c.code} (${c.value}% Off)`
-                              : `💖 ${c.code} (LKR ${c.value.toLocaleString()} Off)`}
-                        </button>
-                      ))}
-                    </div>
                   </div>
                 )}
               </div>
