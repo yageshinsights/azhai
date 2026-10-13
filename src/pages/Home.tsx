@@ -22,6 +22,7 @@ import RecentlyViewed from '@/components/RecentlyViewed';
 import { useRecentlyViewed } from '@/hooks/useRecentlyViewed';
 import { PRODUCTS, COLLECTIONS, type Collection } from '@/lib/data';
 import { useAdminStore } from '@/store/admin';
+import { normalizeCategorySlug } from '@/lib/constants';
 
 export default function Home() {
   const storeProducts = useAdminStore((s) => s.products);
@@ -417,7 +418,7 @@ export default function Home() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 sm:gap-8">
             {allCategories.map((col) => {
               const count = allProducts.filter((p) =>
-                p.categories.some((c) => c.slug === col.slug)
+                p.categories.some((c) => c.slug === col.slug || c.id === col.id || normalizeCategorySlug(c.slug) === normalizeCategorySlug(col.slug))
               ).length;
 
               return (

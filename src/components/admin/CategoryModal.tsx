@@ -4,6 +4,7 @@ import { X, Sparkles, Image as ImageIcon, Upload, Loader2, RefreshCw, Link as Li
 import type { Collection } from '@/lib/data';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import { compressToWebP } from '@/lib/image-compressor';
+import { normalizeCategorySlug } from '@/lib/constants';
 
 interface CategoryModalProps {
   isOpen: boolean;
@@ -137,13 +138,8 @@ export default function CategoryModal({ isOpen, onClose, onSave, initialCategory
     if (!name.trim() || !heroImage.trim()) return;
 
     onSave({
-      name: name.trim(),
-      slug:
-        slug.trim() ||
-        name
-          .toLowerCase()
-          .replace(/[^a-z0-9]+/g, '-')
-          .replace(/(^-|-$)+/g, ''),
+      name: name.trim().replace(/\s+/g, ' '),
+      slug: normalizeCategorySlug(slug || name),
       tagline: tagline.trim() || 'Handcrafted bespoke silk silhouette.',
       season: season.trim() || 'Curated Edit',
       heroImage: heroImage.trim(),
@@ -205,7 +201,7 @@ export default function CategoryModal({ isOpen, onClose, onSave, initialCategory
                 <input
                   type="text"
                   value={slug}
-                  onChange={(e) => setSlug(e.target.value)}
+                  onChange={(e) => setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]+/g, '-'))}
                   placeholder="sarees"
                   required
                   className="w-full px-3.5 py-2.5 rounded-xl bg-[#F7F4EE]/70 border border-[#C5A059]/30 text-xs font-mono text-[#701626] focus:border-[#701626] focus:bg-white focus:outline-none"

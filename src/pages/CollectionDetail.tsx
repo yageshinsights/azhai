@@ -1,9 +1,10 @@
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { ArrowLeft, Sparkles, SlidersHorizontal, ArrowUpDown, X, Filter } from 'lucide-react';
 import { COLLECTIONS, PRODUCTS, type Product } from '@/lib/data';
 import { useAdminStore } from '@/store/admin';
+import { normalizeCategorySlug } from '@/lib/constants';
 import ProductCard from '@/components/ProductCard';
 import SEOHead from '@/components/SEOHead';
 
@@ -11,14 +12,37 @@ type SortOption = 'featured' | 'price-low' | 'price-high' | 'rating';
 
 export default function CollectionDetail() {
   const { slug } = useParams<{ slug: string }>();
+  const navigate = useNavigate();
+  const location = useLocation();
   const storeCategories = useAdminStore((state) => state.categories);
   const storeProducts = useAdminStore((state) => state.products);
 
   const allCategories = Array.isArray(storeCategories) && storeCategories.length > 0 ? storeCategories : COLLECTIONS;
   const allProducts = Array.isArray(storeProducts) ? storeProducts : PRODUCTS;
 
-  const collection = allCategories.find((c) => c.slug === slug);
-  const rawProducts = allProducts.filter((p) => p.categories.some((c) => c.slug === slug));
+  const cleanSlug = normalizeCategorySlug(slug);
+
+  const collection = allCategories.find((c) =>
+    c.slug === slug ||
+    normalizeCategorySlug(c.slug) === cleanSlug ||
+    normalizeCategorySlug(c.name) === cleanSlug
+  );
+
+  const rawProducts = allProducts.filter((p) =>
+    p.categories.some((c) =>
+      c.slug === slug ||
+      normalizeCategorySlug(c.slug) === cleanSlug ||
+      normalizeCategorySlug(c.name) === cleanSlug ||
+      (collection && c.id === collection.id)
+    )
+  );
+
+  // Auto-rewrite dirty or non-canonical URL to clean slug (e.g. /collections/Cord%20sets -> /collections/cord-sets)
+  useEffect(() => {
+    if (slug && cleanSlug && (slug !== cleanSlug || decodeURIComponent(slug).toLowerCase() !== cleanSlug)) {
+      navigate(`/collections/${cleanSlug}${location.search}`, { replace: true });
+    }
+  }, [slug, cleanSlug, location.search, navigate]);
 
   const [sortBy, setSortBy] = useState<SortOption>('featured');
   const [selectedSize, setSelectedSize] = useState<string>('all');
@@ -162,8 +186,8 @@ export default function CollectionDetail() {
         title={`${collection.name} Collection — Handcrafted Silk Couture`}
         description={collection.description || `Discover Azhai's handcrafted ${collection.name} collection in Colombo, Sri Lanka.`}
         image={collection.heroImage}
-        canonicalUrl={`https://azhaiclothing.lk/collections/${collection.slug}`}
-        url={`https://azhaiclothing.lk/collections/${collection.slug}`}
+        canonicalUrl={`https://azhaiclothing.lk/collections/${collection.slug || cleanSlug}`}
+        url={`https://azhaiclothing.lk/collections/${collection.slug || cleanSlug}`}
         schema={collectionSchema}
       />
       {/* Hero Banner */}

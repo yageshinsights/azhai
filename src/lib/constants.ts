@@ -82,3 +82,22 @@ export function getWhatsAppUrl(
   }
   return `https://wa.me/${digits || STORE_WHATSAPP_NUMBER}?text=${encodeURIComponent(prefilledText)}`;
 }
+
+/**
+ * Normalizes any category slug or name into a canonical, SEO-friendly, URL-safe slug.
+ * Handles cases like "Cord  sets", "Cord%20sets", "Cord sets", "cord_sets", "Anarkali" -> "cord-sets", "anarkali".
+ */
+export function normalizeCategorySlug(rawSlug?: string | null): string {
+  if (!rawSlug) return '';
+  let str = String(rawSlug).trim();
+  try {
+    str = decodeURIComponent(str);
+  } catch {
+    // fallback if malformed URI sequence
+  }
+  return str
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}

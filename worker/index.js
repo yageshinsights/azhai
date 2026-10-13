@@ -286,6 +286,29 @@ export default {
       });
     }
 
+    // ── Canonical Collection URL Normalization (Edge 301 Permanent Redirect) ──
+    if (url.pathname.startsWith('/collections/')) {
+      const rawCollectionSlug = url.pathname.slice('/collections/'.length);
+      if (rawCollectionSlug) {
+        let decodedSlug = rawCollectionSlug;
+        try {
+          decodedSlug = decodeURIComponent(rawCollectionSlug);
+        } catch {}
+
+        const cleanSlug = decodedSlug
+          .toLowerCase()
+          .trim()
+          .replace(/[^a-z0-9]+/g, '-')
+          .replace(/(^-|-$)+/g, '');
+
+        if (cleanSlug && (rawCollectionSlug !== cleanSlug || url.pathname !== `/collections/${cleanSlug}`)) {
+          const redirectUrl = new URL(request.url);
+          redirectUrl.pathname = `/collections/${cleanSlug}`;
+          return Response.redirect(redirectUrl.toString(), 301);
+        }
+      }
+    }
+
     // ── 1. Secure Server-Side Brevo Email Dispatcher ───────────
     if (url.pathname === '/api/send-email') {
       if (request.method === 'POST') {

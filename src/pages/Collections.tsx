@@ -5,6 +5,7 @@ import { useAdminStore } from '@/store/admin';
 import { COLLECTIONS, PRODUCTS, type Product } from '@/lib/data';
 import { ArrowRight, Crown } from 'lucide-react';
 import SEOHead from '@/components/SEOHead';
+import { normalizeCategorySlug } from '@/lib/constants';
 
 export default function Collections() {
   const adminCategories = useAdminStore((s) => s.categories);
@@ -60,7 +61,7 @@ export default function Collections() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 sm:gap-8">
             {categoriesList.map((col, i) => {
             const count = allProducts.filter((p: Product) =>
-              p.categories && p.categories.some((c: any) => c.slug === col.slug)
+              p.categories && p.categories.some((c: any) => c.slug === col.slug || c.id === col.id || normalizeCategorySlug(c.slug) === normalizeCategorySlug(col.slug))
             ).length;
 
             return (

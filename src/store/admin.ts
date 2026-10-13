@@ -3,6 +3,7 @@ import { persist, createJSONStorage } from 'zustand/middleware';
 import { PRODUCTS, COLLECTIONS, type Product, type Collection } from '@/lib/data';
 import type { PlacedOrder } from './cart';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
+import { normalizeCategorySlug } from '@/lib/constants';
 import {
   type DressType,
   type TailoringFabric,
@@ -424,10 +425,13 @@ export const useAdminStore = create<AdminState>()(
                   ? Boolean(c.is_featured) 
                   : true;
 
+              const cleanCatSlug = normalizeCategorySlug(c.slug || c.name);
+              const cleanCatName = (c.name || '').replace(/\s+/g, ' ').trim();
+
               return {
                 id: c.id,
-                name: c.name,
-                slug: c.slug,
+                name: cleanCatName,
+                slug: cleanCatSlug,
                 description: c.description || '',
                 heroImage: c.hero_image || '',
                 count: c.count || 0,
@@ -1512,9 +1516,13 @@ export const useAdminStore = create<AdminState>()(
       addCategory: async (categoryData) => {
         const newId = Math.max(...get().categories.map((c) => c.id), 0) + 1;
         const isFeatured = categoryData.isFeatured !== undefined ? categoryData.isFeatured : true;
+        const cleanName = (categoryData.name || '').replace(/\s+/g, ' ').trim();
+        const cleanSlug = normalizeCategorySlug(categoryData.slug || categoryData.name);
         const newCat: Collection = {
           ...categoryData,
           id: newId,
+          name: cleanName,
+          slug: cleanSlug,
           count: 0,
           isFeatured,
         };
@@ -1524,8 +1532,8 @@ export const useAdminStore = create<AdminState>()(
           try {
             await supabase.from('categories').insert({
               id: newId,
-              name: categoryData.name,
-              slug: categoryData.slug,
+              name: cleanName,
+              slug: cleanSlug,
               description: categoryData.description,
               hero_image: categoryData.heroImage,
               count: 0,
@@ -1540,15 +1548,19 @@ export const useAdminStore = create<AdminState>()(
       },
 
       updateCategory: async (id, updates) => {
+        const sanitizedUpdates: Partial<Collection> = { ...updates };
+        if (updates.name !== undefined) sanitizedUpdates.name = updates.name.replace(/\s+/g, ' ').trim();
+        if (updates.slug !== undefined) sanitizedUpdates.slug = normalizeCategorySlug(updates.slug);
+
         set((state) => ({
-          categories: state.categories.map((c) => (c.id === id ? { ...c, ...updates } : c)),
+          categories: state.categories.map((c) => (c.id === id ? { ...c, ...sanitizedUpdates } : c)),
         }));
 
         if (isSupabaseConfigured()) {
           try {
             const dbPayload: any = {};
-            if (updates.name !== undefined) dbPayload.name = updates.name;
-            if (updates.slug !== undefined) dbPayload.slug = updates.slug;
+            if (sanitizedUpdates.name !== undefined) dbPayload.name = sanitizedUpdates.name;
+            if (sanitizedUpdates.slug !== undefined) dbPayload.slug = sanitizedUpdates.slug;
             if (updates.description !== undefined) dbPayload.description = updates.description;
             if (updates.heroImage !== undefined) dbPayload.hero_image = updates.heroImage;
             if (updates.season !== undefined) dbPayload.season = updates.season;
