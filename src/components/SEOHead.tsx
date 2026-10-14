@@ -14,7 +14,7 @@ interface SEOHeadProps {
 
 const DEFAULT_TITLE = 'Azhai Clothing — Handcrafted Silk & Festive Couture by Preethi';
 const DEFAULT_DESC = 'An invitation to rediscover your inherent beauty through handloom tradition, bespoke tailored kurtis, and pure mulberry silks. Colombo, Sri Lanka.';
-const DEFAULT_IMAGE = 'https://images.unsplash.com/photo-1583391733956-3750e0ff4e8b?auto=format&fit=crop&w=1200&q=85';
+const DEFAULT_IMAGE = 'https://azhaiclothing.lk/og-azhai.jpg';
 const DEFAULT_URL = 'https://azhaiclothing.lk';
 
 export default function SEOHead({
