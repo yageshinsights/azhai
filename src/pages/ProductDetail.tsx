@@ -32,6 +32,7 @@ import SEOHead from '@/components/SEOHead';
 import RecentlyViewed from '@/components/RecentlyViewed';
 import { useRecentlyViewed } from '@/hooks/useRecentlyViewed';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
+import { trackViewItem, trackAddToCart, trackWhatsAppClick } from '@/lib/gtm';
 
 export default function ProductDetail() {
   const { slug } = useParams<{ slug: string }>();
@@ -74,6 +75,13 @@ export default function ProductDetail() {
         }
       });
   }, [product?.name, product?.slug]);
+
+  // Track Product Impression (GA4 view_item & Meta ViewContent)
+  useEffect(() => {
+    if (product) {
+      trackViewItem(product);
+    }
+  }, [product?.id, product?.slug]);
 
   const activeReviewCount = dynamicReviews !== null ? dynamicReviews.count : (product?.reviewsCount || 0);
   const activeRating = dynamicReviews !== null ? dynamicReviews.avgRating : (product?.rating || 0);
@@ -206,13 +214,22 @@ export default function ProductDetail() {
 
   const handleAddToCart = () => {
     if (!product || isOutOfStock) return;
+    const activeSize = selectedSize || sizes[0] || 'M';
     addItem({
       id: product.id,
       name: product.name,
       price: product.price,
       image: product.images[0]?.src,
       quantity: quantity,
-      size: selectedSize || sizes[0] || 'M',
+      size: activeSize,
+    });
+    trackAddToCart({
+      id: product.id,
+      name: product.name,
+      price: product.price,
+      quantity: quantity,
+      size: activeSize,
+      category: product.categories?.[0]?.name,
     });
     setJustAdded(true);
     setTimeout(() => setJustAdded(false), 2000);
@@ -238,6 +255,9 @@ export default function ProductDetail() {
   const handleAddBundle = () => {
     if (!product || !companionProduct) return;
 
+    const mainSize = selectedSize || sizes[0] || 'M';
+    const compSize = companionSize || companionSizes[0] || 'Free Size';
+
     // 1. Add current main product
     addItem({
       id: product.id,
@@ -245,7 +265,15 @@ export default function ProductDetail() {
       price: product.price,
       image: product.images[0]?.src,
       quantity: 1,
-      size: selectedSize || sizes[0] || 'M',
+      size: mainSize,
+    });
+    trackAddToCart({
+      id: product.id,
+      name: product.name,
+      price: product.price,
+      quantity: 1,
+      size: mainSize,
+      category: product.categories?.[0]?.name,
     });
 
     // 2. Add companion product
@@ -255,7 +283,15 @@ export default function ProductDetail() {
       price: companionProduct.price,
       image: companionProduct.images[0]?.src,
       quantity: 1,
-      size: companionSize || companionSizes[0] || 'Free Size',
+      size: compSize,
+    });
+    trackAddToCart({
+      id: companionProduct.id,
+      name: companionProduct.name,
+      price: companionProduct.price,
+      quantity: 1,
+      size: compSize,
+      category: companionProduct.categories?.[0]?.name,
     });
 
     setBundleAdded(true);
@@ -613,6 +649,7 @@ export default function ProductDetail() {
                   href={waShareUrl}
                   target="_blank"
                   rel="noreferrer"
+                  onClick={() => trackWhatsAppClick('product_share', product.name)}
                   className="px-3 py-1.5 rounded-xl bg-[#25D366]/10 text-[#128C7E] hover:bg-[#25D366]/20 font-bold flex items-center gap-1.5 transition-colors"
                 >
                   <MessageCircle className="w-3.5 h-3.5" /> WhatsApp

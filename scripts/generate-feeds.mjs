@@ -127,7 +127,18 @@ async function main() {
 
   // 1. Fetch live products and categories
   const dbProducts = await fetchFromSupabase('products', 'select=*&order=id.asc');
-  const products = (Array.isArray(dbProducts) && dbProducts.length > 0) ? dbProducts : FALLBACK_PRODUCTS;
+  const allRawProducts = (Array.isArray(dbProducts) && dbProducts.length > 0) ? dbProducts : FALLBACK_PRODUCTS;
+
+  // Filter out internal test / dummy items (e.g. price < LKR 500 or 'test' in name)
+  const isCommercialProduct = (p) => {
+    if (!p || !p.slug) return false;
+    const nameLower = (p.name || '').toLowerCase();
+    if (nameLower.includes('test') || nameLower.includes('dummy')) return false;
+    const priceNum = parseInt(String(p.price || '').replace(/[^0-9]/g, ''), 10) || 0;
+    if (priceNum < 500) return false;
+    return true;
+  };
+  const products = allRawProducts.filter(isCommercialProduct);
 
   const dbCategories = await fetchFromSupabase('categories', 'select=*&order=id.asc');
   const categories = (Array.isArray(dbCategories) && dbCategories.length > 0) ? dbCategories : FALLBACK_CATEGORIES;

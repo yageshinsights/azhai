@@ -422,7 +422,16 @@ export default {
         });
 
         if (sbRes.ok) {
-          const products = await sbRes.json();
+          const rawProducts = await sbRes.json();
+          // Filter out internal tests and dummy items (price < LKR 500 or 'test' in name)
+          const products = (Array.isArray(rawProducts) ? rawProducts : []).filter((p) => {
+            if (!p || !p.slug) return false;
+            const nameLower = (p.name || '').toLowerCase();
+            if (nameLower.includes('test') || nameLower.includes('dummy')) return false;
+            const priceNum = parseInt(String(p.price || '').replace(/[^0-9]/g, ''), 10) || 0;
+            if (priceNum < 500) return false;
+            return true;
+          });
           const baseUrl = 'https://azhaiclothing.lk';
 
           if (url.pathname.endsWith('.csv')) {
@@ -1295,6 +1304,56 @@ export default {
           }
         } catch (e) {
           console.warn('[Social Crawler Rewrite Error]:', e);
+        }
+      }
+    }
+
+    if (isSocialCrawler && url.pathname.startsWith('/collections/')) {
+      const rawSlug = url.pathname.replace('/collections/', '').split('/')[0].split('?')[0];
+      const cleanSlug = rawSlug ? decodeURIComponent(rawSlug).trim().toLowerCase().replace(/%20|\+/g, '-').replace(/\s+/g, '-') : '';
+      if (cleanSlug) {
+        try {
+          const supabaseUrl = env.VITE_SUPABASE_URL || 'https://hrmcxxcrnxqhesiywqsc.supabase.co';
+          const supabaseKey = env.VITE_SUPABASE_ANON_KEY || 'sb_publishable_-ZSOc4XGHM2OysLhqKZ5yQ_4OPgdcAm';
+          const sbRes = await fetch(
+            `${supabaseUrl}/rest/v1/categories?select=id,name,slug,description,hero_image`,
+            {
+              headers: {
+                apikey: supabaseKey,
+                Authorization: `Bearer ${supabaseKey}`,
+              },
+            }
+          );
+          if (sbRes.ok) {
+            const categories = await sbRes.json();
+            const collection = (Array.isArray(categories) ? categories : []).find((c) => {
+              const cSlug = (c.slug || '').trim().toLowerCase().replace(/%20|\+/g, '-').replace(/\s+/g, '-');
+              const cName = (c.name || '').trim().toLowerCase().replace(/%20|\+/g, '-').replace(/\s+/g, '-');
+              return cSlug === cleanSlug || cName === cleanSlug;
+            });
+
+            if (collection) {
+              const res = await env.ASSETS.fetch(request);
+              const ogTitle = `${collection.name} Collection | Azhai Clothing by Preethi`;
+              const ogDesc = collection.description || `Explore our handcrafted ${collection.name} collection at Azhai Clothing. Heirloom silk and festive couture.`;
+              const ogImg = collection.hero_image || `${url.origin}/og-azhai.jpg`;
+              const ogUrl = `${url.origin}/collections/${collection.slug || cleanSlug}`;
+
+              return new HTMLRewriter()
+                .on('title', { element(e) { e.setInnerContent(ogTitle); } })
+                .on('meta[property="og:title"]', { element(e) { e.setAttribute('content', ogTitle); } })
+                .on('meta[property="og:description"]', { element(e) { e.setAttribute('content', ogDesc); } })
+                .on('meta[property="og:image"]', { element(e) { e.setAttribute('content', ogImg); } })
+                .on('meta[property="og:url"]', { element(e) { e.setAttribute('content', ogUrl); } })
+                .on('meta[name="twitter:title"]', { element(e) { e.setAttribute('content', ogTitle); } })
+                .on('meta[name="twitter:description"]', { element(e) { e.setAttribute('content', ogDesc); } })
+                .on('meta[name="twitter:image"]', { element(e) { e.setAttribute('content', ogImg); } })
+                .on('meta[name="description"]', { element(e) { e.setAttribute('content', ogDesc); } })
+                .transform(res);
+            }
+          }
+        } catch (e) {
+          console.warn('[Social Crawler Collection Rewrite Error]:', e);
         }
       }
     }

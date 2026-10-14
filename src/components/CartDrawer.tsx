@@ -7,6 +7,7 @@ import { useAuthStore } from '@/store/auth';
 import { useAdminStore } from '@/store/admin';
 import { PRODUCTS } from '@/lib/data';
 import { calculateSLPostPostage, estimateCartWeight } from '@/lib/slpost-calculator';
+import { trackRemoveFromCart } from '@/lib/gtm';
 
 export default function CartDrawer() {
   const { items, isOpen, setCartOpen, removeItem, updateQuantity, totalPrice } = useCartStore();
@@ -253,7 +254,18 @@ export default function CartDrawer() {
                           <div className="flex items-center gap-3 pt-2">
                             <div className="flex items-center bg-[#F7F4EE] rounded-full p-0.5 border border-[#C5A059]/40">
                               <button 
-                                onClick={() => updateQuantity(item.id, item.size, item.quantity - 1)} 
+                                onClick={() => {
+                                  if (item.quantity <= 1) {
+                                    trackRemoveFromCart({
+                                      id: item.id,
+                                      name: item.name,
+                                      price: item.price,
+                                      quantity: item.quantity,
+                                      size: item.size,
+                                    });
+                                  }
+                                  updateQuantity(item.id, item.size, item.quantity - 1);
+                                }} 
                                 className="w-7 h-7 flex items-center justify-center rounded-full text-[#110B0E]/70 hover:text-[#701626] hover:bg-black/5 active:scale-95 transition-all cursor-pointer"
                                 aria-label="Decrease quantity"
                               >
@@ -269,7 +281,16 @@ export default function CartDrawer() {
                               </button>
                             </div>
                             <button 
-                              onClick={() => removeItem(item.id, item.size)} 
+                              onClick={() => {
+                                removeItem(item.id, item.size);
+                                trackRemoveFromCart({
+                                  id: item.id,
+                                  name: item.name,
+                                  price: item.price,
+                                  quantity: item.quantity,
+                                  size: item.size,
+                                });
+                              }} 
                               className="p-2 rounded-xl text-[#6D6268]/60 hover:text-rose-600 hover:bg-rose-50 transition-colors ml-auto cursor-pointer"
                               aria-label="Remove item"
                             >

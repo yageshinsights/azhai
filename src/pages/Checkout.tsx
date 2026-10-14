@@ -32,6 +32,7 @@ import { sendBrevoEmail, buildOrderConfirmationHtml, buildAdminOrderAlertHtml, c
 import { initiatePayHereCheckout, verifyPayHereOrderPayment } from '@/lib/payhere';
 import { isUUID } from '@/lib/auth-utils';
 import SEOHead from '@/components/SEOHead';
+import { trackBeginCheckout } from '@/lib/gtm';
 import { 
   calculateSLPostShipping, 
   estimateCartWeight, 
@@ -335,6 +336,13 @@ export default function Checkout() {
       setPaymentMethod('card');
     }
   }, [settings.enableCOD, paymentMethod, finalTotal, maxAllowedCOD]);
+
+  // Track Begin Checkout (GA4 begin_checkout & Meta InitiateCheckout)
+  useEffect(() => {
+    if (items.length > 0 && rawTotal > 0) {
+      trackBeginCheckout(items, rawTotal, activeCouponCode || undefined);
+    }
+  }, []);
 
   const handleSelectSavedAddress = (id: string) => {
     setSelectedAddrId(id);

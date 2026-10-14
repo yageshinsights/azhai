@@ -15,6 +15,7 @@ import BankBadge from '@/components/BankBadge';
 import { uploadBankSlipFile, useSignedSlipUrl } from '@/lib/storage';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import { verifyPayHereOrderPayment } from '@/lib/payhere';
+import { trackPurchase } from '@/lib/gtm';
 import { 
   sendBrevoEmail, 
   buildOrderConfirmationHtml,
@@ -295,6 +296,19 @@ export default function OrderSuccess() {
 
     return lastOrder || null;
   }, [orderId, lastOrder, authOrders, adminOrders, dbOrder]);
+
+  // Track Purchase Event (GA4 purchase & Meta Purchase)
+  useEffect(() => {
+    if (order && order.orderId && order.orderId !== 'AZ-TEST-8840' && Array.isArray(order.items) && order.items.length > 0) {
+      trackPurchase({
+        id: order.orderId,
+        total: order.total,
+        shippingFee: order.shipping,
+        paymentMethod: order.paymentMethod,
+        items: order.items,
+      });
+    }
+  }, [order?.orderId, order?.total]);
 
   const { signedUrl: activeSignedSlipUrl } = useSignedSlipUrl(order?.bankTransferDetails?.slipUrl);
 

@@ -7,6 +7,7 @@ import { useAdminStore } from '@/store/admin';
 import { normalizeCategorySlug } from '@/lib/constants';
 import ProductCard from '@/components/ProductCard';
 import SEOHead from '@/components/SEOHead';
+import { trackViewItemList } from '@/lib/gtm';
 
 type SortOption = 'featured' | 'price-low' | 'price-high' | 'rating';
 
@@ -43,6 +44,13 @@ export default function CollectionDetail() {
       navigate(`/collections/${cleanSlug}${location.search}`, { replace: true });
     }
   }, [slug, cleanSlug, location.search, navigate]);
+
+  // Track Collection / Category Impression (GA4 view_item_list & Meta ViewCategory)
+  useEffect(() => {
+    if (collection && rawProducts.length > 0) {
+      trackViewItemList(collection.name, rawProducts);
+    }
+  }, [collection?.name, rawProducts.length]);
 
   const [sortBy, setSortBy] = useState<SortOption>('featured');
   const [selectedSize, setSelectedSize] = useState<string>('all');

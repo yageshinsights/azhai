@@ -5,6 +5,7 @@ import { useAdminStore } from '@/store/admin';
 import { useAuthStore } from '@/store/auth';
 import { useCartStore } from '@/store/cart';
 import { COLLECTIONS, type Collection } from '@/lib/data';
+import { trackAddToCart } from '@/lib/gtm';
 import InteractiveMannequin from './InteractiveMannequin';
 import {
   type DressType,
@@ -174,6 +175,15 @@ export default function TailoringStudio() {
         measurements: { ...measurements },
         leadTime: selectedDressType.leadTime,
       }
+    });
+
+    trackAddToCart({
+      id: `tailoring_${selectedDressType.id}_${selectedFabric.id}`,
+      name: `Custom ${selectedDressType.name} — ${selectedFabric.name}`,
+      price: totalPrice,
+      quantity: 1,
+      size: 'Custom Fit',
+      category: 'Custom Tailoring Studio',
     });
 
     setIsSuccess(true);

@@ -6,6 +6,7 @@ import LotusIcon from '@/components/LotusIcon';
 import { useAdminStore, cleanWhatsAppDigits } from '@/store/admin';
 import { useCartStore } from '@/store/cart';
 import { STORE_PHONE } from '@/lib/constants';
+import { trackWhatsAppClick } from '@/lib/gtm';
 
 export default function WhatsAppConcierge() {
   const [isOpen, setIsOpen] = useState(false);
@@ -55,6 +56,7 @@ export default function WhatsAppConcierge() {
   };
 
   const handleOpenWhatsApp = (topic?: string) => {
+    trackWhatsAppClick(topic || 'concierge_floating');
     const activeDigits = cleanWhatsAppDigits(whatsappNumber);
     const url = `https://wa.me/${activeDigits}?text=${getCustomMessage(topic)}`;
     window.open(url, '_blank', 'noopener,noreferrer');
