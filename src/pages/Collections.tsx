@@ -16,8 +16,8 @@ export default function Collections() {
   const collectionsSchema = useMemo(() => ({
     '@context': 'https://schema.org',
     '@type': 'CollectionPage',
-    name: 'Curated Silhouettes & Collections — Azhai Clothing',
-    description: 'Explore Azhai’s handcrafted festive collections: handloom kurti sets, lotus organza sarees, Kashmiri tilla shawls, and tailored silk crop tops.',
+    name: 'Designer Ethnic Wear & Silk Collections — Azhai Clothing Colombo',
+    description: 'Explore Azhai’s curated silhouettes: pure silk kurti sets, lightweight organza sarees, flared anarkalis, and modern cord sets tailored in Colombo.',
     url: 'https://azhaiclothing.lk/collections',
     hasPart: categoriesList.map((col) => ({
       '@type': 'ProductModel',
@@ -31,8 +31,8 @@ export default function Collections() {
   return (
     <div className="min-h-screen bg-[#FCFBF8] pt-32 sm:pt-36 text-[#110B0E]">
       <SEOHead
-        title="The Collections — Handloom Silks, Saree Sets & Kurties"
-        description="Explore curated handloom kurti sets, hand-painted lotus organza sarees, Kashmiri tilla shawls, and tailored festive couture by Preethi."
+        title="Designer Ethnic Wear & Silk Collections Colombo"
+        description="Explore Azhai’s curated silhouettes: pure silk kurti sets, lightweight organza sarees, flared anarkalis, and modern cord sets tailored in Colombo."
         canonicalUrl="https://azhaiclothing.lk/collections"
         url="https://azhaiclothing.lk/collections"
         schema={collectionsSchema}
@@ -51,8 +51,8 @@ export default function Collections() {
             <span>Curated Silhouettes ({categoriesList.length} Collections)</span>
           </span>
           <h1 className="font-display text-4xl sm:text-6xl font-bold text-[#110B0E]">The Collections</h1>
-          <p className="text-sm text-[#6D6268] max-w-lg mx-auto font-light leading-relaxed">
-            Curated with timeless handloom silks — crafted for modern Sri Lankan celebrations, weddings, and understated luxury.
+          <p className="text-sm text-[#6D6268] max-w-xl mx-auto font-light leading-relaxed">
+            Curated with timeless handloom silks and bespoke silhouettes — crafted for modern Sri Lankan celebrations, wedding guest wear, and understated luxury.
           </p>
         </motion.div>
 

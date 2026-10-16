@@ -137,6 +137,8 @@ export default function ProductDetail() {
         '@context': 'https://schema.org/',
         '@type': 'Product',
         name: product.name,
+        sku: `azhai_${product.id}`,
+        productID: `azhai_${product.id}`,
         image: product.images.map((i) => i.src),
         description: product.description || product.shortDescription,
         brand: {

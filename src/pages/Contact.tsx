@@ -160,8 +160,8 @@ export default function Contact() {
   return (
     <div className="min-h-screen bg-[#FCFBF8] pt-32 sm:pt-36 pb-20 text-[#110B0E]">
       <SEOHead
-        title="Contact Azhai Atelier — Bespoke Styling & Customer Care Colombo"
-        description="Connect with Azhai Clothing by Preethi in Colombo. WhatsApp concierge, bespoke fitting inquiries, parcel dispatch updates, and showroom appointments."
+        title="Contact Azhai Atelier Colombo — WhatsApp & Concierge"
+        description="Get in touch with Azhai Clothing in Colombo 03. WhatsApp concierge styling, custom sizing consultations, parcel dispatch updates, and atelier care."
         canonicalUrl="https://azhaiclothing.lk/contact"
         url="https://azhaiclothing.lk/contact"
         schema={contactSchema}
@@ -198,22 +198,23 @@ export default function Contact() {
                   <MapPin className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="font-display text-lg font-bold text-[#110B0E]">Colombo Atelier</h3>
-                  <p className="text-xs text-[#6D6268] font-light">Western Province, Sri Lanka</p>
+                  <h3 className="font-display text-lg font-bold text-[#110B0E]">Online Boutique & Atelier</h3>
+                  <p className="text-xs text-[#6D6268] font-light">Colombo, Sri Lanka</p>
                 </div>
               </div>
               <p className="text-xs text-[#6D6268] leading-relaxed">
                 {activeAddress}<br />
-                <span className="text-[11px] text-[#C5A059] font-medium">(Private showroom visits & bespoke fittings by appointment)</span>
+                <span className="text-[11px] text-[#C5A059] font-medium">(Online boutique with island-wide courier delivery · No walk-in showroom)</span>
               </p>
-              <div className="pt-1 border-t border-[#C5A059]/20">
+              <div className="pt-1 border-t border-[#C5A059]/20 flex items-center justify-between text-xs">
+                <span className="text-[#6D6268]">Need sizing or styling advice?</span>
                 <a
-                  href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(activeAddress)}`}
+                  href={`https://wa.me/${activeWhatsAppDigits}?text=${encodeURIComponent('Hello Preethi! I would like to inquire about Azhai clothing sizing and ordering.')}`}
                   target="_blank"
                   rel="noreferrer"
-                  className="inline-flex items-center gap-1.5 text-xs font-bold text-[#701626] hover:underline cursor-pointer"
+                  className="inline-flex items-center gap-1 font-bold text-[#701626] hover:underline cursor-pointer"
                 >
-                  <span>Open Directions in Google Maps</span>
+                  <span>WhatsApp Concierge</span>
                   <ExternalLink className="w-3.5 h-3.5" />
                 </a>
               </div>

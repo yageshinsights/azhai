@@ -19,13 +19,13 @@ export default function AdminSEO() {
   const { products, settings, updateSettings } = useAdminStore();
   const [selectedProduct, setSelectedProduct] = useState(products[0]);
   const [metaTitle, setMetaTitle] = useState(
-    settings.seo?.metaTitle || 'Azhai Clothing by Preethi | Handcrafted Luxury Silk Kurties & Sarees Sri Lanka'
+    settings.seo?.metaTitle || 'Azhai Clothing — Designer Ethnic Wear & Festive Couture Sri Lanka'
   );
   const [metaDesc, setMetaDesc] = useState(
-    settings.seo?.metaDescription || 'Discover heirloom handloom kurti sets, cloud-light organza sarees, and tailored corset tops. Island-wide Sri Lanka delivery & bespoke sizing in Colombo.'
+    settings.seo?.metaDescription || 'Explore Azhai by Preethi: Colombo’s premier luxury boutique for designer ethnic wear, handcrafted festive silk couture, lotus organza sarees, and bespoke tailoring.'
   );
   const [targetKeywords, setTargetKeywords] = useState(
-    settings.seo?.targetKeywords || 'silk kurties sri lanka, bridal saree colombo, handloom clothing boutique, preethi silk couture'
+    settings.seo?.targetKeywords || 'designer ethnic wear sri lanka, luxury clothing boutique colombo, festive couture colombo, handloom silk sarees, bespoke tailoring sri lanka'
   );
   const [savedToast, setSavedToast] = useState(false);
 

@@ -1,7 +1,7 @@
 import { useParams, Link, useNavigate, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useState, useMemo, useEffect } from 'react';
-import { ArrowLeft, Sparkles, SlidersHorizontal, ArrowUpDown, X, Filter } from 'lucide-react';
+import { ArrowLeft, Sparkles, SlidersHorizontal, ArrowUpDown, X, Filter, ChevronDown, HelpCircle } from 'lucide-react';
 import { COLLECTIONS, PRODUCTS, type Product } from '@/lib/data';
 import { useAdminStore } from '@/store/admin';
 import { normalizeCategorySlug } from '@/lib/constants';
@@ -10,6 +10,107 @@ import SEOHead from '@/components/SEOHead';
 import { trackViewItemList } from '@/lib/gtm';
 
 type SortOption = 'featured' | 'price-low' | 'price-high' | 'rating';
+
+const CATEGORY_SEO_MAP: Record<string, { title: string; description: string }> = {
+  kurties: {
+    title: 'Silk Kurti Sets Sri Lanka — Handloom & Festive',
+    description: 'Shop handcrafted silk kurti sets online in Sri Lanka. Tailored with pure mulberry silk, breathable handloom weaves, and matching pants. Colombo dispatch.',
+  },
+  sarees: {
+    title: 'Organza & Handloom Sarees Sri Lanka — Festive',
+    description: 'Discover ethereal hand-painted lotus organza sarees and traditional handloom silks in Colombo. Weightless celebratory drapes with island-wide shipping.',
+  },
+  anarkali: {
+    title: 'Anarkali Suits & Flared Gowns Sri Lanka | Azhai Colombo',
+    description: 'Buy luxury Anarkali dresses online in Sri Lanka. Flared pure chiffon and mulberry silk gowns with handcrafted details. Express delivery across Colombo.',
+  },
+  'cord-sets': {
+    title: 'Co Ord Sets Sri Lanka — Minimal Linen & Silk',
+    description: 'Shop stylish women’s co-ord sets online in Colombo. Breathable linen blends, minimal silhouettes, and pockets designed for modern Sri Lankan comfort.',
+  },
+};
+
+const CATEGORY_FAQS: Record<string, Array<{ q: string; a: string }>> = {
+  kurties: [
+    {
+      q: 'What fabrics are used in Azhai silk kurti sets?',
+      a: 'Our kurti sets are handcrafted using pure mulberry silks, tissue organzas, and breathable handloom cotton blends tailored specifically for South Asian climates.',
+    },
+    {
+      q: 'Are pants or palazzos included with the kurti?',
+      a: 'Yes, our kurti sets include coordinated, tailored trousers or palazzo pants designed with practical pockets and comfortable elasticated backs.',
+    },
+    {
+      q: 'Can I request custom sleeve or bust sizing for my kurti set?',
+      a: 'Yes! You can specify custom measurements during checkout or commission our bespoke tailoring service in Colombo for a made-to-measure fit.',
+    },
+    {
+      q: 'How long does delivery take across Sri Lanka?',
+      a: 'Ready-to-wear kurti sets are dispatched within 24 hours. Express Colombo delivery takes 1–2 working days, and island-wide delivery takes 2–4 working days with SMS tracking.',
+    },
+  ],
+  sarees: [
+    {
+      q: 'Does each saree come with an unstitched blouse piece?',
+      a: 'Yes, all our handloom and lotus organza sarees include 0.8m to 1m of coordinated unstitched blouse fabric. You can also have it tailored directly via our 2D blouse customizer.',
+    },
+    {
+      q: 'How lightweight and wearable is the lotus organza fabric?',
+      a: 'Our lotus organza sarees are specially processed to be cloud-light and drape softly without the stiff bulk often associated with synthetic organzas.',
+    },
+    {
+      q: 'What are the recommended care instructions for festive sarees?',
+      a: 'We recommend professional dry cleaning for your first wear to preserve the delicate hand-painted motifs and pure metallic gold borders.',
+    },
+    {
+      q: 'Do you offer Cash on Delivery (COD) for sarees in Sri Lanka?',
+      a: 'Yes, Cash on Delivery is available across Sri Lanka for ready-to-wear sarees, alongside secure card payments via PayHere.',
+    },
+  ],
+  anarkali: [
+    {
+      q: 'What is the skirt flare (ghera) on Azhai Anarkali suits?',
+      a: 'Our festive Anarkalis feature an expansive 4.5+ meter flare with comfortable breathable lining to create graceful movement without excessive weight.',
+    },
+    {
+      q: 'Are the Anarkali suits pre-stitched and ready to wear?',
+      a: 'Yes, all our Anarkalis are fully stitched with premium lining, coordinated dupattas, and tailored bottoms ready for your celebrations.',
+    },
+    {
+      q: 'Can I adjust the length if I am taller or shorter?',
+      a: 'Our atelier offers complimentary length adjustments prior to courier dispatch. Simply leave a note at checkout or contact our WhatsApp concierge.',
+    },
+  ],
+  'cord-sets': [
+    {
+      q: 'Are Azhai cord sets suitable for both casual and festive wear?',
+      a: 'Yes! Crafted from breathable linen and silk blends, our minimal cord sets seamlessly transition from daytime chic to celebratory evenings with simple jewelry pairings.',
+    },
+    {
+      q: 'Do the cord set pants feature pockets?',
+      a: 'Yes, all our cord set trousers feature deep, discreet tailored pockets designed for everyday practicality.',
+    },
+    {
+      q: 'What size range is available for cord sets?',
+      a: 'Our ready-to-wear cord sets range from XS to XXL, with relaxed comfort fits tailored to South Asian silhouettes.',
+    },
+  ],
+};
+
+const DEFAULT_COLLECTION_FAQS = [
+  {
+    q: 'How do I choose the correct size?',
+    a: 'We provide an exact size guide on every piece. If you are between sizes, we recommend choosing your standard bust measurement, or contacting our WhatsApp styling concierge for personalized sizing advice.',
+  },
+  {
+    q: 'What are your delivery timelines and fees across Sri Lanka?',
+    a: 'Standard courier delivery is LKR 450 (or free on orders above LKR 15,000). Express Colombo delivery is LKR 850 with 1–2 day arrival.',
+  },
+  {
+    q: 'Can I exchange a piece if the fit is not right?',
+    a: 'Yes, we offer hassle-free courier exchange assistance across Sri Lanka for unworn garments with original atelier tags intact within 7 days.',
+  },
+];
 
 export default function CollectionDetail() {
   const { slug } = useParams<{ slug: string }>();
@@ -28,6 +129,11 @@ export default function CollectionDetail() {
     normalizeCategorySlug(c.slug) === cleanSlug ||
     normalizeCategorySlug(c.name) === cleanSlug
   );
+
+  const categorySeo = CATEGORY_SEO_MAP[cleanSlug] || {
+    title: `${collection?.name || 'Collection'} Collection — Designer Ethnic Wear Colombo`,
+    description: collection?.description || `Discover Azhai's handcrafted ${collection?.name} collection in Colombo, Sri Lanka. Bespoke festive couture with island-wide delivery.`,
+  };
 
   const rawProducts = allProducts.filter((p) =>
     p.categories.some((c) =>
@@ -56,6 +162,11 @@ export default function CollectionDetail() {
   const [selectedSize, setSelectedSize] = useState<string>('all');
   const [priceMax, setPriceMax] = useState<number>(50000);
   const [filterDrawerOpen, setFilterDrawerOpen] = useState(false);
+  const [openFaq, setOpenFaq] = useState<number | null>(null);
+
+  const activeFaqs = useMemo(() => {
+    return CATEGORY_FAQS[cleanSlug] || DEFAULT_COLLECTION_FAQS;
+  }, [cleanSlug]);
 
   // Available sizes in this collection
   const availableSizes = useMemo(() => {
@@ -138,9 +249,9 @@ export default function CollectionDetail() {
       {
         '@context': 'https://schema.org',
         '@type': 'CollectionPage',
-        name: `${collection.name} Collection — Azhai Clothing`,
-        description: collection.description,
-        url: `https://azhaiclothing.lk/collections/${collection.slug}`,
+        name: `${categorySeo.title} — Azhai Clothing Colombo`,
+        description: categorySeo.description,
+        url: `https://azhaiclothing.lk/collections/${collection.slug || cleanSlug}`,
         image: collection.heroImage,
         mainEntity: {
           '@type': 'ItemList',
@@ -152,8 +263,20 @@ export default function CollectionDetail() {
           })),
         },
       },
+      {
+        '@context': 'https://schema.org',
+        '@type': 'FAQPage',
+        mainEntity: activeFaqs.map((faq) => ({
+          '@type': 'Question',
+          name: faq.q,
+          acceptedAnswer: {
+            '@type': 'Answer',
+            text: faq.a,
+          },
+        })),
+      },
     ];
-  }, [collection, rawProducts]);
+  }, [collection, rawProducts, categorySeo, cleanSlug, activeFaqs]);
 
   if (!collection) {
     return (
@@ -191,8 +314,8 @@ export default function CollectionDetail() {
   return (
     <div className="min-h-screen bg-[#FCFBF8] pt-32 sm:pt-36 text-[#110B0E]">
       <SEOHead
-        title={`${collection.name} Collection — Handcrafted Silk Couture`}
-        description={collection.description || `Discover Azhai's handcrafted ${collection.name} collection in Colombo, Sri Lanka.`}
+        title={categorySeo.title}
+        description={categorySeo.description}
         image={collection.heroImage}
         canonicalUrl={`https://azhaiclothing.lk/collections/${collection.slug || cleanSlug}`}
         url={`https://azhaiclothing.lk/collections/${collection.slug || cleanSlug}`}
@@ -476,6 +599,69 @@ export default function CollectionDetail() {
               Reset Filters
             </button>
           </div>
+        )}
+
+        {/* Collection-Specific Editorial FAQs & Buying Guide */}
+        {activeFaqs && activeFaqs.length > 0 && (
+          <section className="mt-20 pt-16 border-t border-[#C5A059]/30 max-w-4xl mx-auto">
+            <div className="text-center space-y-2 mb-10">
+              <div className="inline-flex items-center gap-2 text-[#701626] text-xs font-bold uppercase tracking-[0.25em]">
+                <HelpCircle className="w-4 h-4 text-[#C5A059]" />
+                <span>Buyer Guidance &amp; Sizing</span>
+              </div>
+              <h2 className="font-display text-2xl sm:text-4xl font-bold text-[#110B0E]">
+                {collection.name} FAQs
+              </h2>
+              <p className="text-xs sm:text-sm text-[#6D6268] font-light max-w-lg mx-auto leading-relaxed">
+                Important details regarding fabrics, custom tailoring options, sizing, and delivery for our {collection.name.toLowerCase()} collection.
+              </p>
+            </div>
+
+            <div className="space-y-3">
+              {activeFaqs.map((faq, idx) => {
+                const isOpen = openFaq === idx;
+                return (
+                  <div
+                    key={idx}
+                    className="rounded-2xl bg-white border border-[#C5A059]/30 overflow-hidden shadow-xs transition-all duration-300"
+                  >
+                    <button
+                      type="button"
+                      onClick={() => setOpenFaq(isOpen ? null : idx)}
+                      className="w-full text-left p-5 sm:p-6 flex items-center justify-between gap-4 cursor-pointer hover:bg-[#F7F4EE]/50 transition-colors"
+                    >
+                      <span className="font-display text-base sm:text-lg font-bold text-[#110B0E] flex items-center gap-3">
+                        <span className="w-6 h-6 rounded-full bg-[#701626]/8 text-[#701626] text-xs flex items-center justify-center font-bold shrink-0">
+                          {idx + 1}
+                        </span>
+                        {faq.q}
+                      </span>
+                      <ChevronDown
+                        className={`w-4 h-4 text-[#C5A059] shrink-0 transition-transform duration-300 ${
+                          isOpen ? 'rotate-180' : ''
+                        }`}
+                      />
+                    </button>
+                    <AnimatePresence>
+                      {isOpen && (
+                        <motion.div
+                          initial={{ opacity: 0, height: 0 }}
+                          animate={{ opacity: 1, height: 'auto' }}
+                          exit={{ opacity: 0, height: 0 }}
+                          transition={{ duration: 0.3 }}
+                          className="overflow-hidden"
+                        >
+                          <p className="px-5 sm:px-6 pb-6 pt-1 text-xs sm:text-sm text-[#6D6268] font-light leading-relaxed border-t border-[#C5A059]/15 pl-14">
+                            {faq.a}
+                          </p>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
+                );
+              })}
+            </div>
+          </section>
         )}
       </div>
     </div>

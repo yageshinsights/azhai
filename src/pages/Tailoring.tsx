@@ -6,41 +6,78 @@ import BlouseCustomizer from '@/components/BlouseCustomizer';
 import { LiyawelDivider } from '@/components/CulturalPatterns';
 import SEOHead from '@/components/SEOHead';
 
+const TAILORING_FAQS = [
+  {
+    q: 'How does the fabric + stitching bundle pricing work?',
+    a: 'You choose your fabric from our inventory and your preferred dress type. Your total price is the sum of the fabric cost plus the master tailoring fee (e.g. Silk Fabric LKR 4,200 + Stitching Fee LKR 3,500 = Total LKR 7,700).',
+  },
+  {
+    q: 'Can I request custom sleeve or neckline alterations?',
+    a: 'Yes! In Step 3, you can choose "Custom Bespoke Tailor" to specify exact sleeve lengths, bust, waist, and back neck depths. You can also write specific styling notes during checkout.',
+  },
+  {
+    q: 'What if the garment needs a minor adjustment after delivery?',
+    a: 'All our tailored garments include a 1.5-inch inner seam margin for easy future adjustments, and our boutique offers complimentary tailoring adjustments promptly upon delivery.',
+  },
+  {
+    q: 'How long does custom stitching take?',
+    a: 'Standard tailoring takes 4 to 7 working days before dispatch. Once stitched, we notify you via SMS/WhatsApp with live courier tracking.',
+  },
+  {
+    q: 'Do you offer custom saree blouse stitching with lining?',
+    a: 'Yes! Our Colombo atelier crafts designer saree blouses with premium cotton or raw silk linings, built-in pads (cups) on request, and signature boat neck, sweetheart, or deep-back necklines.',
+  },
+];
+
 export default function Tailoring() {
   const [activeMode, setActiveMode] = useState<'apparel' | 'blouse'>('apparel');
 
-  const tailoringSchema = useMemo(() => ({
-    '@context': 'https://schema.org',
-    '@type': 'Service',
-    serviceType: 'Bespoke Custom Tailoring & Saree Blouse Crafting',
-    provider: {
-      '@type': 'ClothingStore',
-      name: 'Azhai Clothing by Preethi',
-      url: 'https://azhaiclothing.lk',
-      address: {
-        '@type': 'PostalAddress',
-        addressLocality: 'Colombo',
-        addressCountry: 'LK',
+  const tailoringSchema = useMemo(() => [
+    {
+      '@context': 'https://schema.org',
+      '@type': 'Service',
+      serviceType: 'Bespoke Saree Blouse Tailoring & Custom Ethnic Couture',
+      provider: {
+        '@type': 'ClothingStore',
+        name: 'Azhai Clothing by Preethi',
+        url: 'https://azhaiclothing.lk',
+        address: {
+          '@type': 'PostalAddress',
+          addressLocality: 'Colombo',
+          addressCountry: 'LK',
+        },
+      },
+      areaServed: {
+        '@type': 'Country',
+        name: 'Sri Lanka',
+      },
+      description: 'Custom bespoke saree blouse stitching, made-to-measure handloom kurti sets, interactive 2D neckline customizer, and personalized measurements in Colombo, Sri Lanka.',
+      offers: {
+        '@type': 'Offer',
+        priceCurrency: 'LKR',
+        price: '4500',
+        priceValidUntil: '2027-12-31',
       },
     },
-    areaServed: {
-      '@type': 'Country',
-      name: 'Sri Lanka',
+    {
+      '@context': 'https://schema.org',
+      '@type': 'FAQPage',
+      mainEntity: TAILORING_FAQS.map((faq) => ({
+        '@type': 'Question',
+        name: faq.q,
+        acceptedAnswer: {
+          '@type': 'Answer',
+          text: faq.a,
+        },
+      })),
     },
-    description: 'Custom bespoke handloom kurti sets, tailored saree blouses, 2D neckline customizer, and personalized measurements in Colombo, Sri Lanka.',
-    offers: {
-      '@type': 'Offer',
-      priceCurrency: 'LKR',
-      price: '4500',
-      priceValidUntil: '2027-12-31',
-    },
-  }), []);
+  ], []);
 
   return (
     <div className="min-h-screen bg-[#FCFBF8] pt-32 sm:pt-36 xl:pt-40 pb-32 sm:pb-24">
       <SEOHead
-        title="Custom Tailoring Studio & 2D Saree Blouse Customizer"
-        description="Design your custom saree blouse or bespoke handloom outfit with Azhai. Real-time 2D neckline & sleeve customizer, fitting vault, and express island-wide delivery."
+        title="Saree Blouse Tailoring & Custom Atelier Colombo"
+        description="Design your bespoke saree blouse or custom kurti outfit with Azhai Colombo. Interactive 2D neckline customizer, fitting guarantee, and express island-wide delivery."
         canonicalUrl="https://azhaiclothing.lk/tailoring"
         url="https://azhaiclothing.lk/tailoring"
         schema={tailoringSchema}
@@ -65,7 +102,7 @@ export default function Tailoring() {
           transition={{ delay: 0.1 }}
           className="font-display text-4xl sm:text-6xl font-bold text-[#110B0E] tracking-tight"
         >
-          Custom Tailoring Studio
+          Custom Tailoring Studio &amp; Saree Blouse Atelier
         </motion.h1>
 
         <motion.p
@@ -74,7 +111,7 @@ export default function Tailoring() {
           transition={{ delay: 0.2 }}
           className="text-xs sm:text-base text-[#6D6268] max-w-2xl mx-auto font-light leading-relaxed"
         >
-          Handcrafted luxury apparel tailored exactly to your unique silhouette. Choose your silhouette, select your premium handloom or silk fabric, and configure your bespoke fit.
+          Handcrafted luxury apparel and custom saree blouses tailored exactly to your unique silhouette in Colombo, Sri Lanka. Choose your silhouette, select premium handloom or pure silk, configure custom neckline cuts, and enjoy our perfect fit guarantee with express island-wide delivery.
         </motion.p>
 
         {/* ── ATELIER MODE TOGGLE BAR ── */}
@@ -183,30 +220,13 @@ export default function Tailoring() {
           <span className="text-[10px] uppercase tracking-[0.25em] text-[#701626] font-bold">
             Frequently Asked Questions
           </span>
-          <h3 className="font-display text-2xl sm:text-3xl font-bold text-[#110B0E]">
-            How Bespoke Tailoring Works
-          </h3>
+          <h2 className="font-display text-2xl sm:text-3xl font-bold text-[#110B0E]">
+            How Bespoke Tailoring &amp; Blouse Stitching Works
+          </h2>
         </div>
 
         <div className="space-y-3">
-          {[
-            {
-              q: 'How does the fabric + stitching bundle pricing work?',
-              a: 'You choose your fabric from our inventory and your preferred dress type. Your total price is the sum of the fabric cost plus the master tailoring fee (e.g. Silk Fabric LKR 4,200 + Stitching Fee LKR 3,500 = Total LKR 7,700).',
-            },
-            {
-              q: 'Can I request custom sleeve or neckline alterations?',
-              a: 'Yes! In Step 3, you can choose "Custom Bespoke Tailor" to specify exact sleeve lengths, bust, waist, and back neck depths. You can also write specific styling notes during checkout.',
-            },
-            {
-              q: 'What if the garment needs a minor adjustment after delivery?',
-              a: 'All our tailored garments include a 1.5-inch inner seam margin for easy future adjustments, and our boutique offers complimentary tailoring adjustments promptly upon delivery.',
-            },
-            {
-              q: 'How long does custom stitching take?',
-              a: 'Standard tailoring takes 4 to 7 working days before dispatch. Once stitched, we notify you via SMS/WhatsApp with live courier tracking.',
-            },
-          ].map((faq, idx) => (
+          {TAILORING_FAQS.map((faq, idx) => (
             <div key={idx} className="p-5 rounded-2xl bg-white border border-[#C5A059]/30 shadow-xs space-y-1.5">
               <h4 className="font-bold text-sm text-[#110B0E] flex items-center gap-2">
                 <span className="w-5 h-5 rounded-full bg-[#701626]/10 text-[#701626] text-xs flex items-center justify-center font-bold">

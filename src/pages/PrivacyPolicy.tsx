@@ -107,7 +107,7 @@ export default function PrivacyPolicy() {
             <div className="p-4 rounded-2xl bg-[#F7F4EE] border border-[#C5A059]/30 space-y-1 font-mono text-[11px] text-[#110B0E]">
               <p>Email: {activeEmail}</p>
               <p>Hotline: {formatPhoneNumber(activePhone)}</p>
-              <p>Atelier Showroom: {activeAddress}</p>
+              <p>Atelier Address: {activeAddress}</p>
             </div>
           </div>
         </div>

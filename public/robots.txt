@@ -10,6 +10,7 @@ Allow: /contact
 Allow: /shipping-policy
 Allow: /returns-exchanges
 Allow: /privacy-policy
+Allow: /terms
 
 # Disallow Private & Transactional Pages
 Disallow: /admin

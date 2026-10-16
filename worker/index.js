@@ -1269,7 +1269,7 @@ export default {
           const supabaseUrl = env.VITE_SUPABASE_URL || 'https://hrmcxxcrnxqhesiywqsc.supabase.co';
           const supabaseKey = env.VITE_SUPABASE_ANON_KEY || 'sb_publishable_-ZSOc4XGHM2OysLhqKZ5yQ_4OPgdcAm';
           const sbRes = await fetch(
-            `${supabaseUrl}/rest/v1/products?slug=eq.${encodeURIComponent(slug)}&select=name,price,description,short_description,images`,
+            `${supabaseUrl}/rest/v1/products?slug=eq.${encodeURIComponent(slug)}&select=id,name,price,description,short_description,images,in_stock`,
             {
               headers: {
                 apikey: supabaseKey,
@@ -1288,6 +1288,9 @@ export default {
                 ? (typeof product.images[0] === 'string' ? product.images[0] : product.images[0].src)
                 : `${url.origin}/og-azhai.jpg`;
               const ogUrl = `${url.origin}/products/${slug}`;
+              const catalogId = `azhai_${product.id || slug}`;
+              const priceNum = String(product.price || '').replace(/[^0-9]/g, '') || '0';
+              const availability = product.in_stock === false ? 'out of stock' : 'in stock';
 
               return new HTMLRewriter()
                 .on('title', { element(e) { e.setInnerContent(ogTitle); } })
@@ -1299,6 +1302,16 @@ export default {
                 .on('meta[name="twitter:description"]', { element(e) { e.setAttribute('content', ogDesc); } })
                 .on('meta[name="twitter:image"]', { element(e) { e.setAttribute('content', firstImg); } })
                 .on('meta[name="description"]', { element(e) { e.setAttribute('content', ogDesc); } })
+                .on('head', {
+                  element(e) {
+                    e.append(`<meta property="product:retailer_item_id" content="${catalogId}" />`, { html: true });
+                    e.append(`<meta property="product:price:amount" content="${priceNum}.00" />`, { html: true });
+                    e.append(`<meta property="product:price:currency" content="LKR" />`, { html: true });
+                    e.append(`<meta property="product:availability" content="${availability}" />`, { html: true });
+                    e.append(`<meta property="product:condition" content="new" />`, { html: true });
+                    e.append(`<meta property="product:brand" content="Azhai Clothing" />`, { html: true });
+                  }
+                })
                 .transform(res);
             }
           }
@@ -1332,10 +1345,28 @@ export default {
               return cSlug === cleanSlug || cName === cleanSlug;
             });
 
-            if (collection) {
-              const res = await env.ASSETS.fetch(request);
-              const ogTitle = `${collection.name} Collection | Azhai Clothing by Preethi`;
-              const ogDesc = collection.description || `Explore our handcrafted ${collection.name} collection at Azhai Clothing. Heirloom silk and festive couture.`;
+              const categorySeoOverrides = {
+                kurties: {
+                  title: 'Silk Kurti Sets Sri Lanka — Handloom & Festive | Azhai',
+                  desc: 'Shop handcrafted silk kurti sets online in Sri Lanka. Tailored with pure mulberry silk, breathable handloom weaves, and matching pants. Colombo dispatch.',
+                },
+                sarees: {
+                  title: 'Organza & Handloom Sarees Sri Lanka — Festive | Azhai',
+                  desc: 'Discover ethereal hand-painted lotus organza sarees and traditional handloom silks in Colombo. Weightless celebratory drapes with island-wide shipping.',
+                },
+                anarkali: {
+                  title: 'Anarkali Suits & Flared Gowns Sri Lanka | Azhai Colombo',
+                  desc: 'Buy luxury Anarkali dresses online in Sri Lanka. Flared pure chiffon and mulberry silk gowns with handcrafted details. Express delivery across Colombo.',
+                },
+                'cord-sets': {
+                  title: 'Co Ord Sets Sri Lanka — Minimal Linen & Silk | Azhai',
+                  desc: 'Shop stylish women’s co-ord sets online in Colombo. Breathable linen blends, minimal silhouettes, and pockets designed for modern Sri Lankan comfort.',
+                },
+              };
+
+              const seoOverride = categorySeoOverrides[cleanSlug];
+              const ogTitle = seoOverride ? seoOverride.title : `${collection.name} Collection | Azhai Clothing by Preethi`;
+              const ogDesc = seoOverride ? seoOverride.desc : (collection.description || `Explore our handcrafted ${collection.name} collection at Azhai Clothing. Heirloom silk and festive couture.`);
               const ogImg = collection.hero_image || `${url.origin}/og-azhai.jpg`;
               const ogUrl = `${url.origin}/collections/${collection.slug || cleanSlug}`;
 

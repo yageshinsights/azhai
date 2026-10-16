@@ -17,10 +17,29 @@ declare global {
   interface Window {
     dataLayer?: Record<string, unknown>[];
     google_tag_manager?: Record<string, unknown>;
+    fbq?: ((...args: any[]) => void) & {
+      callMethod?: (...args: any[]) => void;
+      queue?: any[];
+      loaded?: boolean;
+      version?: string;
+    };
+    _fbq?: unknown;
   }
 }
 
 export const DEFAULT_GTM_ID = 'GTM-5JFH9Q8R';
+export const DEFAULT_META_PIXEL_ID = '2535266683895942';
+
+/**
+ * Ensures ID format strictly matches the Meta & Google Catalog feed item ID:
+ * e.g., '10' -> 'azhai_10', 'azhai_10' -> 'azhai_10'
+ */
+export function toCatalogId(id?: string | number): string {
+  const strId = String(id ?? '').trim();
+  if (!strId) return 'azhai_0';
+  if (strId.startsWith('azhai_')) return strId;
+  return `azhai_${strId}`;
+}
 
 export function isLocalhost(): boolean {
   if (typeof window === 'undefined') return false;
@@ -37,6 +56,25 @@ export function parsePriceNumber(priceStr?: string | number): number {
   const cleaned = String(priceStr).replace(/[^0-9.]/g, '');
   return parseFloat(cleaned) || 0;
 }
+
+/**
+ * Low-level dispatch to Meta (Facebook) Pixel fbq
+ */
+export function trackMetaEvent(event: string, params: Record<string, any> = {}): void {
+  if (typeof window === 'undefined') return;
+  if (isLocalhost() || import.meta.env.DEV) {
+    console.debug(`[Meta Pixel Dev Log]: ${event}`, params);
+    return;
+  }
+  if (typeof window.fbq === 'function') {
+    try {
+      window.fbq('track', event, params);
+    } catch (err) {
+      console.warn(`[Meta Pixel] Error tracking ${event}:`, err);
+    }
+  }
+}
+
 
 /**
  * Initializes Google Tag Manager in <head> and <body>.
@@ -131,10 +169,12 @@ export function trackPageView(pagePath: string, pageTitle?: string): void {
     page_title: pageTitle || (typeof document !== 'undefined' ? document.title : ''),
     page_location: typeof window !== 'undefined' ? window.location.href : '',
   });
+  trackMetaEvent('PageView');
 }
 
 /**
  * Track Product Impression / ViewContent
+ * Parameterized to guarantee 100% Catalog Match Rate with Meta Commerce Manager
  */
 export function trackViewItem(product: {
   id: string | number;
@@ -144,7 +184,8 @@ export function trackViewItem(product: {
 }): void {
   if (typeof window === 'undefined') return;
   const numPrice = parsePriceNumber(product.price);
-  const primaryCategory = product.categories?.[0]?.name || 'Traditional & Ceremonial';
+  const primaryCategory = product.categories?.[0]?.name || 'Traditional & Ceremonial Clothing';
+  const catalogId = toCatalogId(product.id);
 
   window.dataLayer = window.dataLayer || [];
   window.dataLayer.push({ ecommerce: null }); // Clear previous ecommerce object per GA4 spec
@@ -155,7 +196,7 @@ export function trackViewItem(product: {
       value: numPrice,
       items: [
         {
-          item_id: `azhai_${product.id}`,
+          item_id: catalogId,
           item_name: product.name,
           price: numPrice,
           item_category: primaryCategory,
@@ -163,6 +204,23 @@ export function trackViewItem(product: {
         },
       ],
     },
+  });
+
+  // Direct Meta Pixel ViewContent event with matching catalog content_ids & contents
+  trackMetaEvent('ViewContent', {
+    content_ids: [catalogId],
+    contents: [
+      {
+        id: catalogId,
+        quantity: 1,
+        item_price: numPrice,
+      },
+    ],
+    content_type: 'product',
+    content_name: product.name,
+    content_category: primaryCategory,
+    value: numPrice,
+    currency: 'LKR',
   });
 }
 
@@ -182,7 +240,7 @@ export function trackViewItemList(categoryName: string, products: Array<{
     ecommerce: {
       item_list_name: categoryName,
       items: products.slice(0, 20).map((p, idx) => ({
-        item_id: `azhai_${p.id}`,
+        item_id: toCatalogId(p.id),
         item_name: p.name,
         price: parsePriceNumber(p.price),
         item_category: categoryName,
@@ -190,10 +248,18 @@ export function trackViewItemList(categoryName: string, products: Array<{
       })),
     },
   });
+
+  // Meta Pixel Category view
+  trackMetaEvent('ViewCategory', {
+    content_category: categoryName,
+    content_ids: products.slice(0, 10).map((p) => toCatalogId(p.id)),
+    content_type: 'product',
+  });
 }
 
 /**
- * Track Add to Cart (Standard Product & Bespoke Tailored Pieces)
+ * Track Add to Cart (Standard Product, Bundle & Bespoke Tailored Pieces)
+ * Guaranteed Catalog ID match for Meta Catalog
  */
 export function trackAddToCart(item: {
   id: string | number;
@@ -206,6 +272,7 @@ export function trackAddToCart(item: {
   if (typeof window === 'undefined') return;
   const numPrice = parsePriceNumber(item.price);
   const qty = item.quantity || 1;
+  const catalogId = toCatalogId(item.id);
 
   window.dataLayer = window.dataLayer || [];
   window.dataLayer.push({ ecommerce: null });
@@ -216,15 +283,32 @@ export function trackAddToCart(item: {
       value: numPrice * qty,
       items: [
         {
-          item_id: `azhai_${item.id}`,
+          item_id: catalogId,
           item_name: item.name,
           price: numPrice,
-          item_category: item.category || 'Traditional & Ceremonial',
+          item_category: item.category || 'Traditional & Ceremonial Clothing',
           item_variant: item.size || 'M',
           quantity: qty,
         },
       ],
     },
+  });
+
+  // Direct Meta Pixel AddToCart event
+  trackMetaEvent('AddToCart', {
+    content_ids: [catalogId],
+    contents: [
+      {
+        id: catalogId,
+        quantity: qty,
+        item_price: numPrice,
+      },
+    ],
+    content_type: 'product',
+    content_name: item.name,
+    content_category: item.category || 'Traditional & Ceremonial Clothing',
+    value: numPrice * qty,
+    currency: 'LKR',
   });
 }
 
@@ -241,6 +325,7 @@ export function trackRemoveFromCart(item: {
   if (typeof window === 'undefined') return;
   const numPrice = parsePriceNumber(item.price);
   const qty = item.quantity || 1;
+  const catalogId = toCatalogId(item.id);
 
   window.dataLayer = window.dataLayer || [];
   window.dataLayer.push({ ecommerce: null });
@@ -251,7 +336,7 @@ export function trackRemoveFromCart(item: {
       value: numPrice * qty,
       items: [
         {
-          item_id: `azhai_${item.id}`,
+          item_id: catalogId,
           item_name: item.name,
           price: numPrice,
           item_variant: item.size,
@@ -271,6 +356,8 @@ export function trackBeginCheckout(
   couponCode?: string
 ): void {
   if (typeof window === 'undefined') return;
+  const catalogIds = items.map((i) => toCatalogId(i.id));
+
   window.dataLayer = window.dataLayer || [];
   window.dataLayer.push({ ecommerce: null });
   window.dataLayer.push({
@@ -280,7 +367,7 @@ export function trackBeginCheckout(
       value: totalValue,
       coupon: couponCode || undefined,
       items: items.map((i) => ({
-        item_id: `azhai_${i.id}`,
+        item_id: toCatalogId(i.id),
         item_name: i.name,
         price: parsePriceNumber(i.price),
         item_variant: i.size,
@@ -288,10 +375,25 @@ export function trackBeginCheckout(
       })),
     },
   });
+
+  // Direct Meta Pixel InitiateCheckout event
+  trackMetaEvent('InitiateCheckout', {
+    content_ids: catalogIds,
+    contents: items.map((i) => ({
+      id: toCatalogId(i.id),
+      quantity: i.quantity || 1,
+      item_price: parsePriceNumber(i.price),
+    })),
+    content_type: 'product',
+    value: totalValue,
+    currency: 'LKR',
+    num_items: items.reduce((sum, i) => sum + (i.quantity || 1), 0),
+  });
 }
 
 /**
  * Track Purchase (Meta & GA4 Revenue Event)
+ * Guaranteed Catalog ID match for Meta Catalog ROAS
  */
 export function trackPurchase(order: {
   id: string;
@@ -310,26 +412,43 @@ export function trackPurchase(order: {
   }
   sessionStorage.setItem(dedupeKey, 'true');
 
+  const catalogIds = order.items.map((i) => toCatalogId(i.id || i.name));
+  const totalVal = Number(order.total) || 0;
+
   window.dataLayer = window.dataLayer || [];
   window.dataLayer.push({ ecommerce: null });
   window.dataLayer.push({
     event: 'purchase',
     ecommerce: {
       transaction_id: order.id,
-      value: Number(order.total) || 0,
+      value: totalVal,
       currency: 'LKR',
       tax: 0,
       shipping: Number(order.shippingFee) || 0,
       coupon: order.couponCode || undefined,
       payment_type: order.paymentMethod || 'Online',
       items: order.items.map((i) => ({
-        item_id: `azhai_${i.id || i.name}`,
+        item_id: toCatalogId(i.id || i.name),
         item_name: i.name,
         price: parsePriceNumber(i.price),
         item_variant: i.size,
         quantity: i.quantity || 1,
       })),
     },
+  });
+
+  // Direct Meta Pixel Purchase event with catalog content_ids & contents
+  trackMetaEvent('Purchase', {
+    content_ids: catalogIds,
+    contents: order.items.map((i) => ({
+      id: toCatalogId(i.id || i.name),
+      quantity: i.quantity || 1,
+      item_price: parsePriceNumber(i.price),
+    })),
+    content_type: 'product',
+    value: totalVal,
+    currency: 'LKR',
+    num_items: order.items.reduce((sum, i) => sum + (i.quantity || 1), 0),
   });
 }
 
@@ -341,5 +460,10 @@ export function trackWhatsAppClick(source: string, productTitle?: string): void 
     method: 'whatsapp',
     source,
     product_name: productTitle || undefined,
+  });
+
+  trackMetaEvent('Contact', {
+    content_name: productTitle || source,
+    content_category: 'WhatsApp Concierge',
   });
 }

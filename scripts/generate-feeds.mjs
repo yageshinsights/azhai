@@ -155,7 +155,7 @@ async function main() {
     { loc: '/shipping-policy', priority: '0.5', changefreq: 'monthly' },
     { loc: '/returns-exchanges', priority: '0.5', changefreq: 'monthly' },
     { loc: '/privacy-policy', priority: '0.4', changefreq: 'monthly' },
-    { loc: '/terms-and-conditions', priority: '0.4', changefreq: 'monthly' },
+    { loc: '/terms', priority: '0.4', changefreq: 'monthly' },
   ];
 
   let sitemapXml = `<?xml version="1.0" encoding="UTF-8"?>

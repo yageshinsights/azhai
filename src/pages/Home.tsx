@@ -10,8 +10,33 @@ import {
   Crown, 
   ChevronLeft, 
   ChevronRight, 
-  Layers 
+  Layers,
+  ChevronDown,
+  HelpCircle
 } from 'lucide-react';
+
+const HOME_FAQS = [
+  {
+    q: "What defines Azhai's designer ethnic wear and handloom silks?",
+    a: "Azhai Clothing by Preethi brings bespoke luxury and breathable comfort together. Every piece is handcrafted from pure mulberry silks, handloom weaves, and tissue organzas tailored specifically for tropical climates and celebratory elegance in Sri Lanka.",
+  },
+  {
+    q: "Do you offer bespoke custom tailoring and made-to-measure sizing?",
+    a: "Yes. In our Colombo atelier, you can order standard boutique sizing (XS to XXL) or commission custom bespoke measurements. Our interactive 2D blouse studio allows you to configure personalized neckline depths, sleeve lengths, and bust fit with a generous 1.5-inch alteration margin.",
+  },
+  {
+    q: "How does island-wide delivery and courier shipping work across Sri Lanka?",
+    a: "We offer express 1–2 day dispatch within Colombo and 2–4 working days island-wide via registered courier service with real-time SMS tracking. We accept secure online payments via PayHere, bank deposits, and Cash on Delivery (COD) for ready-to-wear pieces.",
+  },
+  {
+    q: "Can I consult with Preethi or the atelier team for wedding guest or bridal styling?",
+    a: "Absolutely. Our atelier concierge provides personalized styling guidance via WhatsApp. Whether coordinating bridesmaid ensembles, festive Diwali or wedding guest couture, or custom sizing advice, our team is delighted to assist you.",
+  },
+  {
+    q: "Does Azhai have a physical showroom, or can I order online?",
+    a: "Azhai Clothing is an exclusive online boutique and design atelier based in Colombo, Sri Lanka. We operate entirely online with express island-wide delivery across Sri Lanka. While we do not operate a walk-in physical showroom, our atelier team and Preethi provide one-on-one styling guidance, fabric previews, and bespoke sizing assistance directly via our WhatsApp concierge.",
+  },
+];
 import ProductCard from '@/components/ProductCard';
 import TailoringStudio from '@/components/TailoringStudio';
 import StyleQuiz from '@/components/StyleQuiz';
@@ -22,11 +47,19 @@ import RecentlyViewed from '@/components/RecentlyViewed';
 import { useRecentlyViewed } from '@/hooks/useRecentlyViewed';
 import { PRODUCTS, COLLECTIONS, type Collection } from '@/lib/data';
 import { useAdminStore } from '@/store/admin';
-import { normalizeCategorySlug } from '@/lib/constants';
+import { 
+  normalizeCategorySlug, 
+  STORE_INSTAGRAM_URL, 
+  STORE_FACEBOOK_URL, 
+  STORE_TIKTOK_URL, 
+  STORE_PHONE, 
+  STORE_ADDRESS_FULL 
+} from '@/lib/constants';
 
 export default function Home() {
   const storeProducts = useAdminStore((s) => s.products);
   const storeCategories = useAdminStore((s) => s.categories);
+  const settings = useAdminStore((s) => s.settings);
   const recentlyViewed = useRecentlyViewed();
 
   const allProducts = Array.isArray(storeProducts) ? storeProducts : PRODUCTS;
@@ -56,6 +89,7 @@ export default function Home() {
   const [activeSlide, setActiveSlide] = useState(0);
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [direction, setDirection] = useState(1);
+  const [openFaq, setOpenFaq] = useState<number | null>(null);
   const isHovered = useRef(false);
   const touchStartX = useRef<number | null>(null);
 
@@ -106,34 +140,76 @@ export default function Home() {
     return p.categories.some((c) => c.slug === selectedCategory);
   });
 
-  const organizationSchema = useMemo(() => ({
-    '@context': 'https://schema.org',
-    '@type': 'ClothingStore',
-    name: 'Azhai Clothing by Preethi',
-    url: 'https://azhaiclothing.lk',
-    logo: 'https://azhaiclothing.lk/logo-light.png',
-    description: 'Bespoke handloom kurti sets, lotus organza sarees, and tailored festive couture. Colombo, Sri Lanka.',
-    address: {
-      '@type': 'PostalAddress',
-      addressLocality: 'Colombo',
-      addressRegion: 'Western Province',
-      addressCountry: 'LK',
-    },
-    priceRange: 'LKR 8,500 - 32,000',
-  }), []);
+  const homeSchemas = useMemo(() => {
+    const instagramUrl = settings?.socialLinks?.instagram || STORE_INSTAGRAM_URL;
+    const facebookUrl = settings?.socialLinks?.facebook || STORE_FACEBOOK_URL;
+    const tiktokUrl = settings?.socialLinks?.tiktok || STORE_TIKTOK_URL;
+    const activePhone = settings?.phoneNumber || STORE_PHONE;
+    const activeAddress = settings?.atelierAddress || STORE_ADDRESS_FULL;
+
+    const socialUrls = [instagramUrl, facebookUrl, tiktokUrl].filter(Boolean);
+
+    return [
+      {
+        '@context': 'https://schema.org',
+        '@type': 'ClothingStore',
+        name: 'Azhai Clothing by Preethi',
+        url: 'https://azhaiclothing.lk',
+        logo: 'https://azhaiclothing.lk/logo-light.png',
+        image: 'https://azhaiclothing.lk/og-azhai.jpg',
+        description: 'Bespoke handloom kurti sets, lotus organza sarees, and tailored festive couture. Colombo, Sri Lanka.',
+        telephone: activePhone,
+        address: {
+          '@type': 'PostalAddress',
+          streetAddress: activeAddress,
+          addressLocality: 'Colombo',
+          addressRegion: 'Western Province',
+          addressCountry: 'LK',
+        },
+        priceRange: 'LKR 8,500 - 32,000',
+        sameAs: socialUrls,
+      },
+      {
+        '@context': 'https://schema.org',
+        '@type': 'WebSite',
+        name: 'Azhai Clothing',
+        url: 'https://azhaiclothing.lk',
+        potentialAction: {
+          '@type': 'SearchAction',
+          target: {
+            '@type': 'EntryPoint',
+            urlTemplate: 'https://azhaiclothing.lk/collections?q={search_term_string}',
+          },
+          'query-input': 'required name=search_term_string',
+        },
+      },
+      {
+        '@context': 'https://schema.org',
+        '@type': 'FAQPage',
+        mainEntity: HOME_FAQS.map((faq) => ({
+          '@type': 'Question',
+          name: faq.q,
+          acceptedAnswer: {
+            '@type': 'Answer',
+            text: faq.a,
+          },
+        })),
+      },
+    ];
+  }, [settings]);
 
   return (
     <div className="min-h-screen bg-[#FCFBF8] text-[#110B0E]">
       <SEOHead
-        title="Handcrafted Sri Lankan Festive Couture & Handloom Silks"
-        description="Discover tailored corset handloom kurti sets, hand-painted lotus organza sarees, and bespoke Sri Lankan couture by Preethi."
+        title="Designer Ethnic Wear & Festive Couture Sri Lanka"
+        description="Explore Azhai by Preethi: Colombo’s premier luxury boutique for designer ethnic wear, handcrafted festive silk couture, organza sarees, and bespoke tailoring."
         canonicalUrl="https://azhaiclothing.lk"
-        schema={organizationSchema}
+        schema={homeSchemas}
       />
       
       {/* Permanent Brand Semantic H1 for SEO Crawlers */}
       <h1 className="sr-only">
-        Azhai Clothing Colombo — Handcrafted Festive Silk Kurties, Sarees &amp; Bespoke Sri Lankan Couture by Preethi
+        Azhai Clothing Colombo — Designer Ethnic Wear, Handcrafted Festive Silk Couture &amp; Bespoke Tailoring by Preethi
       </h1>
       
       {/* ── FIT-TO-SCREEN EDITORIAL CATEGORY HERO ── */}
@@ -334,13 +410,13 @@ export default function Home() {
         
         <div className="text-center space-y-2 mb-8">
           <span className="text-[10px] uppercase tracking-[0.3em] text-[#701626] font-bold">
-            Curated Catalog
+            Curated Colombo Atelier
           </span>
           <h2 className="font-display text-3xl sm:text-5xl font-bold text-[#110B0E]">
-            Shop All Pieces
+            Designer Ethnic Wear &amp; Silks
           </h2>
-          <p className="text-xs sm:text-sm text-[#6D6268] max-w-md mx-auto font-light leading-relaxed">
-            Thoughtfully designed with simple, graceful silhouettes to make you feel effortless and radiant.
+          <p className="text-xs sm:text-sm text-[#6D6268] max-w-lg mx-auto font-light leading-relaxed">
+            Thoughtfully handcrafted with pure mulberry silks, handloom weaves, and tailored cuts — designed for effortless celebratory radiance across Sri Lanka.
           </p>
         </div>
 
@@ -398,10 +474,10 @@ export default function Home() {
         <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-10">
           <div className="space-y-1">
             <span className="text-[10px] uppercase tracking-[0.3em] text-[#701626] font-bold">
-              Signature Silhouettes & Lookbooks
+              Signature Silhouettes &amp; Handlooms
             </span>
             <h2 className="font-display text-3xl sm:text-5xl font-bold text-[#110B0E]">
-              The Collections
+              Festive Silk Collections
             </h2>
           </div>
           <Link
@@ -545,6 +621,63 @@ export default function Home() {
               </div>
             </div>
           ))}
+        </div>
+      </section>
+
+      {/* ── ATELIER FAQ & CLIENT CARE ── */}
+      <section className="py-20 px-4 sm:px-8 max-w-4xl mx-auto relative z-10 border-t border-[#C5A059]/30">
+        <div className="text-center space-y-2 mb-10">
+          <div className="inline-flex items-center gap-2 text-[#701626] text-xs font-bold uppercase tracking-[0.25em]">
+            <HelpCircle className="w-4 h-4 text-[#C5A059]" />
+            <span>Atelier Care &amp; Guidance</span>
+          </div>
+          <h2 className="font-display text-3xl sm:text-5xl font-bold text-[#110B0E]">
+            Frequently Asked Questions
+          </h2>
+          <p className="text-xs sm:text-sm text-[#6D6268] font-light max-w-lg mx-auto leading-relaxed">
+            Everything you need to know about our handcrafted silks, bespoke sizing in Colombo, and island-wide delivery.
+          </p>
+        </div>
+
+        <div className="space-y-3">
+          {HOME_FAQS.map((faq, idx) => {
+            const isOpen = openFaq === idx;
+            return (
+              <div 
+                key={idx}
+                className="rounded-2xl bg-white border border-[#C5A059]/30 overflow-hidden shadow-xs transition-all duration-300"
+              >
+                <button
+                  type="button"
+                  onClick={() => setOpenFaq(isOpen ? null : idx)}
+                  className="w-full text-left p-5 sm:p-6 flex items-center justify-between gap-4 cursor-pointer hover:bg-[#F7F4EE]/50 transition-colors"
+                >
+                  <span className="font-display text-base sm:text-lg font-bold text-[#110B0E] flex items-center gap-3">
+                    <span className="w-6 h-6 rounded-full bg-[#701626]/8 text-[#701626] text-xs flex items-center justify-center font-bold shrink-0">
+                      {idx + 1}
+                    </span>
+                    {faq.q}
+                  </span>
+                  <ChevronDown className={`w-4 h-4 text-[#C5A059] shrink-0 transition-transform duration-300 ${isOpen ? 'rotate-180' : ''}`} />
+                </button>
+                <AnimatePresence>
+                  {isOpen && (
+                    <motion.div
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: 'auto' }}
+                      exit={{ opacity: 0, height: 0 }}
+                      transition={{ duration: 0.3 }}
+                      className="overflow-hidden"
+                    >
+                      <p className="px-5 sm:px-6 pb-6 pt-1 text-xs sm:text-sm text-[#6D6268] font-light leading-relaxed border-t border-[#C5A059]/15 pl-14">
+                        {faq.a}
+                      </p>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+            );
+          })}
         </div>
       </section>
 

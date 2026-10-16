@@ -167,7 +167,7 @@ export default function ReturnsExchanges() {
               <p>Email: {settings?.studio?.supportEmail || 'orders@azhaiclothing.lk'}</p>
               <p>Hotline: {formatPhoneNumber(settings?.phoneNumber || STORE_PHONE)}</p>
               <p>WhatsApp Concierge: {formatPhoneNumber(activeWhatsApp)}</p>
-              <p>Atelier Showroom: {settings?.atelierAddress || 'Colombo, Sri Lanka'}</p>
+              <p>Atelier Returns Hub: {settings?.atelierAddress || 'Colombo, Sri Lanka'}</p>
             </div>
           </div>
 

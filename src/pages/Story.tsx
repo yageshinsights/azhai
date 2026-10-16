@@ -49,8 +49,8 @@ export default function Story() {
   return (
     <div className="min-h-screen bg-[#FCFBF8] text-[#110B0E] selection:bg-[#701626] selection:text-white pt-28 sm:pt-32 pb-20">
       <SEOHead
-        title="The Story of Azhai — The Wave of Unbroken Elegance | By Preethi"
-        description="In Tamil, Azhai (அலை) means the ocean wave. From TV presenter to atelier founder, discover screen-tested couture, pure mulberry silks, and in-house bespoke tailoring in Colombo."
+        title="The Story of Azhai — Screen-Tested Silk Couture by Preethi"
+        description="In Tamil, Azhai means the ocean wave. Discover Preethi’s journey from TV screens to founder of Colombo’s premier handloom silk and bespoke tailoring atelier."
         canonicalUrl="https://azhaiclothing.lk/story"
         url="https://azhaiclothing.lk/story"
         schema={storySchema}

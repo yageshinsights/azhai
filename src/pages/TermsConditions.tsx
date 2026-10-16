@@ -129,7 +129,7 @@ export default function TermsConditions() {
               <p>Email: {activeEmail}</p>
               <p>Hotline: {formatPhoneNumber(activePhone)}</p>
               <p>WhatsApp Concierge: {formatPhoneNumber(activeWhatsApp)}</p>
-              <p>Showroom Address: {activeAddress}</p>
+              <p>Atelier Address: {activeAddress}</p>
             </div>
           </div>
 

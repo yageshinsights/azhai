@@ -214,7 +214,7 @@ export default function Footer() {
               </li>
               <li>
                 <Link to="/contact" className="text-xs text-[#6D6268] hover:text-[#701626] transition-colors font-medium">
-                  Contact & Showroom
+                  Contact & Concierge
                 </Link>
               </li>
             </ul>

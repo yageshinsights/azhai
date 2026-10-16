@@ -701,7 +701,7 @@ export default function AdminSettings() {
               <div className="space-y-1">
                 <label className="block text-xs font-bold text-[#110B0E] uppercase tracking-wider flex items-center gap-1.5">
                   <Clock className="w-3.5 h-3.5 text-[#701626]" />
-                  <span>Showroom Opening Hours</span>
+                  <span>Concierge & Support Hours</span>
                 </label>
                 <input
                   type="text"
