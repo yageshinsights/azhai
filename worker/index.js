@@ -1345,6 +1345,7 @@ export default {
               return cSlug === cleanSlug || cName === cleanSlug;
             });
 
+            if (collection) {
               const categorySeoOverrides = {
                 kurties: {
                   title: 'Silk Kurti Sets Sri Lanka — Handloom & Festive | Azhai',
